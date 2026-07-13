@@ -93,3 +93,17 @@ export const REVENUE_STATUS_LABELS: Record<string, string> = {
   PAID: "Ausgezahlt",
   REVERSED: "Storniert",
 };
+
+export const EXPENSE_CATEGORY_LABELS: Record<string, string> = {
+  TOOLS_SOFTWARE: "Tools & Software",
+  ADVERTISING: "Werbung",
+  AI_CREDITS: "KI-Credits",
+  VIDEO_PRODUCTION: "Videoproduktion",
+  STOCK_MEDIA: "Stock-Media",
+  SUBSCRIPTIONS: "Abonnements",
+  FREELANCE: "Freelancer",
+  HARDWARE: "Hardware",
+  OFFICE: "Büro",
+  TAXES_FEES: "Steuern & Gebühren",
+  OTHER: "Sonstiges",
+};
