@@ -1,0 +1,9 @@
+/home/carryos/ugc-affiliate-os/AGENTS.md
+/home/carryos/ugc-affiliate-os/CLAUDE.md
+/home/carryos/ugc-affiliate-os/README.md
+/home/carryos/ugc-affiliate-os/public/file.svg
+/home/carryos/ugc-affiliate-os/public/globe.svg
+/home/carryos/ugc-affiliate-os/public/mock/video-result.svg
+/home/carryos/ugc-affiliate-os/public/next.svg
+/home/carryos/ugc-affiliate-os/public/vercel.svg
+/home/carryos/ugc-affiliate-os/public/window.svg
