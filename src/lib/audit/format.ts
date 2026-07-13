@@ -1,0 +1,36 @@
+const ACTION_LABELS: Record<string, string> = {
+  "auth.login": "Login",
+  "auth.logout": "Logout",
+  "contact.submitted": "Kontaktanfrage eingegangen",
+  "notification.read": "Benachrichtigung gelesen",
+  "notification.read_all": "Alle Benachrichtigungen gelesen",
+  "product.create": "Produkt erstellt",
+  "product.update": "Produkt aktualisiert",
+  "product.archive": "Produkt archiviert",
+  "product.delete": "Produkt gelöscht",
+  "campaign.create": "Kampagne erstellt",
+  "campaign.update": "Kampagne aktualisiert",
+  "campaign.status_change": "Kampagnenstatus geändert",
+  "script.create": "Skript erstellt",
+  "script.version_create": "Skriptversion erstellt",
+  "script.status_change": "Skriptstatus geändert",
+  "video_job.create": "Video-Job erstellt",
+  "video_job.retry": "Video-Job erneut gestartet",
+  "video_job.cancel": "Video-Job abgebrochen",
+  "affiliate_program.create": "Affiliate-Programm angelegt",
+  "affiliate_link.create": "Affiliate-Link erstellt",
+  "social_post.create": "Veröffentlichung erstellt",
+  "social_post.status_change": "Veröffentlichungsstatus geändert",
+  "revenue.create": "Einnahme erfasst",
+  "expense.create": "Ausgabe erfasst",
+  "integration.connect": "Integration verbunden",
+  "integration.disconnect": "Integration getrennt",
+  "integration.rotate_secret": "Zugangsdaten rotiert",
+  "agent.run": "Agent gestartet",
+  "agent.pause": "Agent pausiert",
+  "automation.run": "Automation ausgeführt",
+};
+
+export function formatAuditAction(action: string): string {
+  return ACTION_LABELS[action] ?? action;
+}

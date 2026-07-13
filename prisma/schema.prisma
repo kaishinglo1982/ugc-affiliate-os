@@ -1,0 +1,753 @@
+// UGC Affiliate Operating System — data model
+// Single-user system. All monetary values use Decimal. Timestamps are UTC;
+// localized display (Europe/Berlin) happens in the presentation layer.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Auth
+// ---------------------------------------------------------------------------
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  name         String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions Session[]
+
+  @@index([email])
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash    String   @unique
+  userAgent    String?
+  ipAddress    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  revokedAt    DateTime?
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ---------------------------------------------------------------------------
+// Product Radar
+// ---------------------------------------------------------------------------
+
+enum ProductStatus {
+  IDEA
+  RESEARCHING
+  VALIDATED
+  ACTIVE
+  PAUSED
+  REJECTED
+  ARCHIVED
+}
+
+enum TrendStatus {
+  EMERGING
+  GROWING
+  STABLE
+  DECLINING
+  SATURATED
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model Product {
+  id             String        @id @default(uuid())
+  name           String
+  description    String?
+  imageUrl       String?
+  vendor         String?
+  targetUrl      String?
+  category       String?
+  tags           String[]      @default([])
+  price          Decimal?      @db.Decimal(12, 2)
+  currency       String        @default("EUR")
+  commissionRate Decimal?      @db.Decimal(6, 3)
+  estimatedMargin Decimal?     @db.Decimal(12, 2)
+  audience       String?
+  problemSolved  String?
+  notes          String?
+  status         ProductStatus @default(IDEA)
+  trend          TrendStatus   @default(STABLE)
+  risk           RiskLevel     @default(MEDIUM)
+  isFavorite     Boolean       @default(false)
+  archivedAt     DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  scores          ProductScore[]
+  affiliateLinks  AffiliateLink[]
+  campaigns       Campaign[]
+  scripts         Script[]
+  videoJobs       VideoJob[]
+  mediaAssets     MediaAsset[]
+  revenues        Revenue[]
+  expenses        Expense[]
+
+  @@index([status])
+  @@index([category])
+}
+
+model ProductScore {
+  id                    String   @id @default(uuid())
+  productId             String
+  product               Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  demand                Int      @default(0)
+  commission            Int      @default(0)
+  contentPotential      Int      @default(0)
+  competition           Int      @default(0)
+  problemSolvingPower   Int      @default(0)
+  visualDemonstrability Int      @default(0)
+  platformFit           Int      @default(0)
+  trendMomentum         Int      @default(0)
+  returnRisk            Int      @default(0)
+  complianceRisk        Int      @default(0)
+  totalScore            Int      @default(0)
+  breakdown             Json
+  createdAt             DateTime @default(now())
+
+  @@index([productId])
+}
+
+// ---------------------------------------------------------------------------
+// Affiliate
+// ---------------------------------------------------------------------------
+
+enum AffiliateProviderKey {
+  AMAZON_ASSOCIATES
+  EBAY_PARTNER_NETWORK
+  AWIN
+  CJ_AFFILIATE
+  IMPACT
+  RAKUTEN_ADVERTISING
+  SHAREASALE
+  DIGISTORE24
+  ADCELL
+  CUSTOM
+}
+
+enum IntegrationMode {
+  LIVE
+  SANDBOX
+  MOCK
+}
+
+model AffiliateProgram {
+  id             String               @id @default(uuid())
+  provider       AffiliateProviderKey
+  customName     String?
+  trackingId     String?
+  credentialId   String?
+  credential     EncryptedCredential? @relation(fields: [credentialId], references: [id])
+  mode           IntegrationMode      @default(MOCK)
+  status         String               @default("DISCONNECTED")
+  notes          String?
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  links    AffiliateLink[]
+  revenues Revenue[]
+
+  @@index([provider])
+}
+
+model AffiliateLink {
+  id               String            @id @default(uuid())
+  programId        String
+  program          AffiliateProgram  @relation(fields: [programId], references: [id], onDelete: Cascade)
+  productId        String?
+  product          Product?          @relation(fields: [productId], references: [id])
+  label            String
+  destinationUrl   String
+  deepLink         String?
+  shortSlug        String            @unique
+  utmSource        String?
+  utmMedium        String?
+  utmCampaign      String?
+  utmContent       String?
+  utmTerm          String?
+  platform         String?
+  clickCount       Int               @default(0)
+  lastCheckedAt    DateTime?
+  lastCheckStatus  String?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  clicks       LinkClick[]
+  campaignLinks Campaign[]
+
+  @@index([programId])
+  @@index([productId])
+}
+
+model LinkClick {
+  id        String        @id @default(uuid())
+  linkId    String
+  link      AffiliateLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  occurredAt DateTime     @default(now())
+  source    String?
+
+  @@index([linkId])
+}
+
+// ---------------------------------------------------------------------------
+// Campaigns
+// ---------------------------------------------------------------------------
+
+enum CampaignStatus {
+  DRAFT
+  RESEARCH
+  SCRIPTING
+  PRODUCTION
+  REVIEW
+  SCHEDULED
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+model Campaign {
+  id             String         @id @default(uuid())
+  name           String
+  productId      String?
+  product        Product?       @relation(fields: [productId], references: [id])
+  affiliateLinkId String?
+  affiliateLink  AffiliateLink? @relation(fields: [affiliateLinkId], references: [id])
+  audience       String?
+  targetPlatforms String[]      @default([])
+  contentGoal    String?
+  budget         Decimal?       @db.Decimal(12, 2)
+  currency       String         @default("EUR")
+  startDate      DateTime?
+  endDate        DateTime?
+  status         CampaignStatus @default(DRAFT)
+  notes          String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  scripts     Script[]
+  videoJobs   VideoJob[]
+  socialPosts SocialPost[]
+  revenues    Revenue[]
+  expenses    Expense[]
+  mediaAssets MediaAsset[]
+
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Scripts
+// ---------------------------------------------------------------------------
+
+enum ScriptStatus {
+  DRAFT
+  APPROVED
+  ARCHIVED
+}
+
+model Script {
+  id          String       @id @default(uuid())
+  title       String
+  productId   String?
+  product     Product?     @relation(fields: [productId], references: [id])
+  campaignId  String?
+  campaign    Campaign?    @relation(fields: [campaignId], references: [id])
+  audience    String?
+  platform    String?
+  durationSec Int?
+  tone        String?
+  hookType    String?
+  cta         String?
+  status      ScriptStatus @default(DRAFT)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  versions  ScriptVersion[]
+  videoJobs VideoJob[]
+
+  @@index([status])
+  @@index([campaignId])
+}
+
+model ScriptVersion {
+  id             String   @id @default(uuid())
+  scriptId       String
+  script         Script   @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+  versionNumber  Int
+  hook           String
+  problem        String
+  situation      String
+  productIntro   String
+  demonstration  String
+  benefit        String
+  socialProof    String
+  objectionHandling String
+  cta            String
+  onScreenText   String?
+  bRollNotes     String?
+  voiceover      String?
+  sceneList      Json
+  generatedBy    String   @default("template")
+  createdAt      DateTime @default(now())
+
+  @@unique([scriptId, versionNumber])
+}
+
+// ---------------------------------------------------------------------------
+// Video
+// ---------------------------------------------------------------------------
+
+enum VideoJobStatus {
+  QUEUED
+  PROCESSING
+  REVIEW_REQUIRED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum VideoProviderKey {
+  HIGGSFIELD
+  RUNWAY
+  KLING
+  VEO
+  HEYGEN
+  ELEVENLABS
+  CUSTOM
+  MOCK
+}
+
+model VideoJob {
+  id           String         @id @default(uuid())
+  scriptId     String?
+  script       Script?        @relation(fields: [scriptId], references: [id])
+  productId    String?
+  product      Product?       @relation(fields: [productId], references: [id])
+  campaignId   String?
+  campaign     Campaign?      @relation(fields: [campaignId], references: [id])
+  provider     VideoProviderKey @default(MOCK)
+  format       String
+  aspectRatio  String
+  durationSec  Int
+  style        String?
+  avatar       String?
+  voice        String?
+  language     String         @default("de")
+  subtitles    Boolean        @default(true)
+  music        String?
+  status       VideoJobStatus @default(QUEUED)
+  progress     Int            @default(0)
+  errorMessage String?
+  resultUrl    String?
+  attempts     Int            @default(0)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  completedAt  DateTime?
+
+  mediaAssets MediaAsset[]
+
+  @@index([status])
+  @@index([campaignId])
+}
+
+// ---------------------------------------------------------------------------
+// Media
+// ---------------------------------------------------------------------------
+
+enum MediaKind {
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+}
+
+model MediaAsset {
+  id          String    @id @default(uuid())
+  kind        MediaKind
+  fileName    String
+  storageKey  String
+  url         String
+  mimeType    String
+  sizeBytes   Int
+  durationSec Int?
+  width       Int?
+  height      Int?
+  tags        String[]  @default([])
+  productId   String?
+  product     Product?  @relation(fields: [productId], references: [id])
+  campaignId  String?
+  campaign    Campaign? @relation(fields: [campaignId], references: [id])
+  videoJobId  String?
+  videoJob    VideoJob? @relation(fields: [videoJobId], references: [id])
+  archivedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  socialPosts SocialPost[]
+
+  @@index([kind])
+  @@index([campaignId])
+}
+
+// ---------------------------------------------------------------------------
+// Social publishing
+// ---------------------------------------------------------------------------
+
+enum SocialPlatform {
+  TIKTOK
+  INSTAGRAM
+  FACEBOOK
+  YOUTUBE_SHORTS
+  PINTEREST
+  REDDIT
+  X
+  LINKEDIN
+}
+
+model SocialAccount {
+  id           String          @id @default(uuid())
+  platform     SocialPlatform
+  handle       String
+  mode         IntegrationMode @default(MOCK)
+  credentialId String?
+  credential   EncryptedCredential? @relation(fields: [credentialId], references: [id])
+  status       String          @default("DISCONNECTED")
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  posts SocialPost[]
+
+  @@index([platform])
+}
+
+enum SocialPostStatus {
+  DRAFT
+  READY
+  APPROVED
+  SCHEDULED
+  PUBLISHING
+  PUBLISHED
+  FAILED
+  CANCELLED
+}
+
+model SocialPost {
+  id              String            @id @default(uuid())
+  campaignId      String?
+  campaign        Campaign?         @relation(fields: [campaignId], references: [id])
+  mediaAssetId    String?
+  mediaAsset      MediaAsset?       @relation(fields: [mediaAssetId], references: [id])
+  accountId       String
+  account         SocialAccount     @relation(fields: [accountId], references: [id])
+  caption         String
+  hashtags        String[]          @default([])
+  affiliateLinkText String?
+  disclosure      String?
+  scheduledAt     DateTime?
+  publishedAt     DateTime?
+  status          SocialPostStatus  @default(DRAFT)
+  errorMessage     String?
+  attempts        Int               @default(0)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+// ---------------------------------------------------------------------------
+// Finance
+// ---------------------------------------------------------------------------
+
+enum RevenueStatus {
+  PENDING
+  CONFIRMED
+  PAID
+  REVERSED
+}
+
+model Revenue {
+  id            String        @id @default(uuid())
+  date          DateTime
+  programId     String?
+  program       AffiliateProgram? @relation(fields: [programId], references: [id])
+  productId     String?
+  product       Product?      @relation(fields: [productId], references: [id])
+  campaignId    String?
+  campaign      Campaign?     @relation(fields: [campaignId], references: [id])
+  platform      String?
+  grossAmount   Decimal       @db.Decimal(12, 2)
+  currency      String        @default("EUR")
+  status        RevenueStatus @default(PENDING)
+  reference     String?
+  notes         String?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  @@index([date])
+  @@index([campaignId])
+}
+
+enum ExpenseCategory {
+  TOOLS_SOFTWARE
+  ADVERTISING
+  AI_CREDITS
+  VIDEO_PRODUCTION
+  STOCK_MEDIA
+  SUBSCRIPTIONS
+  FREELANCE
+  HARDWARE
+  OFFICE
+  TAXES_FEES
+  OTHER
+}
+
+model Expense {
+  id           String          @id @default(uuid())
+  date         DateTime
+  category     ExpenseCategory
+  vendor       String?
+  campaignId   String?
+  campaign     Campaign?       @relation(fields: [campaignId], references: [id])
+  productId    String?
+  product      Product?        @relation(fields: [productId], references: [id])
+  amount       Decimal         @db.Decimal(12, 2)
+  currency     String          @default("EUR")
+  isRecurring  Boolean         @default(false)
+  isTaxRelevant Boolean        @default(true)
+  receiptUrl   String?
+  notes        String?
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+
+  @@index([date])
+  @@index([campaignId])
+}
+
+model TaxSetting {
+  id                    String   @id @default(uuid())
+  reserveRatePercent    Decimal  @db.Decimal(5, 2) @default(30)
+  vatRatePercent        Decimal  @db.Decimal(5, 2) @default(19)
+  vatEnabled            Boolean  @default(false)
+  tradeTaxReservePercent Decimal @db.Decimal(5, 2) @default(15)
+  incomeTaxReservePercent Decimal @db.Decimal(5, 2) @default(25)
+  updatedAt             DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------------
+// Integrations / API vault
+// ---------------------------------------------------------------------------
+
+enum IntegrationCategory {
+  AFFILIATE
+  VIDEO
+  AI
+  SOCIAL_MEDIA
+  ANALYTICS
+  FINANCE
+  STORAGE
+}
+
+model Integration {
+  id            String              @id @default(uuid())
+  providerKey   String              @unique
+  displayName   String
+  category      IntegrationCategory
+  mode          IntegrationMode     @default(MOCK)
+  status        String              @default("DISCONNECTED")
+  lastSyncAt    DateTime?
+  lastError     String?
+  credentialId  String?
+  credential    EncryptedCredential? @relation(fields: [credentialId], references: [id])
+  config        Json?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  @@index([category])
+}
+
+model EncryptedCredential {
+  id            String   @id @default(uuid())
+  label         String
+  cipherText    String
+  iv            String
+  authTag       String
+  keyVersion    Int      @default(1)
+  lastRotatedAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  affiliatePrograms AffiliateProgram[]
+  socialAccounts    SocialAccount[]
+  integrations      Integration[]
+}
+
+// ---------------------------------------------------------------------------
+// Agents & automations
+// ---------------------------------------------------------------------------
+
+enum AgentStatus {
+  IDLE
+  RUNNING
+  PAUSED
+  ERROR
+}
+
+model Agent {
+  id             String      @id @default(uuid())
+  key            String      @unique
+  name           String
+  role           String
+  description    String
+  capabilities   String[]    @default([])
+  allowedActions String[]    @default([])
+  status         AgentStatus @default(IDLE)
+  lastRunAt      DateTime?
+  nextTask       String?
+  successCount   Int         @default(0)
+  errorCount     Int         @default(0)
+  config         Json?
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  runs AgentRun[]
+}
+
+enum AgentRunStatus {
+  RUNNING
+  SUCCESS
+  FAILED
+}
+
+model AgentRun {
+  id         String         @id @default(uuid())
+  agentId    String
+  agent      Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  status     AgentRunStatus @default(RUNNING)
+  startedAt  DateTime       @default(now())
+  finishedAt DateTime?
+  summary    String?
+  logs       Json?
+
+  @@index([agentId])
+}
+
+enum AutomationTrigger {
+  PRODUCT_ADDED
+  PRODUCT_SCORE_ABOVE_THRESHOLD
+  SCRIPT_APPROVED
+  VIDEO_COMPLETED
+  POST_FAILED
+  REVENUE_IMPORTED
+  CAMPAIGN_UNDER_TARGET
+  SCHEDULE_REACHED
+}
+
+enum AutomationActionType {
+  CREATE_TASK
+  GENERATE_SCRIPT
+  PREPARE_VIDEO_JOB
+  CREATE_NOTIFICATION
+  CHANGE_STATUS
+  PREPARE_PUBLISHING
+  START_AGENT
+  SEND_WEBHOOK
+}
+
+model Automation {
+  id           String            @id @default(uuid())
+  name         String
+  isActive     Boolean           @default(true)
+  trigger      AutomationTrigger
+  conditions   Json?
+  actions      Json
+  lastRunAt    DateTime?
+  nextRunAt    DateTime?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+
+  runs AutomationRun[]
+}
+
+enum AutomationRunStatus {
+  SUCCESS
+  FAILED
+  SKIPPED
+}
+
+model AutomationRun {
+  id           String               @id @default(uuid())
+  automationId String
+  automation   Automation           @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  status       AutomationRunStatus
+  runAt        DateTime             @default(now())
+  message      String?
+
+  @@index([automationId])
+}
+
+// ---------------------------------------------------------------------------
+// Notifications, contact, audit
+// ---------------------------------------------------------------------------
+
+enum NotificationLevel {
+  INFO
+  SUCCESS
+  WARNING
+  ERROR
+}
+
+model Notification {
+  id        String             @id @default(uuid())
+  level     NotificationLevel  @default(INFO)
+  title     String
+  message   String
+  link      String?
+  readAt    DateTime?
+  createdAt DateTime           @default(now())
+
+  @@index([readAt])
+}
+
+model ContactRequest {
+  id        String   @id @default(uuid())
+  name      String
+  email     String
+  subject   String
+  message   String
+  createdAt DateTime @default(now())
+  handledAt DateTime?
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  actor      String   @default("owner")
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  requestId  String?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+}

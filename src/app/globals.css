@@ -1,0 +1,256 @@
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
+
+/* ---------------------------------------------------------------------------
+ * Design tokens — semantic, not hardcoded. Dark-first (deep anthracite, not
+ * pure black) with an optional light mode. Accents: Electric Violet, Cyan,
+ * warm Orange. See docs/architecture.md "Design system" for rationale.
+ * ------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: dark;
+
+  /* Surfaces — neutral anthracite ramp, never pure black (avoids OLED smear
+     and reads as premium rather than "off/void"). */
+  --color-background: #121214;
+  --color-surface: #18181b;
+  --color-surface-raised: #1e1e22;
+  --color-surface-overlay: #232328;
+  --color-border: rgba(255, 255, 255, 0.09);
+  --color-border-strong: rgba(255, 255, 255, 0.16);
+
+  /* Text */
+  --color-foreground: #f4f4f5;
+  --color-foreground-muted: #a1a1aa;
+  --color-foreground-subtle: #71717a;
+
+  /* Brand accents */
+  --color-violet: #8b5cf6;
+  --color-violet-strong: #7c3aed;
+  --color-violet-soft: #a78bfa;
+  --color-cyan: #22d3ee;
+  --color-cyan-strong: #06b6d4;
+  --color-orange: #fb923c;
+  --color-orange-strong: #f97316;
+
+  /* Semantic roles */
+  --color-primary: var(--color-violet);
+  --color-primary-foreground: #ffffff;
+  --color-accent: var(--color-cyan);
+  --color-accent-foreground: #06222a;
+  --color-warm: var(--color-orange);
+  --color-warm-foreground: #2a1204;
+  --color-ring: var(--color-violet);
+
+  --color-success: #34d399;
+  --color-success-foreground: #052e21;
+  --color-warning: #fbbf24;
+  --color-warning-foreground: #2a1c02;
+  --color-destructive: #f87171;
+  --color-destructive-foreground: #2a0a0a;
+  --color-info: var(--color-cyan);
+
+  /* Radii */
+  --radius-sm: 0.375rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.5rem;
+  --radius-full: 9999px;
+
+  /* Shadows (dark-mode tuned: soft ambient + brand glows for emphasis) */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 12px 40px rgba(0, 0, 0, 0.5);
+  --shadow-glow-violet: 0 0 0 1px rgba(139, 92, 246, 0.4), 0 8px 30px rgba(139, 92, 246, 0.25);
+  --shadow-glow-cyan: 0 0 0 1px rgba(34, 211, 238, 0.35), 0 8px 30px rgba(34, 211, 238, 0.2);
+
+  /* Glass */
+  --blur-glass: 20px;
+  --surface-glass: rgba(24, 24, 27, 0.72);
+
+  /* Containers */
+  --container-content: 1280px;
+  --container-narrow: 768px;
+  --container-wide: 1440px;
+
+  /* Motion */
+  --motion-duration-instant: 100ms;
+  --motion-duration-fast: 150ms;
+  --motion-duration-base: 220ms;
+  --motion-duration-slow: 400ms;
+  --motion-duration-page: 520ms;
+  --motion-ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --motion-ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --motion-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* Z-index scale. Popovers/selects/dropdowns/tooltips sit above modals
+     because they are frequently triggered from within an open Dialog
+     (e.g. a Select inside a form Dialog) and must render above its overlay. */
+  --z-base: 0;
+  --z-sticky: 30;
+  --z-overlay: 40;
+  --z-modal: 50;
+  --z-popover: 60;
+  --z-toast: 70;
+  --z-command: 80;
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --color-background: #f7f7f8;
+  --color-surface: #ffffff;
+  --color-surface-raised: #ffffff;
+  --color-surface-overlay: #ffffff;
+  --color-border: rgba(15, 15, 20, 0.1);
+  --color-border-strong: rgba(15, 15, 20, 0.18);
+
+  --color-foreground: #18181b;
+  --color-foreground-muted: #52525b;
+  --color-foreground-subtle: #71717a;
+
+  --color-primary-foreground: #ffffff;
+  --color-accent-foreground: #06222a;
+
+  --shadow-sm: 0 1px 2px rgba(15, 15, 20, 0.06);
+  --shadow-md: 0 4px 16px rgba(15, 15, 20, 0.08);
+  --shadow-lg: 0 12px 40px rgba(15, 15, 20, 0.12);
+  --surface-glass: rgba(255, 255, 255, 0.72);
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --color-background: #f7f7f8;
+    --color-surface: #ffffff;
+    --color-surface-raised: #ffffff;
+    --color-surface-overlay: #ffffff;
+    --color-border: rgba(15, 15, 20, 0.1);
+    --color-border-strong: rgba(15, 15, 20, 0.18);
+    --color-foreground: #18181b;
+    --color-foreground-muted: #52525b;
+    --color-foreground-subtle: #71717a;
+    --shadow-sm: 0 1px 2px rgba(15, 15, 20, 0.06);
+    --shadow-md: 0 4px 16px rgba(15, 15, 20, 0.08);
+    --shadow-lg: 0 12px 40px rgba(15, 15, 20, 0.12);
+    --surface-glass: rgba(255, 255, 255, 0.72);
+  }
+}
+
+@theme inline {
+  --color-background: var(--color-background);
+  --color-surface: var(--color-surface);
+  --color-surface-raised: var(--color-surface-raised);
+  --color-surface-overlay: var(--color-surface-overlay);
+  --color-border: var(--color-border);
+  --color-border-strong: var(--color-border-strong);
+  --color-foreground: var(--color-foreground);
+  --color-foreground-muted: var(--color-foreground-muted);
+  --color-foreground-subtle: var(--color-foreground-subtle);
+
+  --color-violet: var(--color-violet);
+  --color-violet-strong: var(--color-violet-strong);
+  --color-violet-soft: var(--color-violet-soft);
+  --color-cyan: var(--color-cyan);
+  --color-cyan-strong: var(--color-cyan-strong);
+  --color-orange: var(--color-orange);
+  --color-orange-strong: var(--color-orange-strong);
+
+  --color-primary: var(--color-primary);
+  --color-primary-foreground: var(--color-primary-foreground);
+  --color-accent: var(--color-accent);
+  --color-accent-foreground: var(--color-accent-foreground);
+  --color-warm: var(--color-warm);
+  --color-warm-foreground: var(--color-warm-foreground);
+  --color-ring: var(--color-ring);
+
+  --color-success: var(--color-success);
+  --color-success-foreground: var(--color-success-foreground);
+  --color-warning: var(--color-warning);
+  --color-warning-foreground: var(--color-warning-foreground);
+  --color-destructive: var(--color-destructive);
+  --color-destructive-foreground: var(--color-destructive-foreground);
+  --color-info: var(--color-info);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-full: var(--radius-full);
+
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+
+  --container-content: var(--container-content);
+  --container-narrow: var(--container-narrow);
+  --container-wide: var(--container-wide);
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+  border-color: var(--color-border);
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-violet) 40%, transparent);
+  color: var(--color-foreground);
+}
+
+.glass-panel {
+  background: var(--surface-glass);
+  backdrop-filter: blur(var(--blur-glass));
+  -webkit-backdrop-filter: blur(var(--blur-glass));
+  border: 1px solid var(--color-border);
+}
+
+.bg-grid-fade {
+  background-image:
+    linear-gradient(to bottom, transparent, var(--color-background) 85%),
+    radial-gradient(circle at 20% 0%, color-mix(in oklab, var(--color-violet) 18%, transparent), transparent 55%),
+    radial-gradient(circle at 85% 15%, color-mix(in oklab, var(--color-cyan) 12%, transparent), transparent 50%);
+}
+
+@keyframes accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+
+@keyframes accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+.animate-accordion-down {
+  animation: accordion-down var(--motion-duration-base) var(--motion-ease-out);
+}
+
+.animate-accordion-up {
+  animation: accordion-up var(--motion-duration-base) var(--motion-ease-in);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

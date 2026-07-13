@@ -1,0 +1,92 @@
+import "server-only";
+import { prisma } from "@/lib/db/client";
+import type {
+  Prisma,
+  ProductStatus,
+  TrendStatus,
+  RiskLevel,
+} from "@/generated/prisma/client";
+
+export interface ProductListFilters {
+  search?: string;
+  status?: string;
+  category?: string;
+  trend?: string;
+  risk?: string;
+  favoritesOnly?: boolean;
+  includeArchived?: boolean;
+  sort?: "score" | "name" | "createdAt" | "price";
+}
+
+export async function listProducts(filters: ProductListFilters) {
+  const where: Prisma.ProductWhereInput = {};
+
+  if (!filters.includeArchived) {
+    where.status = { not: "ARCHIVED" };
+  }
+  if (filters.status && filters.status !== "ALL") {
+    where.status = filters.status as ProductStatus;
+  }
+  if (filters.category && filters.category !== "ALL") {
+    where.category = filters.category;
+  }
+  if (filters.trend && filters.trend !== "ALL") {
+    where.trend = filters.trend as TrendStatus;
+  }
+  if (filters.risk && filters.risk !== "ALL") {
+    where.risk = filters.risk as RiskLevel;
+  }
+  if (filters.favoritesOnly) {
+    where.isFavorite = true;
+  }
+  if (filters.search) {
+    where.OR = [
+      { name: { contains: filters.search, mode: "insensitive" } },
+      { vendor: { contains: filters.search, mode: "insensitive" } },
+      { category: { contains: filters.search, mode: "insensitive" } },
+      { tags: { has: filters.search } },
+    ];
+  }
+
+  const products = await prisma.product.findMany({
+    where,
+    include: { scores: { orderBy: { createdAt: "desc" }, take: 1 } },
+    orderBy:
+      filters.sort === "name"
+        ? { name: "asc" }
+        : filters.sort === "price"
+          ? { price: "desc" }
+          : { createdAt: "desc" },
+  });
+
+  const withScore = products.map((p) => ({
+    ...p,
+    latestScore: p.scores[0]?.totalScore ?? 0,
+  }));
+
+  if (filters.sort === "score" || !filters.sort) {
+    withScore.sort((a, b) => b.latestScore - a.latestScore);
+  }
+
+  return withScore;
+}
+
+export async function getProductById(id: string) {
+  return prisma.product.findUnique({
+    where: { id },
+    include: {
+      scores: { orderBy: { createdAt: "desc" }, take: 1 },
+      affiliateLinks: { include: { program: true } },
+      campaigns: true,
+    },
+  });
+}
+
+export async function listProductCategories(): Promise<string[]> {
+  const products = await prisma.product.findMany({
+    where: { category: { not: null } },
+    select: { category: true },
+    distinct: ["category"],
+  });
+  return products.map((p) => p.category).filter((c): c is string => Boolean(c));
+}
