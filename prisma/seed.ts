@@ -406,23 +406,90 @@ async function seedVideoJobsAndPosts(campaigns: Awaited<ReturnType<typeof seedCa
   const igAccount = await prisma.socialAccount.create({
     data: { platform: "INSTAGRAM", handle: "ugc.os.demo", mode: "MOCK", status: "CONNECTED" },
   });
+  const ytAccount = await prisma.socialAccount.create({
+    data: { platform: "YOUTUBE_SHORTS", handle: "@ugc.os.demo", mode: "MOCK", status: "CONNECTED" },
+  });
+  const pinAccount = await prisma.socialAccount.create({
+    data: { platform: "PINTEREST", handle: "ugc.os.demo", mode: "MOCK", status: "CONNECTED" },
+  });
+  const accounts = [account, igAccount, ytAccount, pinAccount];
+
+  // Impressions/reach/engagement ranges are platform-typical: TikTok and YouTube
+  // Shorts trend toward higher reach and engagement than Instagram/Pinterest.
+  const PLATFORM_PROFILE: Record<string, { impressions: [number, number]; reachRatio: [number, number]; likeRatio: [number, number] }> = {
+    TIKTOK: { impressions: [6000, 42000], reachRatio: [0.55, 0.75], likeRatio: [0.04, 0.09] },
+    INSTAGRAM: { impressions: [2500, 16000], reachRatio: [0.5, 0.7], likeRatio: [0.03, 0.07] },
+    YOUTUBE_SHORTS: { impressions: [3500, 26000], reachRatio: [0.6, 0.8], likeRatio: [0.035, 0.08] },
+    PINTEREST: { impressions: [1200, 9000], reachRatio: [0.45, 0.65], likeRatio: [0.015, 0.04] },
+  };
+
+  function randomBetween([min, max]: [number, number]): number {
+    return min + Math.random() * (max - min);
+  }
+
+  function generateMetrics(platform: string) {
+    const profile = PLATFORM_PROFILE[platform] ?? PLATFORM_PROFILE.INSTAGRAM;
+    const impressions = Math.round(randomBetween(profile.impressions));
+    const reach = Math.round(impressions * randomBetween(profile.reachRatio));
+    const likes = Math.round(reach * randomBetween(profile.likeRatio));
+    const comments = Math.round(likes * randomBetween([0.05, 0.15]));
+    const shares = Math.round(likes * randomBetween([0.02, 0.08]));
+    return { impressions, reach, likes, comments, shares };
+  }
 
   const postStatuses = ["PUBLISHED", "PUBLISHED", "SCHEDULED", "APPROVED", "DRAFT", "FAILED"] as const;
+  let publishedCount = 0;
   for (let i = 0; i < campaigns.length; i++) {
+    const acc = accounts[i % accounts.length];
+    const isPublished = postStatuses[i] === "PUBLISHED";
+    const metrics = isPublished ? generateMetrics(acc.platform) : {};
     await prisma.socialPost.create({
       data: {
         campaignId: campaigns[i].id,
-        accountId: i % 2 === 0 ? account.id : igAccount.id,
+        accountId: acc.id,
         caption: `Ehrliche Erfahrung mit ${campaigns[i].name.split("–")[0].trim()} 👀`,
         hashtags: ["#ad", "#empfehlung", "#alltagshack"],
         disclosure: "Werbung / Affiliate-Link",
         status: postStatuses[i],
         scheduledAt: postStatuses[i] === "SCHEDULED" ? daysAgo(-3) : undefined,
-        publishedAt: postStatuses[i] === "PUBLISHED" ? daysAgo(10 - i) : undefined,
+        publishedAt: isPublished ? daysAgo(10 - i) : undefined,
+        ...metrics,
       },
     });
+    if (isPublished) publishedCount++;
   }
-  console.log(`Seeded ${jobs.length} video jobs and ${campaigns.length} social posts`);
+
+  // Additional historical published posts spread across platforms/campaigns/dates
+  // over the last 90 days, giving Analytics/BI a meaningful time series.
+  const extraCaptions = [
+    "3 Dinge, die ich vorher gecheckt hätte 👀",
+    "So spart das im Alltag wirklich Zeit",
+    "Unboxing + erster Eindruck nach 1 Woche",
+    "Der Vergleich, den ich mir gewünscht hätte",
+    "Mein ehrliches Fazit nach 30 Tagen",
+    "Warum ich das jedem empfehle, der pendelt",
+  ];
+  const EXTRA_POSTS = 18;
+  for (let i = 0; i < EXTRA_POSTS; i++) {
+    const campaign = campaigns[i % campaigns.length];
+    const acc = accounts[i % accounts.length];
+    const metrics = generateMetrics(acc.platform);
+    await prisma.socialPost.create({
+      data: {
+        campaignId: campaign.id,
+        accountId: acc.id,
+        caption: extraCaptions[i % extraCaptions.length],
+        hashtags: ["#ad", "#empfehlung"],
+        disclosure: "Werbung / Affiliate-Link",
+        status: "PUBLISHED",
+        publishedAt: daysAgo(Math.floor(Math.random() * 90)),
+        ...metrics,
+      },
+    });
+    publishedCount++;
+  }
+
+  console.log(`Seeded ${jobs.length} video jobs and ${campaigns.length + EXTRA_POSTS} social posts (${publishedCount} published with metrics)`);
 }
 
 async function seedFinance(
