@@ -91,13 +91,17 @@ Depends on: Band 15.
 
 | Band | Status      | Notes                                  |
 | ---- | ----------- | -------------------------------------- |
-| 10   | IN_PROGRESS | First band, swarm started              |
-| 11   | PLANNED     | Depends on 10                          |
-| 12   | PLANNED     | Depends on 11                          |
-| 13   | PLANNED     | Depends on 12                          |
-| 14   | PLANNED     | Depends on 10, 13                      |
-| 15   | PLANNED     | Depends on 10–14                       |
-| 16   | PLANNED     | Depends on 15                          |
+| 10   | DOCUMENTED  | Voll-Masterprompt vorhanden (`masterprompt-10.full.md`) |
+| 11   | DOCUMENTED  | Voll-Masterprompt vorhanden (`masterprompt-11.full.md`) |
+| 12   | DOCUMENTED  | Voll-Masterprompt vorhanden (`masterprompt-12.full.md`) |
+| 13   | DOCUMENTED  | Voll-Masterprompt vorhanden (`masterprompt-13.full.md`) |
+| 14   | DOCUMENTED  | Voll-Masterprompt vorhanden (`masterprompt-14.full.md`) |
+| 15   | DOCUMENTED  | Voll-Masterprompt vorhanden (`masterprompt-15.full.md`) |
+| 16   | DOCUMENTED  | Voll-Masterprompt vorhanden (`masterprompt-16.full.md`) |
+
+> Hinweis: "DOCUMENTED" bedeutet, dass der ausgeschriebene Masterprompt
+> (10 Kapitel + Quality Gates + Abschlussbericht) vorliegt. Die Umsetzung
+> erfolgt bandweise über den Swarm/Codex, beginnend mit Band 10.
 
 See `docs/roadmaps/EXECUTION_STATE.md` for the live status and
 `docs/bands/band-XX/` for per-band master prompts.
