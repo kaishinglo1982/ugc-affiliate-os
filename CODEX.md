@@ -8,10 +8,12 @@ It is referenced from `AGENTS.md` and must be read before any roadmap task.
 1. `AGENTS.md` (Root-Regeln, Architektur- und Coding-Regeln)
 2. `CODEX.md` (diese Datei)
 3. `docs/roadmaps/BANDS_10_16_ROADMAP.md` (übergeordnete Ziel-/Abhängigkeitsroadmap)
-4. `docs/roadmaps/ROADMAP_INDEX.md` (aktiver Band/Masterprompt)
-5. `docs/roadmaps/EXECUTION_STATE.md` (live Status, Voraussetzungen, Blocker)
-6. `docs/bands/<betroffener-band>/` (Masterprompt + Acceptance des Bandes)
-7. Repository-Code und bestehende Tests (Ist-Zustand)
+4. `docs/roadmaps/CHAPTERS_1_70_ROADMAP.md` (70 Kernkapitel der Core-Plattform)
+5. `docs/roadmaps/BANDS_1_100_OVERVIEW.md` (Gesamtübersicht aller 100 Bände)
+6. `docs/roadmaps/ROADMAP_INDEX.md` (aktiver Band/Masterprompt)
+7. `docs/roadmaps/EXECUTION_STATE.md` (live Status, Voraussetzungen, Blocker)
+8. `docs/bands/<betroffener-band>/` (Masterprompt + Acceptance des Bandes)
+9. Repository-Code und bestehende Tests (Ist-Zustand)
 
 Codex muss aus dem Repository-Root gestartet werden, damit diese
 Anweisungskette aufgebaut wird. Die Summe automatisch geladener

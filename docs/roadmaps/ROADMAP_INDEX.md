@@ -10,6 +10,8 @@ Status: COMPLETED (Doku), IN_PROGRESS (Implementierung)
 ## Globale Roadmap
 
 - [Band 10–16](./BANDS_10_16_ROADMAP.md)
+- [Kapitel-Roadmap 1–70](./CHAPTERS_1_70_ROADMAP.md)
+- [Band-Übersicht 1–100](./BANDS_1_100_OVERVIEW.md)
 
 ## Bände
 
