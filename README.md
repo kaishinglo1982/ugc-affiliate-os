@@ -87,3 +87,9 @@ APP_BASE_URL=https://your-app.example WORKER_SECRET=... scripts/run-product-rese
 ## CI
 
 GitHub Actions runs install, Prisma client generation, typecheck, lint, unit tests, and build. The e2e job starts a PostgreSQL service, applies migrations, seeds, installs Chromium, builds, starts the app through Playwright, and runs `test:e2e`.
+
+## Claude/Git Agent Swarm
+
+The development swarm is versioned separately from the app's runtime agents.
+Start with `docs/agent-swarm.md` for roles, `.agents/` for worker profiles, and
+`docs/swarm-workflows.md` for branch, PR, validation, and handoff rules.

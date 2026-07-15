@@ -1,0 +1,15 @@
+# Default repository owner for review routing.
+* @kaishinglo1982
+
+# Swarm governance and deployment controls.
+/.agents/ @kaishinglo1982
+/.github/ @kaishinglo1982
+/docs/ @kaishinglo1982
+/deploy/ @kaishinglo1982
+/scripts/ @kaishinglo1982
+
+# Durable data contracts.
+/prisma/ @kaishinglo1982
+
+# Application runtime and UI.
+/src/ @kaishinglo1982

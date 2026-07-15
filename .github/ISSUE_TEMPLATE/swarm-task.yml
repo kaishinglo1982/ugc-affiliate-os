@@ -1,0 +1,48 @@
+name: Swarm task
+description: Assign bounded repository work to a Claude/Git swarm agent.
+title: "[Swarm] "
+labels:
+  - swarm
+body:
+  - type: dropdown
+    id: profile
+    attributes:
+      label: Swarm profile
+      options:
+        - Coordinator
+        - Deploy/CI/Docs
+        - Data Platform
+        - App Runtime
+        - UI Product
+        - QA/Security
+    validations:
+      required: true
+  - type: textarea
+    id: objective
+    attributes:
+      label: Objective
+      description: What should the worker accomplish?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Allowed scope
+      description: Files, directories, or behavior the worker may change.
+    validations:
+      required: true
+  - type: textarea
+    id: out_of_scope
+    attributes:
+      label: Out of scope
+      description: Files, behavior, or decisions the worker must not change.
+  - type: textarea
+    id: validation
+    attributes:
+      label: Required validation
+      description: Commands, e2e flows, or review gates required for completion.
+  - type: textarea
+    id: risks
+    attributes:
+      label: Known risks
+      description: Migrations, secrets, auth, deploy, or compatibility concerns.
