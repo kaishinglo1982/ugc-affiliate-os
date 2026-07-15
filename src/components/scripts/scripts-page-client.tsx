@@ -34,6 +34,7 @@ export function ScriptsPageClient({
 
   useEffect(() => {
     if (searchParams.get("create") === "1") {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
       setCreateOpen(true);
       router.replace("/app/scripts");
     }

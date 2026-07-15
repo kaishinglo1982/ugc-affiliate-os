@@ -28,7 +28,7 @@ export async function listProducts(filters: ProductListFilters) {
     where.status = filters.status as ProductStatus;
   }
   if (filters.category && filters.category !== "ALL") {
-    where.category = filters.category;
+    where.categoryLabel = filters.category;
   }
   if (filters.trend && filters.trend !== "ALL") {
     where.trend = filters.trend as TrendStatus;
@@ -43,7 +43,7 @@ export async function listProducts(filters: ProductListFilters) {
     where.OR = [
       { name: { contains: filters.search, mode: "insensitive" } },
       { vendor: { contains: filters.search, mode: "insensitive" } },
-      { category: { contains: filters.search, mode: "insensitive" } },
+      { categoryLabel: { contains: filters.search, mode: "insensitive" } },
       { tags: { has: filters.search } },
     ];
   }
@@ -84,9 +84,9 @@ export async function getProductById(id: string) {
 
 export async function listProductCategories(): Promise<string[]> {
   const products = await prisma.product.findMany({
-    where: { category: { not: null } },
-    select: { category: true },
-    distinct: ["category"],
+    where: { categoryLabel: { not: null } },
+    select: { categoryLabel: true },
+    distinct: ["categoryLabel"],
   });
-  return products.map((p) => p.category).filter((c): c is string => Boolean(c));
+  return products.map((p) => p.categoryLabel).filter((c): c is string => Boolean(c));
 }

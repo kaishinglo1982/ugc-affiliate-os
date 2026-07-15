@@ -29,7 +29,7 @@ export async function GET() {
 
   const rows = products.map((p) => [
     p.name,
-    p.category ?? "",
+    p.categoryLabel ?? "",
     p.vendor ?? "",
     p.status,
     p.trend,

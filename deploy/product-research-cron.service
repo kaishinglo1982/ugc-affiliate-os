@@ -1,0 +1,12 @@
+[Unit]
+Description=UGC Affiliate OS - Phase 7 product intelligence research pipeline (discovery -> scoring -> data-quality)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/srv/ugc-affiliate-os
+ExecStart=/usr/bin/env sh /srv/ugc-affiliate-os/scripts/run-product-research-cron.sh
+EnvironmentFile=/srv/ugc-affiliate-os/.env
+# Ensure WORKER_SECRET and APP_BASE_URL are present in the EnvironmentFile.
+User=ugc_app

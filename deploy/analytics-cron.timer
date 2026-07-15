@@ -1,0 +1,11 @@
+[Unit]
+Description=UGC Affiliate OS - daily analytics automation pipeline timer
+
+[Timer]
+OnCalendar=*-*-* 03:00:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+Unit=analytics-cron.service
+
+[Install]
+WantedBy=timers.target

@@ -150,7 +150,7 @@ export function ProductForm({
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-3">
             <FormField label="Status" htmlFor="status">
-              <Select name="status" defaultValue={initialValues?.status ?? "IDEA"}>
+              <Select name="status" defaultValue={initialValues?.status ?? "DISCOVERED"}>
                 <SelectTrigger id="status"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {Object.entries(PRODUCT_STATUS_LABELS).map(([value, label]) => (

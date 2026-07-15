@@ -48,12 +48,12 @@ model Session {
 // ---------------------------------------------------------------------------
 
 enum ProductStatus {
-  IDEA
-  RESEARCHING
-  VALIDATED
-  ACTIVE
-  PAUSED
+  DISCOVERED
+  UNDER_REVIEW
+  APPROVED
   REJECTED
+  PAUSED
+  UNAVAILABLE
   ARCHIVED
 }
 
@@ -69,43 +69,72 @@ enum RiskLevel {
   LOW
   MEDIUM
   HIGH
+  CRITICAL
 }
 
 model Product {
-  id             String        @id @default(uuid())
-  name           String
-  description    String?
-  imageUrl       String?
-  vendor         String?
-  targetUrl      String?
-  category       String?
-  tags           String[]      @default([])
-  price          Decimal?      @db.Decimal(12, 2)
-  currency       String        @default("EUR")
-  commissionRate Decimal?      @db.Decimal(6, 3)
-  estimatedMargin Decimal?     @db.Decimal(12, 2)
-  audience       String?
-  problemSolved  String?
-  notes          String?
-  status         ProductStatus @default(IDEA)
-  trend          TrendStatus   @default(STABLE)
-  risk           RiskLevel     @default(MEDIUM)
-  isFavorite     Boolean       @default(false)
-  archivedAt     DateTime?
-  createdAt      DateTime      @default(now())
-  updatedAt      DateTime      @updatedAt
+  id                        String        @id @default(uuid())
+  workspaceId               String        @default("00000000-0000-0000-0000-000000000001")
+  // Canonical Phase 7 product identity
+  canonicalName             String
+  slug                      String?
+  description               String?
+  brandName                 String?
+  manufacturerName          String?
+  categoryId                String?
+  nicheId                   String?
+  status                    ProductStatus @default(DISCOVERED)
+  riskLevel                 RiskLevel     @default(MEDIUM)
+  primaryImageReferenceId   String?
+  languageCode              String        @default("de")
+  targetCountryCodes        String[]      @default(["DE"])
+  lastVerifiedAt            DateTime?
+  // Legacy "Product Radar" columns retained for backward compatibility
+  name                      String        @default("")
+  imageUrl                  String?
+  vendor                    String?
+  targetUrl                 String?
+  categoryLabel             String?
+  tags                      String[]      @default([])
+  price                     Decimal?      @db.Decimal(12, 2)
+  currency                  String        @default("EUR")
+  commissionRate            Decimal?      @db.Decimal(6, 3)
+  estimatedMargin           Decimal?      @db.Decimal(12, 2)
+  audience                  String?
+  problemSolved             String?
+  notes                     String?
+  trend                     TrendStatus   @default(STABLE)
+  risk                      RiskLevel     @default(MEDIUM)
+  isFavorite                Boolean       @default(false)
+  archivedAt                DateTime?
+  createdAt                 DateTime      @default(now())
+  updatedAt                 DateTime      @updatedAt
 
-  scores          ProductScore[]
-  affiliateLinks  AffiliateLink[]
-  campaigns       Campaign[]
-  scripts         Script[]
-  videoJobs       VideoJob[]
-  mediaAssets     MediaAsset[]
-  revenues        Revenue[]
-  expenses        Expense[]
+  // Relations
+  category                  ProductCategory?     @relation(fields: [categoryId], references: [id])
+  niche                     Niche?               @relation(fields: [nicheId], references: [id])
+  primaryImage              MediaAsset?          @relation("ProductPrimaryImage", fields: [primaryImageReferenceId], references: [id])
+  scores                    ProductScore[]
+  affiliateLinks            AffiliateLink[]
+  offers                    AffiliateOffer[]
+  complianceProfiles        ProductComplianceProfile[]
+  contentFitProfiles        ProductContentFitProfile[]
+  profitabilityEstimates    ProductProfitabilityEstimate[]
+  opportunities             ProductOpportunity[]
+  dataQualityReports        ProductDataQualityReport[]
+  matchCandidates           ProductMatchCandidate[] @relation("MatchSourceProduct")
+  campaigns                 Campaign[]
+  scripts                   Script[]
+  videoJobs                 VideoJob[]
+  mediaAssets               MediaAsset[]
+  revenues                  Revenue[]
+  expenses                  Expense[]
 
-  @@index([status])
-  @@index([category])
+  @@index([workspaceId, status])
+  @@index([workspaceId, categoryId])
+  @@index([workspaceId, nicheId])
+  @@index([workspaceId, riskLevel])
+  @@unique([workspaceId, slug])
 }
 
 model ProductScore {
@@ -167,6 +196,7 @@ model AffiliateProgram {
 
   links    AffiliateLink[]
   revenues Revenue[]
+  offers   AffiliateOffer[]
 
   @@index([provider])
 }
@@ -252,6 +282,7 @@ model Campaign {
   revenues    Revenue[]
   expenses    Expense[]
   mediaAssets MediaAsset[]
+  briefs      ContentBrief[]
 
   @@index([status])
 }
@@ -405,6 +436,8 @@ model MediaAsset {
 
   socialPosts SocialPost[]
 
+  primaryImageProducts Product[] @relation("ProductPrimaryImage")
+
   @@index([kind])
   @@index([campaignId])
 }
@@ -468,6 +501,9 @@ model SocialPost {
   status          SocialPostStatus  @default(DRAFT)
   errorMessage     String?
   attempts        Int               @default(0)
+  approvedBy      String?
+  approvedAt      DateTime?
+  publishJobs     PublishJob[]
   impressions     Int?
   reach           Int?
   likes           Int?
@@ -478,6 +514,37 @@ model SocialPost {
 
   @@index([status])
   @@index([scheduledAt])
+}
+
+enum PublishJobStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  DEAD
+}
+
+/**
+ * Durable publish queue. One row per publish attempt for a SocialPost. The
+ * worker picks PENDING jobs (and FAILED jobs whose `nextAttemptAt` has passed),
+ * calls the platform adapter, and either marks the job SUCCEEDED or applies
+ * exponential backoff. After `maxAttempts` failures the job is moved to DEAD
+ * (dead-letter) and must be retried manually — publishing is never retried
+ * indefinitely without an owner's intervention.
+ */
+model PublishJob {
+  id              String           @id @default(uuid())
+  postId          String
+  post            SocialPost       @relation(fields: [postId], references: [id], onDelete: Cascade)
+  status          PublishJobStatus @default(PENDING)
+  attempts        Int              @default(0)
+  lastError       String?
+  nextAttemptAt   DateTime?
+  externalPostUrl String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@index([status, nextAttemptAt])
 }
 
 // ---------------------------------------------------------------------------
@@ -652,6 +719,7 @@ model AgentRun {
   finishedAt DateTime?
   summary    String?
   logs       Json?
+  toolCalls  AgentToolCall[]
 
   @@index([agentId])
 }
@@ -755,4 +823,3270 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@index([createdAt])
+}
+
+// ===========================================================================
+// Phase 6 — Analytics, Content Intelligence, Experimentation, Optimization
+// Single-user workspace: `workspaceId` is a required, indexed String used for
+// isolation. Cross-references to pre-Phase-6 models (Product, Campaign,
+// SocialPost, SocialAccount, MediaAsset, AffiliateProgram, AffiliateLink) are
+// stored as scalar id columns and joined manually to avoid retrofitting
+// back-relations onto those models.
+// ===========================================================================
+
+enum AnalyticsEventType {
+  IMPRESSION
+  VIEW
+  VIDEO_STARTED
+  VIDEO_COMPLETED
+  LIKE
+  COMMENT
+  SHARE
+  SAVE
+  PROFILE_VISIT
+  LINK_CLICK
+  AFFILIATE_CLICK
+  LEAD
+  CONVERSION
+  REFUND
+  CHARGEBACK
+  REVENUE
+  COST
+}
+
+enum AnalyticsEventSource {
+  PLATFORM_API
+  AFFILIATE_API
+  WEBHOOK
+  CSV
+  INTERNAL
+  MANUAL
+}
+
+enum MetricSnapshotSource {
+  PLATFORM_API
+  CSV
+  MANUAL
+}
+
+enum SyncJobType {
+  ACCOUNT_SYNC
+  POST_SYNC
+  POST_BACKFILL
+  METRIC_NORMALIZATION
+  EVENT_DEDUPLICATION
+  AGGREGATION
+  ANOMALY_DETECTION
+}
+
+enum SyncJobStatus {
+  PENDING
+  PROCESSING
+  SUCCEEDED
+  FAILED
+  DEAD
+}
+
+enum AnalyticsSyncFailureCode {
+  AUTHENTICATION_FAILED
+  REAUTH_REQUIRED
+  ACCOUNT_RESTRICTED
+  POST_NOT_FOUND
+  RATE_LIMITED
+  UNSUPPORTED_METRIC
+  INVALID_RESPONSE
+  PLATFORM_UNAVAILABLE
+  NETWORK_ERROR
+  UNKNOWN_ERROR
+}
+
+enum PublishingFormat {
+  VIDEO_SHORT
+  VIDEO_LONG
+  IMAGE_CAROUSEL
+  STATIC_IMAGE
+  STORY
+  REEL
+  LIVESTREAM
+  TEXT_POST
+  OTHER
+}
+
+enum HookType {
+  PROBLEM
+  QUESTION
+  SHOCK
+  CURIOSITY
+  BENEFIT
+  COMPARISON
+  DEMONSTRATION
+  TESTIMONIAL
+  STORY
+  URGENCY
+  AUTHORITY
+  CONTRARIAN
+}
+
+enum ScriptStructureType {
+  HOOK_PROBLEM_SOLUTION_CTA
+  HOOK_DEMO_PROOF_CTA
+  STORY_PROBLEM_SOLUTION
+  COMPARISON_RECOMMENDATION
+  LISTICLE
+  BEFORE_AFTER
+  TESTIMONIAL
+  TUTORIAL
+  UNBOXING
+  REVIEW
+}
+
+enum CallToActionType {
+  CLICK_LINK
+  BUY_NOW
+  LEARN_MORE
+  SAVE_POST
+  FOLLOW
+  COMMENT
+  SHARE
+  VISIT_PROFILE
+  NONE
+}
+
+enum AnalysisSource {
+  MANUAL
+  RULE_ENGINE
+  AI
+}
+
+enum ContentVariantStatus {
+  DRAFT
+  READY
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum GeneratedBy {
+  HUMAN
+  TEMPLATE
+  AI
+  OPTIMIZATION_ENGINE
+}
+
+enum ApprovalStatus {
+  DRAFT
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum ApprovalResourceType {
+  product
+  affiliate_offer
+  product_opportunity
+  product_campaign_candidate
+  campaign_candidate
+  campaign_strategy
+  creative_angle
+  creative_brief
+  content_batch
+  production_task_override
+  production_schedule_override
+  campaign_quality_override
+  campaign_production
+  media_production_plan
+  voice_profile
+  avatar_profile
+  consent_record
+  media_generation_job
+  render_specification
+  media_timeline
+  render_job
+  subtitle_track
+  media_asset
+  media_variant
+}
+
+/// Phase 5/7 approval workflow. One row per approval request; the resource's
+/// own `status` (Product.status / ProductOpportunity.status) mirrors the outcome.
+model Approval {
+  id           String               @id @default(uuid())
+  workspaceId  String               @default("00000000-0000-0000-0000-000000000001")
+  resourceType ApprovalResourceType
+  resourceId   String
+  status       ApprovalStatus       @default(PENDING)
+  requestedBy    String?
+  decidedBy    String?
+  decisionReason String?
+  decidedAt    DateTime?
+  cost       Decimal?          @db.Decimal(12, 2)
+  currency   String?
+  expiresAt  DateTime?
+  payload    Json?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+
+  @@index([workspaceId, resourceType, resourceId])
+  @@index([resourceType, resourceId])
+}
+
+enum ExperimentStatus {
+  DRAFT
+  AWAITING_APPROVAL
+  SCHEDULED
+  RUNNING
+  PAUSED
+  COMPLETED
+  CANCELLED
+  INCONCLUSIVE
+}
+
+enum ExperimentType {
+  HOOK
+  SCRIPT
+  CAPTION
+  THUMBNAIL
+  CTA
+  POSTING_TIME
+  CONTENT_FORMAT
+  PRODUCT
+  PLATFORM
+}
+
+enum ExperimentMetric {
+  VIEW_RATE
+  COMPLETION_RATE
+  ENGAGEMENT_RATE
+  CLICK_THROUGH_RATE
+  CONVERSION_RATE
+  COMMISSION_REVENUE
+  ESTIMATED_NET_REVENUE
+  REVENUE_PER_VIEW
+  REVENUE_PER_CLICK
+  RETURN_ON_CONTENT_SPEND
+}
+
+enum TrafficAllocationMode {
+  EQUAL
+  WEIGHTED
+  MANUAL
+}
+
+enum ExperimentVariantStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+}
+
+enum ExperimentAssignmentType {
+  PUBLISHING_JOB
+  SOCIAL_ACCOUNT
+  TIME_SLOT
+  AUDIENCE_SEGMENT
+}
+
+enum AnalysisMethod {
+  FREQUENTIST
+  BAYESIAN
+  DESCRIPTIVE
+}
+
+enum ExperimentResultStatus {
+  RUNNING
+  INSUFFICIENT_DATA
+  INCONCLUSIVE
+  WINNER_FOUND
+  COMPLETED_WITHOUT_WINNER
+}
+
+enum RecommendationType {
+  CREATE_VARIANT
+  REUSE_HOOK
+  RETIRE_HOOK
+  CHANGE_CTA
+  CHANGE_POSTING_TIME
+  CHANGE_PLATFORM
+  PROMOTE_PRODUCT
+  PAUSE_PRODUCT
+  INCREASE_TESTING
+  REDUCE_COST
+  REVIEW_ATTRIBUTION
+  REVIEW_COMPLIANCE
+}
+
+enum ScopeType {
+  WORKSPACE
+  BRAND
+  NICHE
+  CAMPAIGN
+  PRODUCT
+  CONTENT_ASSET
+  CONTENT_VARIANT
+  SOCIAL_ACCOUNT
+}
+
+enum ExpectedImpact {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum RecommendationStatus {
+  GENERATED
+  REVIEWED
+  ACCEPTED
+  REJECTED
+  IMPLEMENTED
+  EXPIRED
+}
+
+enum OptimizationMode {
+  OBSERVE_ONLY
+  RECOMMEND
+  DRAFT_VARIANTS
+}
+
+enum AnomalySeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AnomalyStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+  DISMISSED
+}
+
+enum DataQualityScope {
+  WORKSPACE
+  SOCIAL_ACCOUNT
+  CAMPAIGN
+  CONTENT_ASSET
+  AFFILIATE_PROGRAM
+}
+
+enum DataQualityIssueType {
+  MISSING_METRICS
+  STALE_METRICS
+  DUPLICATE_EVENTS
+  CURRENCY_MISMATCH
+  MISSING_ATTRIBUTION
+  INVALID_TIMESTAMP
+  METRIC_REGRESSION
+  PROVIDER_MAPPING_ERROR
+  ORPHANED_POST
+  ORPHANED_TRANSACTION
+  UNEXPECTED_NEGATIVE_VALUE
+}
+
+enum OptimizationRuleStatus {
+  ACTIVE
+  DISABLED
+}
+
+// ---------------------------------------------------------------------------
+// Supporting reference models
+// ---------------------------------------------------------------------------
+
+model Brand {
+  id        String   @id @default(uuid())
+  workspaceId String
+  name      String
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([workspaceId])
+}
+
+model Niche {
+  id        String   @id @default(uuid())
+  workspaceId String
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  products Product[]
+
+  @@index([workspaceId])
+}
+
+model ContentAsset {
+  id            String   @id @default(uuid())
+  workspaceId   String
+  name          String
+  mediaAssetId  String?
+  brandId       String?
+  nicheId       String?
+  format        PublishingFormat?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  intelligenceProfiles ContentIntelligenceProfile[]
+  variants             ContentVariant[]
+
+  @@index([workspaceId])
+  @@index([brandId])
+  @@index([nicheId])
+}
+
+// ---------------------------------------------------------------------------
+// Analytics event model
+// ---------------------------------------------------------------------------
+
+model AnalyticsEvent {
+  id                 String              @id @default(uuid())
+  workspaceId        String
+  eventType          AnalyticsEventType
+  platform           SocialPlatform?
+  socialAccountId    String?
+  brandId            String?
+  nicheId            String?
+  campaignId         String?
+  publishingJobId    String?
+  externalPostId     String?
+  contentAssetId     String?
+  contentVariantId   String?
+  productId          String?
+  affiliateProgramId String?
+  affiliateLinkId    String?
+  experimentId       String?
+  experimentVariantId String?
+  numericValue       Decimal?            @db.Decimal(14, 2)
+  currency           String?
+  occurredAt         DateTime            @db.Timestamptz(6)
+  sourceTimezone     String?
+  importedAt         DateTime            @default(now())
+  source             AnalyticsEventSource
+  externalEventId    String?
+  idempotencyKey     String              @unique
+  metadataReferenceId String?
+  correctedByEventId String?
+
+  @@index([workspaceId, occurredAt])
+  @@index([workspaceId, eventType])
+  @@index([contentAssetId])
+  @@index([experimentId])
+  @@index([externalPostId])
+}
+
+// ---------------------------------------------------------------------------
+// Normalized platform metrics
+// ---------------------------------------------------------------------------
+
+model PlatformMetricSnapshot {
+  id                  String             @id @default(uuid())
+  workspaceId         String
+  platform            SocialPlatform
+  socialAccountId     String
+  externalPostId      String
+  publishingJobId     String?
+  contentAssetId      String?
+  measuredAt          DateTime           @db.Timestamptz(6)
+  periodStart         DateTime?          @db.Timestamptz(6)
+  periodEnd           DateTime?          @db.Timestamptz(6)
+  impressions         BigInt?
+  reach               BigInt?
+  views               BigInt?
+  videoStarts         BigInt?
+  videoCompletions    BigInt?
+  likes               BigInt?
+  comments            BigInt?
+  shares              BigInt?
+  saves               BigInt?
+  profileVisits       BigInt?
+  linkClicks          BigInt?
+  averageWatchTimeSeconds Decimal?        @db.Decimal(12, 2)
+  totalWatchTimeSeconds   Decimal?        @db.Decimal(14, 2)
+  completionRate      Decimal?           @db.Decimal(6, 4)
+  source              MetricSnapshotSource
+  externalSnapshotId  String?
+  createdAt           DateTime           @default(now())
+
+  @@index([workspaceId, platform])
+  @@index([socialAccountId, measuredAt])
+  @@index([externalPostId])
+}
+
+// ---------------------------------------------------------------------------
+// Sync jobs + provider mapping
+// ---------------------------------------------------------------------------
+
+model AnalyticsSyncJob {
+  id               String              @id @default(uuid())
+  workspaceId      String
+  jobType          SyncJobType
+  socialAccountId  String?
+  externalPostId   String?
+  correlationId    String
+  idempotencyKey   String?             @unique
+  periodStart      DateTime?
+  periodEnd        DateTime?
+  attempts         Int                 @default(0)
+  maxAttempts      Int                 @default(5)
+  status           SyncJobStatus       @default(PENDING)
+  failureCode      AnalyticsSyncFailureCode?
+  lastError        String?
+  nextAttemptAt    DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  @@index([status, nextAttemptAt])
+  @@index([workspaceId, jobType])
+  @@index([socialAccountId])
+}
+
+model AnalyticsProviderMapping {
+  id              String   @id @default(uuid())
+  workspaceId     String
+  platform        SocialPlatform
+  version         Int      @default(1)
+  mapping         Json
+  createdAt       DateTime @default(now())
+  @@unique([platform, version])
+  @@index([workspaceId, platform])
+}
+
+// ---------------------------------------------------------------------------
+// Content intelligence + variants
+// ---------------------------------------------------------------------------
+
+model ContentIntelligenceProfile {
+  id                    String         @id @default(uuid())
+  workspaceId           String
+  contentAssetId        String
+  contentVariantId      String?
+  language              String
+  durationSeconds       Decimal?       @db.Decimal(10, 2)
+  aspectRatio           String?
+  contentFormat         PublishingFormat?
+  hookType              HookType?
+  scriptStructure       ScriptStructureType?
+  callToActionType      CallToActionType?
+  visualStyle           String?
+  voiceStyle            String?
+  pacing               String?
+  sentiment             String?
+  productMentionCount   Int            @default(0)
+  affiliateDisclosurePresent Boolean    @default(false)
+  subtitlePresent       Boolean         @default(false)
+  faceVisible           Boolean?
+  avatarUsed            Boolean?
+  analysisSource        AnalysisSource
+  modelReference        String?
+  confidenceScore       Decimal?       @db.Decimal(4, 3)
+  analyzedAt            DateTime       @default(now())
+  supersededByProfileId String?
+
+  contentAsset          ContentAsset   @relation(fields: [contentAssetId], references: [id], onDelete: Cascade)
+  contentVariant        ContentVariant? @relation(fields: [contentVariantId], references: [id])
+
+  @@index([workspaceId, contentAssetId])
+  @@index([hookType])
+}
+
+model ContentVariant {
+  id                        String              @id @default(uuid())
+  workspaceId               String
+  parentContentAssetId      String
+  name                      String
+  version                   Int
+  status                    ContentVariantStatus @default(DRAFT)
+  hookText                  String?
+  scriptText                String?
+  captionText               String?
+  titleText                 String?
+  callToActionText          String?
+  mediaAssetId              String?
+  thumbnailAssetId          String?
+  voiceAssetId              String?
+  generatedBy               GeneratedBy         @default(HUMAN)
+  sourceVariantId           String?
+  generationPromptReferenceId String?
+  approvalStatus            ApprovalStatus      @default(DRAFT)
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+
+  parentContentAsset        ContentAsset         @relation(fields: [parentContentAssetId], references: [id], onDelete: Cascade)
+  intelligenceProfiles      ContentIntelligenceProfile[]
+  experimentVariants        ExperimentVariant[]
+
+  @@index([workspaceId, parentContentAssetId])
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------------
+// Aggregations
+// ---------------------------------------------------------------------------
+
+model ContentPerformanceSnapshot {
+  id                  String    @id @default(uuid())
+  workspaceId         String
+  contentAssetId      String
+  contentVariantId    String?
+  platform            SocialPlatform?
+  socialAccountId     String?
+  brandId             String?
+  nicheId             String?
+  productId           String?
+  campaignId          String?
+  periodStart         DateTime  @db.Timestamptz(6)
+  periodEnd           DateTime  @db.Timestamptz(6)
+  impressions         BigInt    @default(0)
+  views               BigInt    @default(0)
+  engagements         BigInt    @default(0)
+  linkClicks          BigInt    @default(0)
+  conversions         BigInt    @default(0)
+  grossRevenue        Decimal   @db.Decimal(14, 2) @default(0)
+  commissionRevenue   Decimal   @db.Decimal(14, 2) @default(0)
+  attributedCosts     Decimal   @db.Decimal(14, 2) @default(0)
+  estimatedNetRevenue Decimal   @db.Decimal(14, 2) @default(0)
+  engagementRate      Decimal?  @db.Decimal(6, 4)
+  clickThroughRate    Decimal?  @db.Decimal(6, 4)
+  conversionRate      Decimal?  @db.Decimal(6, 4)
+  completionRate      Decimal?  @db.Decimal(6, 4)
+  revenuePerView      Decimal?  @db.Decimal(14, 4)
+  revenuePerClick     Decimal?  @db.Decimal(14, 4)
+  revenuePerPost      Decimal?  @db.Decimal(14, 4)
+  returnOnContentSpend Decimal? @db.Decimal(10, 4)
+  sampleSize          BigInt    @default(0)
+  formulaVersion      String    @default("1.0.0")
+  generatedAt         DateTime  @default(now())
+
+  @@index([workspaceId, contentAssetId])
+  @@index([periodStart, periodEnd])
+}
+
+model ProductPerformanceSnapshot {
+  id                  String    @id @default(uuid())
+  workspaceId         String
+  productId           String
+  brandId             String?
+  nicheId             String?
+  periodStart         DateTime  @db.Timestamptz(6)
+  periodEnd           DateTime  @db.Timestamptz(6)
+  publishedPostCount  Int       @default(0)
+  impressions         BigInt    @default(0)
+  views               BigInt    @default(0)
+  affiliateClicks     BigInt    @default(0)
+  conversions         BigInt    @default(0)
+  grossRevenue        Decimal   @db.Decimal(14, 2) @default(0)
+  commissionRevenue   Decimal   @db.Decimal(14, 2) @default(0)
+  attributedCosts     Decimal   @db.Decimal(14, 2) @default(0)
+  estimatedNetRevenue Decimal   @db.Decimal(14, 2) @default(0)
+  clickThroughRate    Decimal?  @db.Decimal(6, 4)
+  conversionRate      Decimal?  @db.Decimal(6, 4)
+  returnOnContentSpend Decimal? @db.Decimal(10, 4)
+  refundRate          Decimal?  @db.Decimal(6, 4)
+  chargebackRate      Decimal?  @db.Decimal(6, 4)
+  dataQualityScore    Decimal   @db.Decimal(4, 3) @default(0)
+  formulaVersion      String    @default("1.0.0")
+  generatedAt         DateTime  @default(now())
+
+  @@index([workspaceId, productId])
+  @@index([periodStart, periodEnd])
+}
+
+model PostingTimePerformance {
+  id                  String         @id @default(uuid())
+  workspaceId         String
+  socialAccountId     String
+  platform            SocialPlatform
+  weekday             Int
+  hourOfDay           Int
+  timezone            String
+  postCount           Int            @default(0)
+  impressions         BigInt         @default(0)
+  views               BigInt         @default(0)
+  linkClicks          BigInt         @default(0)
+  conversions         BigInt         @default(0)
+  commissionRevenue   Decimal        @db.Decimal(14, 2) @default(0)
+  engagementRate      Decimal?       @db.Decimal(6, 4)
+  clickThroughRate    Decimal?       @db.Decimal(6, 4)
+  conversionRate      Decimal?       @db.Decimal(6, 4)
+  sampleSize          BigInt         @default(0)
+  generatedAt         DateTime       @default(now())
+
+  @@unique([socialAccountId, weekday, hourOfDay, timezone])
+  @@index([workspaceId, socialAccountId])
+}
+
+// ---------------------------------------------------------------------------
+// Experimentation
+// ---------------------------------------------------------------------------
+
+model ContentExperiment {
+  id                            String              @id @default(uuid())
+  workspaceId                   String
+  brandId                       String
+  name                          String
+  description                   String?
+  experimentType                ExperimentType
+  status                        ExperimentStatus    @default(DRAFT)
+  primaryMetric                 ExperimentMetric
+  secondaryMetrics              ExperimentMetric[]
+  minimumSampleSize             Int
+  minimumRuntimeHours           Int
+  maximumRuntimeHours           Int
+  confidenceThreshold           Decimal             @db.Decimal(4, 3)
+  practicalSignificanceThreshold Decimal            @db.Decimal(14, 4)
+  trafficAllocationMode         TrafficAllocationMode @default(EQUAL)
+  approvalStatus                ApprovalStatus      @default(DRAFT)
+  startedAt                     DateTime?
+  endedAt                       DateTime?
+  createdAt                     DateTime            @default(now())
+  updatedAt                     DateTime            @updatedAt
+
+  variants                      ExperimentVariant[]
+  assignments                   ExperimentAssignment[]
+  results                       ExperimentResult[]
+
+  @@index([workspaceId, status])
+  @@index([brandId])
+}
+
+model ExperimentVariant {
+  id                      String                  @id @default(uuid())
+  experimentId            String
+  contentVariantId        String?
+  publishingConfigurationId String?
+  name                    String
+  isControl               Boolean                 @default(false)
+  trafficWeight           Int
+  status                  ExperimentVariantStatus @default(DRAFT)
+  createdAt               DateTime                @default(now())
+
+  experiment              ContentExperiment       @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  contentVariant          ContentVariant?         @relation(fields: [contentVariantId], references: [id])
+  assignments             ExperimentAssignment[]
+
+  @@index([experimentId])
+}
+
+model ExperimentAssignment {
+  id                  String                  @id @default(uuid())
+  workspaceId         String
+  experimentId        String
+  experimentVariantId String
+  assignmentKey       String
+  assignmentType      ExperimentAssignmentType
+  assignmentReferenceId String
+  assignedAt          DateTime                @default(now())
+
+  experiment          ContentExperiment        @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  variant             ExperimentVariant        @relation(fields: [experimentVariantId], references: [id])
+
+  @@unique([experimentId, assignmentKey])
+  @@index([workspaceId, experimentId])
+  @@index([assignmentReferenceId])
+}
+
+model ExperimentResult {
+  id                    String                @id @default(uuid())
+  experimentId          String
+  analyzedAt            DateTime              @default(now())
+  status                ExperimentResultStatus
+  winningVariantId      String?
+  primaryMetric         ExperimentMetric
+  controlValue          Decimal?              @db.Decimal(14, 4)
+  winningValue          Decimal?              @db.Decimal(14, 4)
+  relativeLift          Decimal?              @db.Decimal(10, 4)
+  absoluteLift          Decimal?              @db.Decimal(14, 4)
+  sampleSize            BigInt                @default(0)
+  confidenceScore       Decimal?              @db.Decimal(4, 3)
+  practicalSignificanceReached Boolean        @default(false)
+  analysisMethod        AnalysisMethod        @default(FREQUENTIST)
+  analysisVersion       String
+  explanation           String
+
+  experiment            ContentExperiment      @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+
+  @@index([experimentId])
+}
+
+// ---------------------------------------------------------------------------
+// Recommendations + policies
+// ---------------------------------------------------------------------------
+
+model OptimizationRecommendation {
+  id                    String           @id @default(uuid())
+  workspaceId           String
+  recommendationType    RecommendationType
+  scopeType             ScopeType
+  scopeId               String
+  title                 String
+  explanation           String
+  confidenceScore       Decimal           @db.Decimal(4, 3)
+  expectedImpact        ExpectedImpact
+  evidenceReferences    String[]
+  minimumEvidenceCount  Int
+  sampleSize            BigInt?
+  status                RecommendationStatus @default(GENERATED)
+  requiresApproval      Boolean          @default(true)
+  expiresAt             DateTime?
+  ruleId                String?
+  generatedAt           DateTime         @default(now())
+  reviewedAt            DateTime?
+  reviewedBy            String?
+
+  @@index([workspaceId, status])
+  @@index([recommendationType, scopeType, scopeId])
+}
+
+model OptimizationPolicy {
+  id                              String         @id @default(uuid())
+  workspaceId                     String
+  scopeType                       ScopeType
+  scopeId                         String
+  mode                            OptimizationMode @default(OBSERVE_ONLY)
+  minimumSampleSize               Int
+  minimumConfidenceScore          Decimal        @db.Decimal(4, 3)
+  maximumRecommendationsPerDay    Int
+  allowAiAnalysis                 Boolean        @default(false)
+  allowAiVariantDrafts            Boolean        @default(false)
+  requireApprovalForExperiment    Boolean        @default(true)
+  requireApprovalForVariantDraft  Boolean        @default(true)
+  requireApprovalForScheduleChange Boolean       @default(true)
+  blockedRecommendationTypes      RecommendationType[]
+  createdAt                       DateTime       @default(now())
+  updatedAt                       DateTime       @updatedAt
+
+  @@index([workspaceId, scopeType, scopeId])
+}
+
+// ---------------------------------------------------------------------------
+// Audience segments
+// ---------------------------------------------------------------------------
+
+model AudienceSegment {
+  id                  String   @id @default(uuid())
+  workspaceId         String
+  name                String
+  description         String?
+  platform            SocialPlatform?
+  countryCodes        String[]
+  languageCodes       String[]
+  interestTags        String[]
+  behaviorTags        String[]
+  status              String   @default("draft")
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@index([workspaceId])
+}
+
+// ---------------------------------------------------------------------------
+// Data quality + anomalies
+// ---------------------------------------------------------------------------
+
+model DataQualityReport {
+  id                  String           @id @default(uuid())
+  workspaceId         String
+  scopeType           DataQualityScope
+  scopeId             String
+  completenessScore   Decimal          @db.Decimal(4, 3)
+  consistencyScore    Decimal          @db.Decimal(4, 3)
+  freshnessScore      Decimal          @db.Decimal(4, 3)
+  attributionScore    Decimal          @db.Decimal(4, 3)
+  overallScore        Decimal          @db.Decimal(4, 3)
+  issueCount          Int              @default(0)
+  generatedAt         DateTime         @default(now())
+
+  issues              DataQualityIssue[]
+  @@index([workspaceId, scopeType, scopeId])
+}
+
+model DataQualityIssue {
+  id                String               @id @default(uuid())
+  reportId          String
+  issueType         DataQualityIssueType
+  severity          AnomalySeverity
+  detail            String?
+  detectedAt        DateTime             @default(now())
+
+  report            DataQualityReport    @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  @@index([reportId])
+}
+
+model AnalyticsAnomaly {
+  id                  String           @id @default(uuid())
+  workspaceId         String
+  anomalyType         String
+  scopeType           ScopeType
+  scopeId             String
+  severity            AnomalySeverity
+  observedValue       Decimal?         @db.Decimal(14, 4)
+  expectedRangeMin    Decimal?         @db.Decimal(14, 4)
+  expectedRangeMax    Decimal?         @db.Decimal(14, 4)
+  explanation         String
+  evidenceReferences  String[]
+  status              AnomalyStatus    @default(OPEN)
+  detectedAt          DateTime         @default(now())
+  resolvedAt          DateTime?
+
+  @@index([workspaceId, status])
+  @@index([scopeType, scopeId])
+}
+
+// ---------------------------------------------------------------------------
+// Optimization rules
+// ---------------------------------------------------------------------------
+
+model OptimizationRule {
+  id          String               @id @default(uuid())
+  workspaceId String
+  code        String
+  name        String
+  version     Int                  @default(1)
+  description String?
+  status      OptimizationRuleStatus @default(ACTIVE)
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  executions  OptimizationRuleExecution[]
+  @@unique([code, version])
+  @@index([workspaceId, status])
+}
+
+model OptimizationRuleExecution {
+  id                String   @id @default(uuid())
+  ruleId            String
+  workspaceId       String
+  executedAt        DateTime @default(now())
+  recommendationIds String[]
+  evaluatedCount    Int      @default(0)
+  matchedCount      Int      @default(0)
+
+  rule              OptimizationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, ruleId])
+}
+
+// ===========================================================================
+// Phase 7 — Product Intelligence
+// ===========================================================================
+
+enum AffiliateOfferStatus {
+  ACTIVE
+  PAUSED
+  EXPIRED
+  UNAVAILABLE
+  INVALID
+}
+
+enum Availability {
+  IN_STOCK
+  LIMITED
+  OUT_OF_STOCK
+  PREORDER
+  UNKNOWN
+}
+
+enum CommissionType {
+  PERCENTAGE
+  FIXED
+  VARIABLE
+  UNKNOWN
+}
+
+enum ProductSourceFailureCode {
+  AUTHENTICATION_FAILED
+  REAUTH_REQUIRED
+  PROGRAM_NOT_APPROVED
+  PERMISSION_DENIED
+  RATE_LIMITED
+  PRODUCT_NOT_FOUND
+  OFFER_NOT_FOUND
+  INVALID_RESPONSE
+  UNSUPPORTED_OPERATION
+  PLATFORM_UNAVAILABLE
+  NETWORK_ERROR
+  UNKNOWN_ERROR
+}
+
+enum DiscoveryQueryStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum DiscoveryRunStatus {
+  QUEUED
+  RUNNING
+  PARTIALLY_COMPLETED
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum MatchMethod {
+  EXTERNAL_ID
+  GTIN
+  MANUFACTURER_PART_NUMBER
+  NORMALIZED_NAME
+  FUZZY
+  MANUAL
+}
+
+enum MatchStatus {
+  PENDING
+  CONFIRMED
+  REJECTED
+}
+
+enum ComplianceStatus {
+  PENDING
+  PASSED
+  FAILED
+  MANUAL_REVIEW
+}
+
+enum OpportunityStatus {
+  NEW
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  EXPIRED
+  CONVERTED_TO_CAMPAIGN
+}
+
+enum ResearchJobType {
+  PRODUCT_DISCOVERY_RUN
+  PRODUCT_PROVIDER_IMPORT
+  PRODUCT_NORMALIZATION
+  PRODUCT_DEDUPLICATION
+  PRODUCT_OFFER_REFRESH
+  PRODUCT_COMPLIANCE_EVALUATION
+  PRODUCT_CONTENT_FIT_ANALYSIS
+  PRODUCT_PROFITABILITY_ESTIMATION
+  PRODUCT_OPPORTUNITY_SCORING
+  PRODUCT_OPPORTUNITY_EXPIRATION
+  PRODUCT_DATA_QUALITY_SCAN
+}
+
+enum ResearchJobStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum ProductDataQualityIssueType {
+  MISSING_TITLE
+  MISSING_DESCRIPTION
+  MISSING_CATEGORY
+  MISSING_BRAND
+  MISSING_PRICE
+  MISSING_CURRENCY
+  MISSING_COMMISSION
+  MISSING_AVAILABILITY
+  MISSING_TARGET_MARKET
+  INVALID_PRODUCT_URL
+  INVALID_AFFILIATE_URL
+  STALE_OFFER
+  CONFLICTING_IDENTITY
+  POSSIBLE_DUPLICATE
+  CURRENCY_MISMATCH
+  COMPLIANCE_NOT_EVALUATED
+  INACTIVE_AFFILIATE_PROGRAM
+}
+
+model ProductCategory {
+  id                       String       @id @default(uuid())
+  workspaceId              String       @default("00000000-0000-0000-0000-000000000001")
+  name                     String
+  slug                     String
+  parentCategoryId         String?
+  riskLevel                RiskLevel    @default(LOW)
+  requiresManualApproval   Boolean      @default(false)
+  contentGenerationAllowed Boolean      @default(true)
+  affiliatePromotionAllowed Boolean      @default(true)
+  createdAt                DateTime     @default(now())
+  updatedAt                DateTime     @updatedAt
+
+  parent    ProductCategory?    @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id])
+  children  ProductCategory[]   @relation("CategoryHierarchy")
+  products  Product[]
+
+  @@unique([workspaceId, slug])
+  @@index([workspaceId, parentCategoryId])
+}
+
+model AffiliateOffer {
+  id                   String               @id @default(uuid())
+  workspaceId          String               @default("00000000-0000-0000-0000-000000000001")
+  productId            String
+  affiliateProgramId   String
+  provider             AffiliateProviderKey
+  externalProductId    String
+  externalOfferId      String?
+  title                String
+  description          String?
+  productUrl           String
+  affiliateUrl         String?
+  priceAmount          Decimal?             @db.Decimal(12, 2)
+  originalPriceAmount  Decimal?             @db.Decimal(12, 2)
+  currency             String?
+  commissionType       CommissionType       @default(UNKNOWN)
+  commissionRate       Decimal?             @db.Decimal(6, 4)
+  commissionAmount     Decimal?             @db.Decimal(12, 2)
+  availability         Availability         @default(UNKNOWN)
+  sellerName           String?
+  shippingCountryCodes String[]             @default([])
+  averageRating        Decimal?             @db.Decimal(3, 2)
+  ratingCount          BigInt?
+  status               AffiliateOfferStatus @default(ACTIVE)
+  sourceUpdatedAt      DateTime?
+  importedAt           DateTime             @default(now())
+  lastCheckedAt        DateTime?
+  rawReferenceId       String?
+
+  product           Product                 @relation(fields: [productId], references: [id], onDelete: Cascade)
+  affiliateProgram  AffiliateProgram        @relation(fields: [affiliateProgramId], references: [id])
+  snapshots         AffiliateOfferSnapshot[]
+  matchCandidates   ProductMatchCandidate[] @relation("MatchOffer")
+  profitabilityEstimates ProductProfitabilityEstimate[]
+  opportunities     ProductOpportunity[]
+
+  @@unique([provider, externalProductId, externalOfferId])
+  @@index([workspaceId, productId])
+  @@index([workspaceId, affiliateProgramId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, provider])
+}
+
+model AffiliateOfferSnapshot {
+  id                String       @id @default(uuid())
+  workspaceId       String       @default("00000000-0000-0000-0000-000000000001")
+  affiliateOfferId  String
+  priceAmount       Decimal?     @db.Decimal(12, 2)
+  originalPriceAmount Decimal?   @db.Decimal(12, 2)
+  currency          String?
+  commissionRate    Decimal?     @db.Decimal(6, 4)
+  commissionAmount  Decimal?     @db.Decimal(12, 2)
+  availability      Availability
+  averageRating     Decimal?     @db.Decimal(3, 2)
+  ratingCount       BigInt?
+  capturedAt        DateTime     @default(now())
+
+  offer  AffiliateOffer @relation(fields: [affiliateOfferId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, affiliateOfferId, capturedAt])
+}
+
+model ProductDiscoveryQuery {
+  id                    String               @id @default(uuid())
+  workspaceId           String               @default("00000000-0000-0000-0000-000000000001")
+  name                  String
+  nicheId               String?
+  keywords              String[]             @default([])
+  excludedKeywords      String[]             @default([])
+  categoryIds           String[]             @default([])
+  excludedCategoryIds   String[]             @default([])
+  targetCountryCodes    String[]             @default([])
+  languageCodes         String[]             @default([])
+  minimumPrice          Decimal?             @db.Decimal(12, 2)
+  maximumPrice          Decimal?             @db.Decimal(12, 2)
+  currency              String?
+  minimumCommissionRate Decimal?             @db.Decimal(6, 4)
+  minimumCommissionAmount Decimal?           @db.Decimal(12, 2)
+  minimumRating         Decimal?             @db.Decimal(3, 2)
+  minimumRatingCount    Int?
+  requireInStock        Boolean              @default(false)
+  providerIds           String[]             @default([])
+  status                DiscoveryQueryStatus @default(DRAFT)
+  currentVersion        Int                  @default(1)
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  versions  ProductDiscoveryQueryVersion[]
+  runs      ProductDiscoveryRun[]
+
+  @@index([workspaceId, status])
+}
+
+model ProductDiscoveryQueryVersion {
+  id            String   @id @default(uuid())
+  workspaceId   String   @default("00000000-0000-0000-0000-000000000001")
+  queryId       String
+  version       Int
+  querySnapshot Json
+  createdAt     DateTime @default(now())
+
+  query  ProductDiscoveryQuery @relation(fields: [queryId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, queryId])
+}
+
+model ProductDiscoveryRun {
+  id                    String              @id @default(uuid())
+  workspaceId           String              @default("00000000-0000-0000-0000-000000000001")
+  queryId               String
+  status                DiscoveryRunStatus   @default(QUEUED)
+  providerCount         Int                 @default(0)
+  successfulProviderCount Int                @default(0)
+  failedProviderCount   Int                 @default(0)
+  discoveredOfferCount  Int                 @default(0)
+  newProductCount       Int                 @default(0)
+  updatedProductCount   Int                 @default(0)
+  duplicateCount        Int                 @default(0)
+  rejectedCount         Int                 @default(0)
+  startedAt             DateTime?
+  completedAt           DateTime?
+  correlationId         String
+  idempotencyKey        String              @unique
+  failureReason         String?
+  createdAt             DateTime            @default(now())
+
+  query         ProductDiscoveryQuery       @relation(fields: [queryId], references: [id])
+  providerRuns  ProductDiscoveryProviderRun[]
+
+  @@index([workspaceId, queryId])
+  @@index([workspaceId, status])
+}
+
+model ProductDiscoveryProviderRun {
+  id                 String              @id @default(uuid())
+  workspaceId        String              @default("00000000-0000-0000-0000-000000000001")
+  discoveryRunId     String
+  provider           AffiliateProviderKey
+  status             DiscoveryRunStatus   @default(QUEUED)
+  discoveredOfferCount Int                @default(0)
+  newProductCount    Int                 @default(0)
+  updatedProductCount Int                @default(0)
+  duplicateCount     Int                 @default(0)
+  rejectedCount      Int                 @default(0)
+  failureCode        ProductSourceFailureCode?
+  failureReason      String?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  run                ProductDiscoveryRun  @relation(fields: [discoveryRunId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, discoveryRunId])
+  @@index([workspaceId, provider])
+}
+
+model ProductImportBatch {
+  id           String   @id @default(uuid())
+  workspaceId  String   @default("00000000-0000-0000-0000-000000000001")
+  fileName     String?
+  fileHash     String?
+  source       String   @default("csv")
+  status       String   @default("preview")
+  previewToken String?  @unique
+  validRows    Int      @default(0)
+  invalidRows  Int      @default(0)
+  warningRows  Int      @default(0)
+  committedAt  DateTime?
+  createdAt    DateTime @default(now())
+
+  rows  ProductImportRow[]
+
+  @@index([workspaceId, previewToken])
+}
+
+model ProductImportRow {
+  id              String   @id @default(uuid())
+  workspaceId     String   @default("00000000-0000-0000-0000-000000000001")
+  batchId         String
+  rowIndex        Int
+  status          String   @default("valid")
+  rawData         Json
+  normalizedData  Json?
+  errors          Json?
+  warnings        Json?
+  batch           ProductImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, batchId])
+}
+
+model ProductMatchCandidate {
+  id                 String       @id @default(uuid())
+  workspaceId        String       @default("00000000-0000-0000-0000-000000000001")
+  sourceOfferId      String
+  candidateProductId String
+  matchMethod        MatchMethod
+  confidenceScore    Decimal      @db.Decimal(4, 3)
+  evidence           String[]     @default([])
+  status             MatchStatus  @default(PENDING)
+  createdAt          DateTime     @default(now())
+  decidedAt          DateTime?
+  decidedBy          String?
+
+  sourceOffer      AffiliateOffer @relation("MatchOffer", fields: [sourceOfferId], references: [id], onDelete: Cascade)
+  candidateProduct Product        @relation("MatchSourceProduct", fields: [candidateProductId], references: [id])
+
+  @@index([workspaceId, sourceOfferId])
+  @@index([workspaceId, candidateProductId])
+  @@index([workspaceId, status])
+}
+
+model ProductComplianceProfile {
+  id                           String           @id @default(uuid())
+  workspaceId                  String           @default("00000000-0000-0000-0000-000000000001")
+  productId                    String
+  categoryAllowed              Boolean          @default(true)
+  nicheAllowed                 Boolean          @default(true)
+  targetMarketAllowed          Boolean          @default(true)
+  affiliateProgramAllowsPromotion Boolean?
+  ageRestrictionDetected       Boolean          @default(false)
+  healthClaimRiskDetected      Boolean          @default(false)
+  financialClaimRiskDetected   Boolean          @default(false)
+  regulatedProductRiskDetected Boolean          @default(false)
+  trademarkRiskDetected        Boolean          @default(false)
+  misleadingClaimRiskDetected  Boolean          @default(false)
+  disclosureRequired           Boolean          @default(false)
+  manualReviewRequired         Boolean          @default(false)
+  riskLevel                    RiskLevel        @default(LOW)
+  status                       ComplianceStatus @default(PENDING)
+  reasons                      String[]         @default([])
+  evidenceReferences           String[]         @default([])
+  evaluatedAt                  DateTime         @default(now())
+  evaluationVersion            String
+
+  product  Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, productId])
+}
+
+model ProductContentFitProfile {
+  id                        String               @id @default(uuid())
+  workspaceId               String               @default("00000000-0000-0000-0000-000000000001")
+  productId                 String
+  demonstrabilityScore      Int                  @default(0)
+  visualAppealScore         Int                  @default(0)
+  problemSolutionFitScore   Int                  @default(0)
+  testimonialFitScore       Int                  @default(0)
+  tutorialFitScore          Int                  @default(0)
+  shortVideoFitScore        Int                  @default(0)
+  recommendedHookTypes      HookType[]           @default([])
+  recommendedScriptStructures ScriptStructureType[] @default([])
+  recommendedContentFormats PublishingFormat[]   @default([])
+  confidenceScore           Decimal              @db.Decimal(4, 3) @default("0")
+  evidenceReferences        String[]             @default([])
+  generatedAt               DateTime             @default(now())
+
+  product  Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, productId])
+}
+
+model ProductProfitabilityEstimate {
+  id                           String   @id @default(uuid())
+  workspaceId                  String   @default("00000000-0000-0000-0000-000000000001")
+  productId                    String
+  affiliateOfferId             String
+  currency                     String
+  estimatedCommissionPerConversion Decimal? @db.Decimal(12, 2)
+  estimatedConversionRate      Decimal?  @db.Decimal(6, 4)
+  estimatedRevenuePerPost      Decimal?  @db.Decimal(12, 2)
+  estimatedContentCost         Decimal?  @db.Decimal(12, 2)
+  estimatedPlatformCost        Decimal?  @db.Decimal(12, 2)
+  estimatedNetRevenuePerPost   Decimal?  @db.Decimal(12, 2)
+  lowerBound                   Decimal?  @db.Decimal(12, 2)
+  upperBound                   Decimal?  @db.Decimal(12, 2)
+  confidenceScore              Decimal   @db.Decimal(4, 3) @default("0")
+  estimationVersion            String
+  assumptions                  String[]  @default([])
+  generatedAt                  DateTime  @default(now())
+
+  product  Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  offer    AffiliateOffer @relation(fields: [affiliateOfferId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, productId])
+}
+
+model ProductOpportunity {
+  id                  String            @id @default(uuid())
+  workspaceId         String            @default("00000000-0000-0000-0000-000000000001")
+  productId           String
+  affiliateOfferId    String
+  nicheId             String?
+  brandId             String?
+  status              OpportunityStatus @default(NEW)
+  totalScore          Int               @default(0)
+  commissionScore     Int               @default(0)
+  demandScore         Int               @default(0)
+  competitionScore    Int               @default(0)
+  contentFitScore     Int               @default(0)
+  audienceFitScore    Int               @default(0)
+  trendScore          Int               @default(0)
+  profitabilityScore  Int               @default(0)
+  dataQualityScore    Int               @default(0)
+  complianceScore     Int               @default(0)
+  confidenceScore     Decimal           @db.Decimal(4, 3) @default("0")
+  sampleSize          BigInt?
+  scoringVersion      String
+  explanation         String
+  evidenceReferences  String[]          @default([])
+  calculatedAt        DateTime          @default(now())
+  expiresAt           DateTime?
+
+  product          Product                       @relation(fields: [productId], references: [id], onDelete: Cascade)
+  offer            AffiliateOffer                @relation(fields: [affiliateOfferId], references: [id], onDelete: Cascade)
+  scoreComponents  ProductOpportunityScoreComponent[]
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, productId])
+  @@index([workspaceId, affiliateOfferId])
+  @@index([workspaceId, totalScore])
+}
+
+model ProductOpportunityScoreComponent {
+  id                 String   @id @default(uuid())
+  workspaceId        String   @default("00000000-0000-0000-0000-000000000001")
+  opportunityId      String
+  component          String
+  score              Int
+  weight             Decimal  @db.Decimal(5, 4)
+  contribution       Decimal  @db.Decimal(8, 4)
+  explanation        String?
+  evidenceReferences String[] @default([])
+
+  opportunity  ProductOpportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, opportunityId])
+}
+
+model ProductDataQualityReport {
+  id                   String   @id @default(uuid())
+  workspaceId          String   @default("00000000-0000-0000-0000-000000000001")
+  productId            String
+  affiliateOfferId     String?
+  completenessScore    Int      @default(0)
+  freshnessScore       Int      @default(0)
+  consistencyScore     Int      @default(0)
+  identityScore        Int      @default(0)
+  commercialDataScore  Int      @default(0)
+  complianceDataScore   Int      @default(0)
+  overallScore         Int      @default(0)
+  issueCount           Int      @default(0)
+  generatedAt          DateTime @default(now())
+
+  product  Product                  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  issues   ProductDataQualityIssue[]
+
+  @@index([workspaceId, productId])
+}
+
+model ProductDataQualityIssue {
+  id          String                     @id @default(uuid())
+  workspaceId String                     @default("00000000-0000-0000-0000-000000000001")
+  reportId    String
+  issueType   ProductDataQualityIssueType
+  severity    RiskLevel                  @default(MEDIUM)
+  detail      String?
+
+  report  ProductDataQualityReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, reportId])
+}
+
+model ProductResearchJob {
+  id             String            @id @default(uuid())
+  workspaceId    String            @default("00000000-0000-0000-0000-000000000001")
+  jobType        ResearchJobType
+  status         ResearchJobStatus @default(QUEUED)
+  correlationId  String
+  idempotencyKey String            @unique
+  queryId        String?
+  productId      String?
+  provider       AffiliateProviderKey?
+  attemptCount   Int               @default(0)
+  maxAttempts    Int               @default(3)
+  errorMessage   String?
+  startedAt      DateTime?
+  completedAt    DateTime?
+  createdAt      DateTime          @default(now())
+
+  @@index([workspaceId, jobType, status])
+}
+
+model ProductSourceConfiguration {
+  id              String              @id @default(uuid())
+  workspaceId     String              @default("00000000-0000-0000-0000-000000000001")
+  provider        AffiliateProviderKey
+  enabled         Boolean             @default(false)
+  mode            IntegrationMode     @default(MOCK)
+  credentialId    String?
+  capabilities    Json?
+  lastValidatedAt DateTime?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@unique([workspaceId, provider])
+}
+
+// ---------------------------------------------------------------------------
+// Phase 3 — Content Production (planning layer over Script/ContentVariant)
+// ---------------------------------------------------------------------------
+
+enum ContentBriefStatus {
+  DRAFT
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  SUPERSEDED
+  ARCHIVED
+}
+
+model ContentBrief {
+  id             String            @id @default(uuid())
+  workspaceId    String            @default("00000000-0000-0000-0000-000000000001")
+  campaignId     String?
+  campaign       Campaign?         @relation(fields: [campaignId], references: [id])
+  objective      String
+  targetAudience String?
+  platform       String?
+  hookAngle      String?
+  notes          String?
+  status         ContentBriefStatus @default(DRAFT)
+  createdBy      String?
+  // --- Phase 8: Campaign Creative Brief extension (no parallel model) ---
+  campaignStrategyId String?
+  creativeAngleId    String?
+  productId          String?
+  affiliateOfferId   String?
+  affiliateLinkId    String?
+  title                    String?
+  targetAudienceSummary    String?
+  keyProblem               String?
+  desiredOutcome           String?
+  coreMessage              String?
+  valueProposition         String?
+  requiredClaims           String[] @default([])
+  prohibitedClaims         String[] @default([])
+  approvedProofPoints      String[] @default([])
+  requiredProductDetails   String[] @default([])
+  requiredVisualElements   String[] @default([])
+  prohibitedVisualElements String[] @default([])
+  contentFormat            PublishingFormat?
+  targetPlatforms          SocialPlatform[] @default([])
+  desiredDurationSeconds   Int?
+  languageCode             String @default("de")
+  targetCountryCodes       String[] @default([])
+  tone                     String?
+  pacing                   PacingType @default(medium)
+  callToActionType         CallToActionType?
+  affiliateDisclosureRequired Boolean @default(false)
+  affiliateDisclosureText  String?
+  version                  Int @default(1)
+  // ---------------------------------------------------------------------------
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  hooks ContentHook[]
+
+  @@index([workspaceId, status])
+  @@index([campaignId])
+  @@index([workspaceId, campaignStrategyId])
+}
+
+enum ContentHookStatus {
+  IDEA
+  DRAFT
+  APPROVED
+  REJECTED
+}
+
+model ContentHook {
+  id          String            @id @default(uuid())
+  workspaceId String            @default("00000000-0000-0000-0000-000000000001")
+  briefId     String
+  brief       ContentBrief      @relation(fields: [briefId], references: [id], onDelete: Cascade)
+  angle       String
+  body        String?
+  score       Decimal?          @db.Decimal(3, 2)
+  status      ContentHookStatus @default(IDEA)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([workspaceId, briefId])
+}
+
+// ---------------------------------------------------------------------------
+// Phase 4 — Agentic Operations: workflows, tool governance, budgets, memory
+// ---------------------------------------------------------------------------
+
+enum WorkflowStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+model WorkflowDefinition {
+  id           String         @id @default(uuid())
+  workspaceId  String         @default("00000000-0000-0000-0000-000000000001")
+  name         String
+  description  String?
+  trigger      String         @default("manual")
+  scheduleCron String?
+  status       WorkflowStatus @default(DRAFT)
+  enabled      Boolean        @default(false)
+  ownerId      String?
+  config       Json?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+
+  steps WorkflowStepDefinition[]
+  runs  WorkflowRun[]
+
+  @@index([workspaceId, status])
+}
+
+enum WorkflowStepType {
+  AGENT
+  TOOL
+  APPROVAL
+  CONDITION
+}
+
+model WorkflowStepDefinition {
+  id          String             @id @default(uuid())
+  workspaceId String             @default("00000000-0000-0000-0000-000000000001")
+  workflowId  String
+  workflow    WorkflowDefinition @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  stepOrder   Int
+  type        WorkflowStepType
+  name        String
+  config      Json?
+
+  runs WorkflowStepRun[]
+
+  @@index([workspaceId, workflowId])
+}
+
+enum WorkflowRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model WorkflowRun {
+  id          String            @id @default(uuid())
+  workspaceId String            @default("00000000-0000-0000-0000-000000000001")
+  workflowId  String
+  workflow    WorkflowDefinition @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  triggeredBy String?
+  status      WorkflowRunStatus @default(RUNNING)
+  context     Json?
+  startedAt   DateTime          @default(now())
+  finishedAt  DateTime?
+
+  steps WorkflowStepRun[]
+
+  @@index([workspaceId, workflowId, status])
+}
+
+model WorkflowStepRun {
+  id            String            @id @default(uuid())
+  workspaceId   String            @default("00000000-0000-0000-0000-000000000001")
+  workflowRunId String
+  workflowRun   WorkflowRun       @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+  stepId        String
+  step          WorkflowStepDefinition @relation(fields: [stepId], references: [id])
+  status        WorkflowRunStatus @default(RUNNING)
+  output        Json?
+  error         String?
+  startedAt     DateTime          @default(now())
+  finishedAt    DateTime?
+
+  @@index([workspaceId, workflowRunId])
+}
+
+enum AgentToolRiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+model AgentToolDefinition {
+  id          String              @id @default(uuid())
+  workspaceId String              @default("00000000-0000-0000-0000-000000000001")
+  name        String              @unique
+  description String?
+  provider    String?
+  riskLevel   AgentToolRiskLevel @default(LOW)
+  enabled     Boolean             @default(true)
+  schema      Json?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  policies AgentToolPolicy[]
+  calls    AgentToolCall[]
+
+  @@index([workspaceId, enabled])
+}
+
+model AgentToolPolicy {
+  id               String   @id @default(uuid())
+  workspaceId      String   @default("00000000-0000-0000-0000-000000000001")
+  toolId           String
+  tool             AgentToolDefinition @relation(fields: [toolId], references: [id], onDelete: Cascade)
+  requiresApproval Boolean  @default(false)
+  maxCostPerCall   Decimal? @db.Decimal(12, 2)
+  rateLimitPerMin  Int?
+  allowedAgentKeys String[] @default([])
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([workspaceId, toolId])
+}
+
+model AgentToolCall {
+  id          String   @id @default(uuid())
+  workspaceId String   @default("00000000-0000-0000-0000-000000000001")
+  agentRunId  String?
+  agentRun    AgentRun? @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
+  toolId      String
+  tool        AgentToolDefinition @relation(fields: [toolId], references: [id])
+  input       Json?
+  output      Json?
+  cost        Decimal? @db.Decimal(12, 2)
+  status      String   @default("SUCCESS")
+  durationMs  Int?
+  error       String?
+  createdAt   DateTime @default(now())
+
+  @@index([workspaceId, agentRunId])
+  @@index([workspaceId, toolId])
+}
+
+model BudgetPolicy {
+  id                String   @id @default(uuid())
+  workspaceId       String   @default("00000000-0000-0000-0000-000000000001")
+  name              String
+  scope             String   @default("global")
+  limitAmount       Decimal  @db.Decimal(12, 2)
+  currency          String   @default("EUR")
+  period            String   @default("monthly")
+  alertThresholdPct Int      @default(80)
+  action            String   @default("alert")
+  enabled           Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  reservations CostReservation[]
+
+  @@index([workspaceId, scope])
+}
+
+enum CostReservationStatus {
+  RESERVED
+  CONSUMED
+  RELEASED
+  EXPIRED
+}
+
+model CostReservation {
+  id          String               @id @default(uuid())
+  workspaceId String               @default("00000000-0000-0000-0000-000000000001")
+  policyId    String?
+  policy      BudgetPolicy?        @relation(fields: [policyId], references: [id], onDelete: SetNull)
+  ownerType   String
+  ownerId     String
+  amount      Decimal              @db.Decimal(12, 2)
+  currency    String               @default("EUR")
+  status      CostReservationStatus @default(RESERVED)
+  expiresAt   DateTime?
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+
+  @@index([workspaceId, ownerType, ownerId])
+  @@index([workspaceId, status])
+}
+
+enum AgentMemoryType {
+  FACT
+  PREFERENCE
+  CONTEXT
+}
+
+model AgentMemoryEntry {
+  id          String          @id @default(uuid())
+  workspaceId String          @default("00000000-0000-0000-0000-000000000001")
+  agentKey    String
+  type        AgentMemoryType @default(FACT)
+  key         String
+  value       Json?
+  importance  Int             @default(1)
+  expiresAt   DateTime?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([workspaceId, agentKey])
+  @@index([workspaceId, agentKey, key])
+}
+
+// ===========================================================================
+// Phase 8 — Campaign Factory
+// Reuses Campaign, ProductOpportunity, Approval (resource types above),
+// BudgetPolicy/CostReservation, ContentBrief (extended above), VideoJob,
+// PublishJob. New models below use plain String FKs (logical foreign keys)
+// to avoid cross-model relation cycles and follow the workspaceId convention.
+// ===========================================================================
+
+enum CreativeAngleType {
+  problem_solution
+  product_demo
+  comparison
+  testimonial
+  before_after
+  tutorial
+  review
+  unboxing
+  listicle
+  story
+  authority
+  contrarian
+  urgency
+  benefit
+  faq
+  myth_busting
+}
+
+enum CampaignObjective {
+  traffic
+  affiliate_clicks
+  conversions
+  revenue
+  content_testing
+}
+
+enum CampaignPrimaryMetric {
+  views
+  clicks
+  ctr
+  conversions
+  conversion_rate
+  commission_revenue
+  estimated_net_revenue
+  return_on_content_spend
+}
+
+enum CampaignRiskLevel {
+  low
+  medium
+  high
+  critical
+}
+
+enum CampaignCandidateStatus {
+  new
+  under_review
+  approved
+  rejected
+  expired
+  converted
+}
+
+enum CampaignStrategyStatus {
+  draft
+  under_review
+  approved
+  rejected
+  superseded
+  archived
+}
+
+enum CampaignAudienceStatus {
+  draft
+  approved
+  rejected
+  archived
+}
+
+enum CreativeAngleStatus {
+  draft
+  approved
+  rejected
+  archived
+}
+
+enum CampaignHookPlanStatus {
+  draft
+  ready
+  completed
+  archived
+}
+
+enum CampaignScriptPlanStatus {
+  draft
+  ready
+  completed
+  archived
+}
+
+enum CampaignCallToActionPlanStatus {
+  draft
+  approved
+  archived
+}
+
+enum ContentBatchStatus {
+  draft
+  planning
+  awaiting_approval
+  approved
+  in_production
+  quality_review
+  completed
+  failed
+  cancelled
+}
+
+enum ContentBatchPriority {
+  low
+  normal
+  high
+  urgent
+}
+
+enum ContentBatchItemStatus {
+  planned
+  brief_ready
+  hook_ready
+  script_ready
+  production_ready
+  in_production
+  quality_review
+  approved
+  rejected
+  failed
+}
+
+enum ProductionTaskType {
+  research_validation
+  brief_creation
+  hook_creation
+  script_creation
+  caption_creation
+  cta_creation
+  disclosure_validation
+  visual_planning
+  voice_planning
+  media_generation
+  editing
+  subtitle_creation
+  thumbnail_creation
+  quality_assurance
+  compliance_review
+  final_approval
+  publishing_preparation
+}
+
+enum ProductionTaskStatus {
+  pending
+  ready
+  in_progress
+  waiting_for_approval
+  completed
+  failed
+  cancelled
+  skipped
+}
+
+enum ProductionScheduleStatus {
+  planned
+  confirmed
+  in_progress
+  completed
+  cancelled
+}
+
+enum PacingType {
+  slow
+  medium
+  fast
+}
+
+enum CampaignFactoryTemplateStatus {
+  draft
+  active
+  archived
+}
+
+enum CampaignFactoryRunStatus {
+  queued
+  running
+  waiting_for_approval
+  completed
+  partially_completed
+  failed
+  cancelled
+}
+
+enum CampaignQualityReportStatus {
+  pending
+  passed
+  failed
+  manual_review
+}
+
+enum CampaignQualityIssueSeverity {
+  info
+  warning
+  error
+  critical
+}
+
+enum CampaignQualityScopeType {
+  workspace
+  brand
+  niche
+  campaign
+}
+
+enum ProductionCapacityScopeType {
+  workspace
+  agent
+  user
+  provider
+}
+
+enum ProductionCapacityStatus {
+  active
+  paused
+  archived
+}
+
+model CampaignCandidate {
+  id                      String                 @id @default(uuid())
+  workspaceId             String                 @default("00000000-0000-0000-0000-000000000001")
+  productOpportunityId    String
+  productId               String
+  affiliateOfferId        String
+  affiliateProgramId      String
+  brandId                 String?
+  nicheId                 String?
+  status                  CampaignCandidateStatus @default(new)
+  opportunityScore        Int                    @default(0)
+  opportunityConfidence   Decimal?               @db.Decimal(4, 3)
+  proposedObjective       CampaignObjective?
+  targetPlatformCandidates SocialPlatform[]      @default([])
+  targetCountryCodes      String[]               @default([])
+  languageCode            String                 @default("de")
+  estimatedCampaignCost   Decimal?               @db.Decimal(12, 2)
+  estimatedRevenuePerPost Decimal?               @db.Decimal(12, 2)
+  currency                String?
+  sourceScoreVersion      String?
+  evidenceReferences      String[]               @default([])
+  expiresAt               DateTime?
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, productOpportunityId])
+}
+
+model CampaignStrategy {
+  id                       String                 @id @default(uuid())
+  workspaceId              String                 @default("00000000-0000-0000-0000-000000000001")
+  campaignCandidateId      String
+  campaignId               String?
+  name                     String
+  description              String?
+  objective                CampaignObjective
+  primarySuccessMetric     CampaignPrimaryMetric
+  secondarySuccessMetrics  String[]               @default([])
+  targetPlatforms          SocialPlatform[]       @default([])
+  targetCountryCodes       String[]               @default([])
+  languageCode             String                 @default("de")
+  targetAudienceProfileId  String?
+  campaignDurationDays     Int?
+  plannedContentCount      Int                    @default(1)
+  estimatedBudget          Decimal?               @db.Decimal(12, 2)
+  currency                 String?
+  riskLevel                CampaignRiskLevel      @default(low)
+  version                  Int                    @default(1)
+  status                   CampaignStrategyStatus @default(draft)
+  approvedById             String?
+  approvedAt               DateTime?
+  rejectedReason           String?
+  supersededById           String?
+  supersededAt             DateTime?
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, campaignCandidateId])
+}
+
+model CampaignAudienceProfile {
+  id                          String                @id @default(uuid())
+  workspaceId                 String                @default("00000000-0000-0000-0000-000000000001")
+  name                        String
+  description                 String
+  brandId                     String?
+  nicheId                     String?
+  languageCodes               String[]              @default([])
+  countryCodes                String[]              @default([])
+  demographicNotes            String[]              @default([])
+  interestTags                String[]              @default([])
+  problemStatements           String[]              @default([])
+  desiredOutcomes             String[]              @default([])
+  objections                  String[]              @default([])
+  trustSignals                String[]              @default([])
+  prohibitedTargetingAttributes String[]            @default([])
+  status                      CampaignAudienceStatus @default(draft)
+  createdAt                   DateTime              @default(now())
+  updatedAt                   DateTime              @updatedAt
+
+  @@index([workspaceId, status])
+}
+
+model CreativeAngle {
+  id                          String                @id @default(uuid())
+  workspaceId                 String                @default("00000000-0000-0000-0000-000000000001")
+  campaignStrategyId          String
+  name                        String
+  angleType                   CreativeAngleType
+  description                 String
+  targetProblem               String?
+  desiredOutcome              String?
+  coreMessage                 String
+  proofStrategy               String?
+  objectionHandled            String?
+  suitablePlatforms           SocialPlatform[]      @default([])
+  suitableFormats             PublishingFormat[]    @default([])
+  recommendedHookTypes        HookType[]            @default([])
+  recommendedScriptStructures ScriptStructureType[] @default([])
+  riskLevel                   CampaignRiskLevel     @default(low)
+  status                      CreativeAngleStatus   @default(draft)
+  version                     Int                   @default(1)
+  createdAt                   DateTime              @default(now())
+  updatedAt                   DateTime              @updatedAt
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, campaignStrategyId])
+}
+
+model CampaignHookPlan {
+  id                 String                @id @default(uuid())
+  workspaceId        String                @default("00000000-0000-0000-0000-000000000001")
+  creativeBriefId    String
+  creativeAngleId    String
+  requiredHookCount  Int                   @default(1)
+  selectedHookTypes  HookType[]            @default([])
+  hookObjectives     String[]              @default([])
+  prohibitedPatterns String[]              @default([])
+  status             CampaignHookPlanStatus @default(draft)
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  @@index([workspaceId, creativeBriefId])
+}
+
+model CampaignScriptPlan {
+  id                    String                 @id @default(uuid())
+  workspaceId           String                 @default("00000000-0000-0000-0000-000000000001")
+  creativeBriefId       String
+  creativeAngleId       String
+  selectedStructure     ScriptStructureType
+  requiredScriptCount   Int                    @default(1)
+  targetDurationSeconds Int?
+  requiredSections      String[]               @default([])
+  prohibitedClaims      String[]               @default([])
+  requiredDisclosure    Boolean                @default(false)
+  status                CampaignScriptPlanStatus @default(draft)
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
+
+  @@index([workspaceId, creativeBriefId])
+}
+
+model CampaignCallToActionPlan {
+  id                       String                       @id @default(uuid())
+  workspaceId              String                       @default("00000000-0000-0000-0000-000000000001")
+  creativeBriefId          String
+  primaryCtaType           CallToActionType
+  secondaryCtaTypes        CallToActionType[]           @default([])
+  requiredText             String?
+  prohibitedTextPatterns   String[]                     @default([])
+  affiliateLinkRequired     Boolean                      @default(false)
+  status                    CampaignCallToActionPlanStatus @default(draft)
+  createdAt                 DateTime                     @default(now())
+  updatedAt                 DateTime                     @updatedAt
+
+  @@index([workspaceId, creativeBriefId])
+}
+
+model ContentBatch {
+  id                String             @id @default(uuid())
+  workspaceId       String             @default("00000000-0000-0000-0000-000000000001")
+  campaignId        String
+  campaignStrategyId String
+  name              String
+  description       String?
+  targetPlatforms   SocialPlatform[]   @default([])
+  plannedAssetCount Int                @default(1)
+  status            ContentBatchStatus @default(draft)
+  approvalStatus    ApprovalStatus     @default(DRAFT)
+  estimatedCost     Decimal?           @db.Decimal(12, 2)
+  actualCost        Decimal?           @db.Decimal(12, 2)
+  currency          String?
+  priority          ContentBatchPriority @default(normal)
+  dueAt             DateTime?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  completedAt       DateTime?
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, campaignId])
+}
+
+model ContentBatchItem {
+  id                String                @id @default(uuid())
+  workspaceId       String                @default("00000000-0000-0000-0000-000000000001")
+  contentBatchId    String
+  creativeBriefId   String
+  creativeAngleId   String
+  targetPlatform    SocialPlatform
+  publishingFormat  PublishingFormat
+  hookId            String?
+  scriptId          String?
+  contentVariantId  String?
+  contentAssetId    String?
+  status            ContentBatchItemStatus @default(planned)
+  orderIndex        Int                   @default(0)
+  createdAt         DateTime              @default(now())
+  updatedAt         DateTime              @updatedAt
+
+  @@unique([contentBatchId, orderIndex])
+  @@index([workspaceId, contentBatchId])
+}
+
+model ProductionTask {
+  id                        String              @id @default(uuid())
+  workspaceId               String              @default("00000000-0000-0000-0000-000000000001")
+  contentBatchId            String
+  contentBatchItemId        String?
+  taskType                  ProductionTaskType
+  name                      String
+  description               String?
+  status                    ProductionTaskStatus @default(pending)
+  assignedAgentDefinitionId String?
+  assignedUserId            String?
+  dependsOnTaskIds          String[]            @default([])
+  requiredPermission        String?
+  requiresApproval          Boolean             @default(false)
+  estimatedCost             Decimal?            @db.Decimal(12, 2)
+  actualCost                Decimal?            @db.Decimal(12, 2)
+  currency                  String?
+  estimatedDurationMinutes Int?
+  dueAt                     DateTime?
+  attemptCount              Int                 @default(0)
+  maxAttempts               Int                 @default(3)
+  outputReferenceId         String?
+  failureCode               String?
+  failureReason             String?
+  createdAt                 DateTime            @default(now())
+  updatedAt                 DateTime            @updatedAt
+  completedAt               DateTime?
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, contentBatchId])
+}
+
+model ProductionScheduleEntry {
+  id                        String                  @id @default(uuid())
+  workspaceId               String                  @default("00000000-0000-0000-0000-000000000001")
+  productionTaskId          String
+  assignedAgentDefinitionId String?
+  assignedUserId            String?
+  scheduledStartAt          DateTime
+  scheduledEndAt            DateTime
+  timezone                  String                  @default("UTC")
+  status                    ProductionScheduleStatus @default(planned)
+  overrideReason            String?
+  createdAt                 DateTime                @default(now())
+  updatedAt                 DateTime                @updatedAt
+
+  @@index([workspaceId, productionTaskId])
+}
+
+model CampaignFactoryTemplate {
+  id                          String                  @id @default(uuid())
+  workspaceId                 String                  @default("00000000-0000-0000-0000-000000000001")
+  name                        String
+  description                 String?
+  nicheId                     String?
+  brandId                     String?
+  objective                   CampaignObjective
+  defaultPlatforms            SocialPlatform[]        @default([])
+  defaultFormats              PublishingFormat[]      @default([])
+  defaultCreativeAngleTypes   CreativeAngleType[]     @default([])
+  plannedContentCount         Int                     @default(1)
+  taskTemplateDefinition      Json                    @default("{}")
+  status                      CampaignFactoryTemplateStatus @default(draft)
+  version                     Int                     @default(1)
+  createdAt                   DateTime                @default(now())
+  updatedAt                   DateTime                @updatedAt
+
+  @@index([workspaceId, status])
+}
+
+model CampaignFactoryRun {
+  id                 String                 @id @default(uuid())
+  workspaceId        String                 @default("00000000-0000-0000-0000-000000000001")
+  templateId         String?
+  campaignCandidateId String
+  status             CampaignFactoryRunStatus @default(queued)
+  campaignId         String?
+  campaignStrategyId String?
+  contentBatchId     String?
+  correlationId      String
+  idempotencyKey     String                 @unique
+  startedAt          DateTime?
+  completedAt        DateTime?
+  failureCode        String?
+  failureReason      String?
+  createdAt          DateTime               @default(now())
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, campaignCandidateId])
+}
+
+model CampaignQualityPolicy {
+  id                           String                   @id @default(uuid())
+  workspaceId                  String                   @default("00000000-0000-0000-0000-000000000001")
+  scopeType                    CampaignQualityScopeType @default(workspace)
+  scopeId                      String
+  minimumStrategyScore         Decimal                  @db.Decimal(3, 2) @default(0.6)
+  minimumAudienceScore         Decimal                  @db.Decimal(3, 2) @default(0.6)
+  minimumCreativeScore         Decimal                  @db.Decimal(3, 2) @default(0.6)
+  minimumCommercialScore       Decimal                  @db.Decimal(3, 2) @default(0.6)
+  minimumComplianceScore       Decimal                  @db.Decimal(3, 2) @default(0.6)
+  minimumDataQualityScore      Decimal                  @db.Decimal(3, 2) @default(0.6)
+  minimumProductionReadinessScore Decimal               @db.Decimal(3, 2) @default(0.6)
+  minimumOverallScore          Decimal                  @db.Decimal(3, 2) @default(0.6)
+  criticalIssueBlocksApproval  Boolean                  @default(true)
+  createdAt                    DateTime                 @default(now())
+  updatedAt                    DateTime                 @updatedAt
+
+  @@index([workspaceId, scopeType, scopeId])
+}
+
+model CampaignQualityReport {
+  id                      String                    @id @default(uuid())
+  workspaceId             String                    @default("00000000-0000-0000-0000-000000000001")
+  campaignId              String
+  campaignStrategyId      String
+  status                  CampaignQualityReportStatus @default(pending)
+  strategyScore           Decimal                   @db.Decimal(3, 2) @default(0)
+  audienceScore           Decimal                   @db.Decimal(3, 2) @default(0)
+  creativeScore           Decimal                   @db.Decimal(3, 2) @default(0)
+  commercialScore         Decimal                   @db.Decimal(3, 2) @default(0)
+  complianceScore         Decimal                    @db.Decimal(3, 2) @default(0)
+  dataQualityScore        Decimal                    @db.Decimal(3, 2) @default(0)
+  productionReadinessScore Decimal                   @db.Decimal(3, 2) @default(0)
+  overallScore            Decimal                    @db.Decimal(3, 2) @default(0)
+  generatedAt             DateTime                   @default(now())
+  qualityVersion          String                    @default("1")
+
+  @@index([workspaceId, campaignId])
+}
+
+model CampaignQualityIssue {
+  id                  String                        @id @default(uuid())
+  workspaceId         String                        @default("00000000-0000-0000-0000-000000000001")
+  reportId            String
+  code                String
+  severity            CampaignQualityIssueSeverity
+  message             String
+  resourceType        String?
+  resourceId          String?
+  evidenceReferences  String[]                      @default([])
+  createdAt           DateTime                      @default(now())
+
+  @@index([workspaceId, reportId])
+}
+
+model ProductionCapacityProfile {
+  id                        String                     @id @default(uuid())
+  workspaceId               String                     @default("00000000-0000-0000-0000-000000000001")
+  name                      String
+  scopeType                 ProductionCapacityScopeType @default(workspace)
+  scopeId                   String
+  maximumConcurrentTasks    Int                        @default(1)
+  maximumTasksPerDay        Int?
+  maximumEstimatedMinutesPerDay Int?
+  allowedTaskTypes          ProductionTaskType[]        @default([])
+  status                    ProductionCapacityStatus    @default(active)
+  createdAt                 DateTime                   @default(now())
+  updatedAt                 DateTime                   @updatedAt
+
+  @@index([workspaceId, scopeType, scopeId])
+}
+
+model CampaignProductionEstimate {
+  id                        String   @id @default(uuid())
+  workspaceId               String   @default("00000000-0000-0000-0000-000000000001")
+  campaignId                String
+  contentBatchId            String?
+  currency                  String   @default("EUR")
+  researchCost              Decimal  @db.Decimal(12, 2) @default(0)
+  scriptCost                Decimal  @db.Decimal(12, 2) @default(0)
+  mediaGenerationCost       Decimal  @db.Decimal(12, 2) @default(0)
+  editingCost               Decimal  @db.Decimal(12, 2) @default(0)
+  voiceCost                 Decimal  @db.Decimal(12, 2) @default(0)
+  subtitleCost              Decimal  @db.Decimal(12, 2) @default(0)
+  thumbnailCost             Decimal  @db.Decimal(12, 2) @default(0)
+  qualityAssuranceCost      Decimal  @db.Decimal(12, 2) @default(0)
+  publishingPreparationCost Decimal  @db.Decimal(12, 2) @default(0)
+  totalEstimatedCost        Decimal  @db.Decimal(12, 2) @default(0)
+  lowerBound                Decimal? @db.Decimal(12, 2)
+  upperBound                Decimal? @db.Decimal(12, 2)
+  assumptions               String[] @default([])
+  confidenceScore           Decimal  @db.Decimal(3, 2) @default(0.5)
+  estimationVersion         String   @default("1")
+  createdAt                 DateTime @default(now())
+
+  @@index([workspaceId, campaignId])
+}
+
+// ============================================================================
+// Phase 9 — Media Production Platform
+// ============================================================================
+
+enum MediaProviderType {
+  mock
+  openai
+  google
+  anthropic
+  mistral
+  higgsfield
+  runway
+  luma
+  kling
+  pika
+  replicate
+  fal
+  elevenlabs
+  cartesia
+  playht
+  heygen
+  synthesia
+  custom
+}
+
+enum MediaCapability {
+  text_to_image
+  image_to_image
+  text_to_video
+  image_to_video
+  video_to_video
+  text_to_speech
+  voice_clone
+  voice_conversion
+  avatar_video
+  lip_sync
+  subtitle_generation
+  translation
+  background_removal
+  upscaling
+  frame_interpolation
+  thumbnail_generation
+  music_generation
+  sound_effect_generation
+}
+
+enum MediaProviderStatus {
+  draft
+  active
+  paused
+  invalid
+  disconnected
+}
+
+enum MediaBillingUnit {
+  request
+  second
+  minute
+  image
+  character
+  token
+  unknown
+}
+
+enum MediaModelStatus {
+  active
+  deprecated
+  disabled
+}
+
+enum MediaProductionStatus {
+  draft
+  planning
+  awaiting_approval
+  approved
+  in_production
+  quality_review
+  completed
+  failed
+  cancelled
+  archived
+}
+
+enum MediaVisualStrategy {
+  generated_video
+  avatar
+  product_demo
+  slideshow
+  mixed
+  template_based
+}
+
+enum MediaVoiceStrategy {
+  generated_voice
+  approved_cloned_voice
+  human_voice
+  no_voice
+}
+
+enum MediaSubtitleStrategy {
+  burned_in
+  sidecar
+  both
+  none
+}
+
+enum MediaMusicStrategy {
+  licensed_music
+  generated_music
+  no_music
+}
+
+enum MediaSceneType {
+  hook
+  problem
+  demonstration
+  benefit
+  proof
+  comparison
+  testimonial
+  cta
+  transition
+  other
+}
+
+enum MediaSceneStatus {
+  draft
+  ready
+  generating
+  completed
+  failed
+  approved
+}
+
+enum MediaGenerationJobStatus {
+  draft
+  awaiting_approval
+  approved
+  queued
+  submitted
+  processing
+  completed
+  failed
+  cancelled
+  expired
+}
+
+enum MediaGenerationFailureCode {
+  AUTHENTICATION_FAILED
+  REAUTH_REQUIRED
+  PROVIDER_DISABLED
+  MODEL_DISABLED
+  CAPABILITY_NOT_SUPPORTED
+  INVALID_INPUT
+  INVALID_ASSET
+  CONSENT_REQUIRED
+  CONSENT_EXPIRED
+  LICENSE_REQUIRED
+  CONTENT_REJECTED
+  SAFETY_POLICY_REJECTED
+  RATE_LIMITED
+  BUDGET_EXCEEDED
+  APPROVAL_REQUIRED
+  PROVIDER_UNAVAILABLE
+  NETWORK_ERROR
+  OUTPUT_INVALID
+  OUTPUT_MISSING
+  TIMEOUT
+  UNKNOWN_ERROR
+}
+
+enum MediaAttemptStatus {
+  submitted
+  processing
+  completed
+  failed
+  cancelled
+}
+
+enum MediaAssetOrigin {
+  uploaded
+  generated
+  rendered
+  derived
+  recorded
+  imported
+}
+
+enum MediaAssetStatus {
+  draft
+  pending_review
+  approved
+  rejected
+  archived
+}
+
+enum MediaAssetQaStatus {
+  pending
+  passed
+  failed
+  manual_review
+}
+
+enum MediaRenderStatus {
+  draft
+  awaiting_approval
+  approved
+  queued
+  processing
+  completed
+  failed
+  cancelled
+}
+
+enum MediaSubtitleSource {
+  manual
+  speech_to_text
+  script_alignment
+  translated
+}
+
+enum MediaSubtitleStatus {
+  draft
+  generated
+  reviewed
+  approved
+  archived
+}
+
+enum MediaVariantCropStrategy {
+  center
+  face_tracking
+  subject_tracking
+  manual
+  none
+}
+
+enum MediaQualityStatus {
+  pending
+  passed
+  failed
+  manual_review
+}
+
+enum MediaQualityIssueSeverity {
+  info
+  warning
+  error
+  critical
+}
+
+enum MediaQualityScopeType {
+  workspace
+  brand
+  campaign
+  platform
+}
+
+enum MediaPromptTemplateStatus {
+  draft
+  active
+  deprecated
+}
+
+enum MediaVoiceProfileType {
+  provider_voice
+  approved_cloned_voice
+  human_recording
+  synthetic_custom
+}
+
+enum MediaGenderPresentation {
+  female
+  male
+  neutral
+  unspecified
+}
+
+enum MediaAvatarType {
+  synthetic
+  licensed_stock
+  custom_with_consent
+  brand_character
+}
+
+enum MediaConsentSubjectType {
+  voice
+  likeness
+  avatar
+  recording
+}
+
+enum MediaConsentStatus {
+  active
+  expired
+  revoked
+  invalid
+}
+
+enum MediaTimelineStatus {
+  draft
+  approved
+  rendering
+  completed
+  superseded
+}
+
+enum MediaTimelineTrackType {
+  video
+  audio
+  voice
+  music
+  subtitle
+  overlay
+  transition
+}
+
+enum MediaAudioAssetType {
+  voice
+  music
+  sound_effect
+  ambient
+  mixed_track
+}
+
+model MediaProviderConfiguration {
+  id                        String             @id @default(uuid())
+  workspaceId               String             @default("00000000-0000-0000-0000-000000000001")
+  provider                  MediaProviderType
+  displayName               String
+  credentialReferenceId     String?
+  status                    MediaProviderStatus @default(draft)
+  enabledCapabilities       MediaCapability[]
+  defaultModelId            String?
+  fallbackProviderConfigurationId String?
+  priority                  Int                @default(100)
+  monthlySpendLimit         Decimal?           @db.Decimal(12, 2)
+  currency                  String?
+  createdAt                 DateTime           @default(now())
+  updatedAt                 DateTime           @updatedAt
+
+  @@index([workspaceId, provider])
+  @@index([workspaceId, status])
+}
+
+model MediaModelDefinition {
+  id                  String           @id @default(uuid())
+  workspaceId         String           @default("00000000-0000-0000-0000-000000000001")
+  providerConfigurationId String
+  externalModelId     String
+  displayName         String
+  capability          MediaCapability
+  status              MediaModelStatus @default(active)
+  inputSchemaVersion  String           @default("1")
+  outputSchemaVersion String           @default("1")
+  estimatedCostPerUnit Decimal?        @db.Decimal(12, 4)
+  billingUnit         MediaBillingUnit @default(unknown)
+  currency            String?
+  commercialUseAllowed Boolean?
+  modelTermsReferenceId String?
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@index([workspaceId, capability])
+  @@index([workspaceId, providerConfigurationId])
+}
+
+model MediaProductionProject {
+  id                  String               @id @default(uuid())
+  workspaceId         String               @default("00000000-0000-0000-0000-000000000001")
+  campaignId          String
+  productId           String
+  opportunityId       String?
+  contentBriefId      String
+  contentScriptId     String
+  name                String
+  description         String?
+  targetPlatforms     SocialPlatform[]
+  targetFormats       PublishingFormat[]
+  languageCode        String               @default("de")
+  targetCountryCodes  String[]             @default([])
+  status              MediaProductionStatus @default(draft)
+  approvalStatus      ApprovalStatus       @default(DRAFT)
+  productionPlanId    String?
+  estimatedCost       Decimal?             @db.Decimal(12, 2)
+  actualCost          Decimal?             @db.Decimal(12, 2)
+  currency            String?
+  completedAt         DateTime?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, campaignId])
+  @@index([workspaceId, contentBriefId])
+}
+
+model MediaProductionPlan {
+  id                  String    @id @default(uuid())
+  workspaceId         String    @default("00000000-0000-0000-0000-000000000001")
+  mediaProductionProjectId String
+  name                String
+  version             Int       @default(1)
+  visualStrategy      MediaVisualStrategy        @default(generated_video)
+  voiceStrategy       MediaVoiceStrategy         @default(generated_voice)
+  subtitleStrategy    MediaSubtitleStrategy      @default(burned_in)
+  musicStrategy       MediaMusicStrategy         @default(no_music)
+  estimatedDurationSeconds Int
+  sceneCount          Int
+  targetAspectRatios  String[]  @default([])
+  targetResolutions   String[]  @default([])
+  status              MediaProductionStatus @default(draft)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([workspaceId, mediaProductionProjectId])
+}
+
+model MediaScene {
+  id                  String         @id @default(uuid())
+  workspaceId         String         @default("00000000-0000-0000-0000-000000000001")
+  mediaProductionPlanId String
+  orderIndex          Int
+  name                String
+  description         String
+  scriptSegment       String?
+  voiceText           String?
+  durationSeconds     Decimal        @db.Decimal(10, 3)
+  sceneType           MediaSceneType @default(other)
+  visualSourceType    String         @default("generated_video")
+  sourceAssetId       String?
+  generatedAssetId    String?
+  voiceProfileId      String?
+  avatarProfileId     String?
+  promptTemplateId    String?
+  promptVersion       Int?
+  status              MediaSceneStatus @default(draft)
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  @@index([workspaceId, mediaProductionPlanId])
+  @@index([workspaceId, status])
+}
+
+model MediaPromptTemplate {
+  id               String                   @id @default(uuid())
+  workspaceId      String                   @default("00000000-0000-0000-0000-000000000001")
+  name             String
+  description      String?
+  capability       MediaCapability
+  providerType     MediaProviderType?
+  templateText     String
+  negativePromptTemplate String?
+  inputSchema      Json                    @default("{}")
+  outputSchema     Json                    @default("{}")
+  version          Int                     @default(1)
+  status           MediaPromptTemplateStatus @default(draft)
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+
+  @@index([workspaceId, capability])
+}
+
+model VoiceProfile {
+  id                  String               @id @default(uuid())
+  workspaceId         String               @default("00000000-0000-0000-0000-000000000001")
+  name                String
+  description         String?
+  profileType         MediaVoiceProfileType
+  providerConfigurationId String?
+  externalVoiceId     String?
+  languageCodes       String[]             @default([])
+  genderPresentation  MediaGenderPresentation @default(unspecified)
+  styleTags           String[]             @default([])
+  consentRecordId     String?
+  sourceAssetId       String?
+  commercialUseAllowed Boolean?
+  status              MediaProviderStatus  @default(draft)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([workspaceId, status])
+}
+
+model AvatarProfile {
+  id                  String               @id @default(uuid())
+  workspaceId         String               @default("00000000-0000-0000-0000-000000000001")
+  name                String
+  description         String?
+  avatarType          MediaAvatarType
+  providerConfigurationId String?
+  externalAvatarId    String?
+  sourceAssetId       String?
+  consentRecordId     String?
+  licenseReferenceId  String?
+  languageCodes       String[]             @default([])
+  styleTags           String[]             @default([])
+  commercialUseAllowed Boolean?
+  status              MediaProviderStatus  @default(draft)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([workspaceId, status])
+}
+
+model MediaConsentRecord {
+  id                String                 @id @default(uuid())
+  workspaceId       String                 @default("00000000-0000-0000-0000-000000000001")
+  subjectType       MediaConsentSubjectType
+  subjectReference  String
+  consentScope      String[]
+  allowedUseCases   String[]
+  prohibitedUseCases String[]
+  commercialUseAllowed Boolean
+  validFrom         DateTime
+  validUntil        DateTime?
+  evidenceAssetId   String?
+  evidenceReference String?
+  status            MediaConsentStatus     @default(active)
+  createdAt         DateTime               @default(now())
+  updatedAt         DateTime               @updatedAt
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, subjectReference])
+}
+
+model MediaGenerationJob {
+  id                  String                 @id @default(uuid())
+  workspaceId         String                 @default("00000000-0000-0000-0000-000000000001")
+  mediaProductionProjectId String
+  mediaSceneId        String?
+  capability          MediaCapability
+  providerConfigurationId String
+  modelDefinitionId   String
+  requestReferenceId  String
+  status              MediaGenerationJobStatus @default(draft)
+  approvalStatus      ApprovalStatus         @default(DRAFT)
+  idempotencyKey      String                 @unique
+  externalJobId       String?
+  estimatedCost       Decimal?               @db.Decimal(12, 2)
+  reservedCost        Decimal?               @db.Decimal(12, 2)
+  actualCost          Decimal?               @db.Decimal(12, 2)
+  currency            String?
+  attemptCount        Int                    @default(0)
+  maxAttempts         Int                    @default(3)
+  progressPercent     Int?
+  failureCode         MediaGenerationFailureCode?
+  failureReason       String?
+  submittedAt         DateTime?
+  completedAt         DateTime?
+  createdAt           DateTime               @default(now())
+  updatedAt           DateTime               @updatedAt
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, mediaProductionProjectId])
+  @@index([workspaceId, mediaSceneId])
+  @@index([workspaceId, idempotencyKey])
+}
+
+model MediaGenerationAttempt {
+  id                  String           @id @default(uuid())
+  workspaceId         String           @default("00000000-0000-0000-0000-000000000001")
+  mediaGenerationJobId String
+  attemptNumber       Int
+  providerConfigurationId String
+  modelDefinitionId   String
+  externalJobId       String?
+  status              MediaAttemptStatus @default(submitted)
+  estimatedCost       Decimal?         @db.Decimal(12, 2)
+  actualCost          Decimal?         @db.Decimal(12, 2)
+  currency            String?
+  startedAt           DateTime         @default(now())
+  completedAt         DateTime?
+  failureCode         MediaGenerationFailureCode?
+  failureReason       String?
+  outputAssetIds      String[]         @default([])
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@index([workspaceId, mediaGenerationJobId])
+}
+
+model MediaAssetMetadata {
+  id                String             @id @default(uuid())
+  workspaceId       String             @default("00000000-0000-0000-0000-000000000001")
+  mediaAssetId      String
+  origin            MediaAssetOrigin   @default(generated)
+  status            MediaAssetStatus   @default(draft)
+  qaStatus          MediaAssetQaStatus @default(pending)
+  parentAssetId     String?
+  providerConfigurationId String?
+  modelDefinitionId String?
+  promptTemplateId  String?
+  promptVersion     Int?
+  consentRecordId   String?
+  licenseReferenceId String?
+  checksum          String?
+  version           Int                @default(1)
+  width             Int?
+  height            Int?
+  durationSeconds   Decimal?           @db.Decimal(10, 3)
+  frameRate         Decimal?           @db.Decimal(6, 3)
+  bitrate           BigInt?
+  sampleRate        Int?
+  channels          Int?
+  codec             String?
+  aspectRatio       String?
+  languageCode      String?
+  audioAssetType    MediaAudioAssetType?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+
+  @@index([workspaceId, mediaAssetId])
+  @@index([workspaceId, status])
+}
+
+model RenderSpecification {
+  id                  String    @id @default(uuid())
+  workspaceId         String    @default("00000000-0000-0000-0000-000000000001")
+  mediaProductionProjectId String
+  name                String
+  version             Int       @default(1)
+  width               Int
+  height              Int
+  frameRate           Decimal   @db.Decimal(6, 3)
+  durationSeconds     Decimal   @db.Decimal(10, 3)
+  videoCodec          String
+  audioCodec          String
+  containerFormat     String
+  backgroundColor     String?
+  subtitleMode        MediaSubtitleStrategy @default(burned_in)
+  loudnessTargetLufs Decimal?  @db.Decimal(6, 2)
+  status              MediaProductionStatus @default(draft)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([workspaceId, mediaProductionProjectId])
+}
+
+model MediaTimeline {
+  id                  String             @id @default(uuid())
+  workspaceId         String             @default("00000000-0000-0000-0000-000000000001")
+  mediaProductionProjectId String
+  renderSpecificationId String
+  name                String
+  version             Int                @default(1)
+  durationSeconds     Decimal            @db.Decimal(10, 3)
+  status              MediaTimelineStatus @default(draft)
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  @@index([workspaceId, mediaProductionProjectId])
+}
+
+model MediaTimelineTrack {
+  id                String                 @id @default(uuid())
+  workspaceId       String                 @default("00000000-0000-0000-0000-000000000001")
+  mediaTimelineId   String
+  trackType         MediaTimelineTrackType
+  orderIndex        Int
+  createdAt         DateTime               @default(now())
+
+  @@index([workspaceId, mediaTimelineId])
+}
+
+model MediaTimelineClip {
+  id                String    @id @default(uuid())
+  workspaceId       String    @default("00000000-0000-0000-0000-000000000001")
+  mediaTimelineTrackId String
+  assetId           String
+  startTimeSeconds  Decimal   @db.Decimal(10, 3)
+  endTimeSeconds    Decimal   @db.Decimal(10, 3)
+  sourceStartSeconds Decimal? @db.Decimal(10, 3)
+  sourceEndSeconds  Decimal? @db.Decimal(10, 3)
+  volume            Decimal?  @db.Decimal(4, 2)
+  opacity           Decimal?  @db.Decimal(4, 2)
+  transform         Json?
+  effects           String[]  @default([])
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([workspaceId, mediaTimelineTrackId])
+}
+
+model RenderJob {
+  id                  String             @id @default(uuid())
+  workspaceId         String             @default("00000000-0000-0000-0000-000000000001")
+  mediaProductionProjectId String
+  mediaTimelineId     String
+  renderSpecificationId String
+  status              MediaRenderStatus   @default(draft)
+  approvalStatus      ApprovalStatus      @default(DRAFT)
+  idempotencyKey      String              @unique
+  externalRenderId    String?
+  estimatedCost       Decimal?            @db.Decimal(12, 2)
+  actualCost          Decimal?            @db.Decimal(12, 2)
+  currency            String?
+  progressPercent     Int?
+  outputAssetId       String?
+  attemptCount        Int                 @default(0)
+  maxAttempts         Int                 @default(3)
+  failureCode         String?
+  failureReason       String?
+  completedAt         DateTime?
+  createdAt           DateTime            @default(now())
+  updatedAt           DateTime            @updatedAt
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, mediaProductionProjectId])
+  @@index([workspaceId, idempotencyKey])
+}
+
+model SubtitleTrack {
+  id                  String               @id @default(uuid())
+  workspaceId         String               @default("00000000-0000-0000-0000-000000000001")
+  mediaProductionProjectId String
+  languageCode        String
+  source              MediaSubtitleSource  @default(manual)
+  status              MediaSubtitleStatus  @default(draft)
+  version             Int                  @default(1)
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  @@index([workspaceId, mediaProductionProjectId])
+}
+
+model SubtitleCue {
+  id                String    @id @default(uuid())
+  workspaceId       String    @default("00000000-0000-0000-0000-000000000001")
+  subtitleTrackId   String
+  orderIndex        Int
+  startTimeSeconds  Decimal   @db.Decimal(10, 3)
+  endTimeSeconds    Decimal   @db.Decimal(10, 3)
+  text              String
+  confidenceScore   Decimal?  @db.Decimal(4, 3)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  @@index([workspaceId, subtitleTrackId])
+}
+
+model MediaVariant {
+  id                String               @id @default(uuid())
+  workspaceId       String               @default("00000000-0000-0000-0000-000000000001")
+  parentAssetId     String
+  platform          SocialPlatform?
+  format            PublishingFormat?
+  aspectRatio       String
+  resolution        String
+  durationSeconds   Decimal              @db.Decimal(10, 3)
+  cropStrategy      MediaVariantCropStrategy @default(center)
+  subtitleMode      MediaSubtitleStrategy   @default(none)
+  outputAssetId     String
+  createdAt         DateTime             @default(now())
+
+  @@index([workspaceId, parentAssetId])
+}
+
+model MediaQualityPolicy {
+  id                       String                 @id @default(uuid())
+  workspaceId              String                 @default("00000000-0000-0000-0000-000000000001")
+  scopeType                MediaQualityScopeType  @default(workspace)
+  scopeId                  String                 @default("global")
+  minimumTechnicalScore    Decimal                @db.Decimal(4, 3) @default(0)
+  minimumAudioScore        Decimal                @db.Decimal(4, 3) @default(0)
+  minimumVisualScore       Decimal                @db.Decimal(4, 3) @default(0)
+  minimumContentScore      Decimal                @db.Decimal(4, 3) @default(0)
+  minimumComplianceScore   Decimal                @db.Decimal(4, 3) @default(0)
+  minimumOverallScore      Decimal                @db.Decimal(4, 3) @default(0)
+  criticalIssueBlocksApproval Boolean            @default(true)
+  createdAt                DateTime               @default(now())
+  updatedAt                DateTime               @updatedAt
+
+  @@index([workspaceId, scopeType, scopeId])
+}
+
+model MediaQualityReport {
+  id                String             @id @default(uuid())
+  workspaceId       String             @default("00000000-0000-0000-0000-000000000001")
+  assetId           String
+  status            MediaQualityStatus @default(pending)
+  technicalScore    Decimal            @db.Decimal(4, 3) @default(0)
+  audioScore        Decimal            @db.Decimal(4, 3) @default(0)
+  visualScore       Decimal            @db.Decimal(4, 3) @default(0)
+  contentScore      Decimal            @db.Decimal(4, 3) @default(0)
+  complianceScore   Decimal            @db.Decimal(4, 3) @default(0)
+  overallScore      Decimal            @db.Decimal(4, 3) @default(0)
+  generatedAt       DateTime           @default(now())
+  qualityVersion    String             @default("1")
+  createdAt         DateTime           @default(now())
+
+  @@index([workspaceId, assetId])
+  @@index([workspaceId, status])
+}
+
+model MediaQualityIssue {
+  id                String                     @id @default(uuid())
+  workspaceId       String                     @default("00000000-0000-0000-0000-000000000001")
+  mediaQualityReportId String
+  code              String
+  severity          MediaQualityIssueSeverity  @default(warning)
+  message           String
+  timestampSeconds  Decimal?                   @db.Decimal(10, 3)
+  evidenceReference String?
+  createdAt         DateTime                   @default(now())
+
+  @@index([workspaceId, mediaQualityReportId])
+}
+
+model MediaRoutingDecision {
+  id                  String             @id @default(uuid())
+  workspaceId         String             @default("00000000-0000-0000-0000-000000000001")
+  capability          MediaCapability
+  selectedProviderConfigurationId String
+  selectedModelDefinitionId String
+  fallbackProviderConfigurationIds String[] @default([])
+  explanation        String
+  evidenceReferences String[] @default([])
+  estimatedCost       Decimal?           @db.Decimal(12, 2)
+  currency            String?
+  createdAt           DateTime           @default(now())
+
+  @@index([workspaceId, capability])
+}
+
+model MediaLicenseReference {
+  id                String   @id @default(uuid())
+  workspaceId       String   @default("00000000-0000-0000-0000-000000000001")
+  name              String
+  licenseType       String
+  referenceUrl      String?
+  validFrom         DateTime @default(now())
+  validUntil        DateTime?
+  status            MediaConsentStatus @default(active)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([workspaceId, status])
 }

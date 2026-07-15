@@ -26,6 +26,7 @@ export function HeroCanvas() {
   useEffect(() => {
     const isNarrow = window.innerWidth < 768;
     const cores = navigator.hardwareConcurrency ?? 4;
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setAllow3D(!isNarrow);
     setQuality(cores <= 4 || isNarrow ? "light" : "full");
   }, []);

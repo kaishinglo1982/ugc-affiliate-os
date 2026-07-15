@@ -27,9 +27,10 @@ async function persistProductWithScore(
 
   const data = {
     name: input.name,
+    canonicalName: input.name,
     description: input.description || null,
     vendor: input.vendor || null,
-    category: input.category || null,
+    categoryLabel: input.category || null,
     tags: splitTags(input.tags),
     targetUrl: input.targetUrl || null,
     imageUrl: input.imageUrl || null,
@@ -230,13 +231,14 @@ export async function importProductsCsvAction(
     const product = await prisma.product.create({
       data: {
         name,
-        category: categoryIdx >= 0 ? row[categoryIdx]?.trim() || null : null,
+        canonicalName: name,
+        categoryLabel: categoryIdx >= 0 ? row[categoryIdx]?.trim() || null : null,
         vendor: vendorIdx >= 0 ? row[vendorIdx]?.trim() || null : null,
         price: priceIdx >= 0 && row[priceIdx] ? Number(row[priceIdx]) : null,
         commissionRate:
           commissionIdx >= 0 && row[commissionIdx] ? Number(row[commissionIdx]) : null,
         tags: tagsIdx >= 0 ? splitTags(row[tagsIdx]) : [],
-        status: "IDEA",
+        status: "DISCOVERED",
         trend: "STABLE",
         risk: "MEDIUM",
       },

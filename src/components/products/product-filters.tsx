@@ -1,6 +1,7 @@
 "use client";
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Search, Star, Upload, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
@@ -113,9 +114,9 @@ export function ProductFilters({ categories }: { categories: string[] }) {
           <Upload className="h-4 w-4" /> CSV-Import
         </Button>
         <Button type="button" variant="outline" size="sm" asChild>
-          <a href="/api/products/export">
+          <Link href="/api/products/export">
             <Download className="h-4 w-4" /> CSV-Export
-          </a>
+          </Link>
         </Button>
       </div>
 

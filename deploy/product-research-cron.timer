@@ -1,0 +1,11 @@
+[Unit]
+Description=UGC Affiliate OS - daily product intelligence research pipeline timer
+
+[Timer]
+OnCalendar=*-*-* 04:00:00 UTC
+Persistent=true
+RandomizedDelaySec=300
+Unit=product-research-cron.service
+
+[Install]
+WantedBy=timers.target

@@ -7,6 +7,27 @@ import { computeProductScore, type ScoreDimensions } from "../src/features/produ
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
+const IS_PRODUCTION = process.env.NODE_ENV === "production";
+const ALLOW_DEMO_SEED = process.env.ALLOW_DEMO_SEED === "true";
+
+function hasText(value: string | undefined): value is string {
+  return typeof value === "string" && value.trim().length > 0;
+}
+
+function assertProductionSeedConfig() {
+  if (!IS_PRODUCTION) return;
+
+  const missing = [];
+  if (!hasText(process.env.ADMIN_EMAIL)) missing.push("ADMIN_EMAIL");
+  if (!hasText(process.env.ADMIN_PASSWORD_HASH)) missing.push("ADMIN_PASSWORD_HASH");
+
+  if (missing.length > 0) {
+    throw new Error(
+      `Production seed requires ${missing.join(" and ")}. Refusing to create a default admin user in production.`,
+    );
+  }
+}
+
 function daysAgo(n: number): Date {
   const d = new Date();
   d.setDate(d.getDate() - n);
@@ -16,8 +37,9 @@ function daysAgo(n: number): Date {
 
 async function seedAdminUser() {
   const email = process.env.ADMIN_EMAIL || "owner@example.com";
-  const passwordHash =
-    process.env.ADMIN_PASSWORD_HASH && process.env.ADMIN_PASSWORD_HASH.length > 0
+  const passwordHash = IS_PRODUCTION
+    ? process.env.ADMIN_PASSWORD_HASH!
+    : hasText(process.env.ADMIN_PASSWORD_HASH)
       ? process.env.ADMIN_PASSWORD_HASH
       : await bcrypt.hash(process.env.ADMIN_PASSWORD || "ChangeMe123!", 12);
 
@@ -50,7 +72,7 @@ const PRODUCT_SEED: Array<{
   vendor: string;
   price: number;
   commissionRate: number;
-  status: "IDEA" | "RESEARCHING" | "VALIDATED" | "ACTIVE" | "PAUSED";
+  status: "DISCOVERED" | "UNDER_REVIEW" | "APPROVED" | "REJECTED" | "PAUSED" | "UNAVAILABLE" | "ARCHIVED";
   trend: "EMERGING" | "GROWING" | "STABLE" | "DECLINING" | "SATURATED";
   risk: "LOW" | "MEDIUM" | "HIGH";
   dims: ScoreDimensions;
@@ -62,7 +84,7 @@ const PRODUCT_SEED: Array<{
     vendor: "Amazon",
     price: 39.99,
     commissionRate: 4.5,
-    status: "ACTIVE",
+    status: "APPROVED",
     trend: "GROWING",
     risk: "LOW",
     tags: ["ugc-friendly", "evergreen"],
@@ -78,7 +100,7 @@ const PRODUCT_SEED: Array<{
     vendor: "Digistore24",
     price: 89,
     commissionRate: 25,
-    status: "ACTIVE",
+    status: "APPROVED",
     trend: "GROWING",
     risk: "MEDIUM",
     tags: ["high-ticket", "before-after"],
@@ -94,7 +116,7 @@ const PRODUCT_SEED: Array<{
     vendor: "Amazon",
     price: 14.99,
     commissionRate: 4,
-    status: "VALIDATED",
+    status: "APPROVED",
     trend: "STABLE",
     risk: "LOW",
     tags: ["low-ticket", "problem-solver"],
@@ -110,7 +132,7 @@ const PRODUCT_SEED: Array<{
     vendor: "AliExpress",
     price: 12.5,
     commissionRate: 8,
-    status: "RESEARCHING",
+    status: "UNDER_REVIEW",
     trend: "STABLE",
     risk: "LOW",
     tags: ["desk-setup"],
@@ -126,7 +148,7 @@ const PRODUCT_SEED: Array<{
     vendor: "Awin",
     price: 34,
     commissionRate: 12,
-    status: "ACTIVE",
+    status: "APPROVED",
     trend: "STABLE",
     risk: "MEDIUM",
     tags: ["evergreen", "health"],
@@ -158,7 +180,7 @@ const PRODUCT_SEED: Array<{
     vendor: "Amazon",
     price: 9.99,
     commissionRate: 4,
-    status: "IDEA",
+    status: "DISCOVERED",
     trend: "EMERGING",
     risk: "LOW",
     tags: ["sustainability"],
@@ -174,7 +196,7 @@ const PRODUCT_SEED: Array<{
     vendor: "ShareASale",
     price: 27,
     commissionRate: 7,
-    status: "VALIDATED",
+    status: "APPROVED",
     trend: "STABLE",
     risk: "LOW",
     tags: ["remote-work"],
@@ -193,9 +215,10 @@ async function seedProducts() {
     const product = await prisma.product.create({
       data: {
         name: p.name,
+        canonicalName: p.name,
         description: `${p.name} – kuratiert für UGC-Testimonials und kurze Demo-Clips.`,
         vendor: p.vendor,
-        category: p.category,
+        categoryLabel: p.category,
         tags: p.tags,
         price: p.price,
         commissionRate: p.commissionRate,
@@ -206,7 +229,7 @@ async function seedProducts() {
         status: p.status,
         trend: p.trend,
         risk: p.risk,
-        isFavorite: p.status === "ACTIVE",
+        isFavorite: p.status === "APPROVED",
       },
     });
     await prisma.productScore.create({
@@ -678,8 +701,16 @@ async function seedNotifications() {
 }
 
 async function main() {
+  assertProductionSeedConfig();
+
   await seedAdminUser();
   await seedTaxSettings();
+
+  if (IS_PRODUCTION && !ALLOW_DEMO_SEED) {
+    console.log("Production seed complete. Demo data skipped; set ALLOW_DEMO_SEED=true to load demo fixtures.");
+    return;
+  }
+
   const products = await seedProducts();
   const programs = await seedAffiliatePrograms();
   const links = await seedAffiliateLinks(programs, products);

@@ -64,6 +64,7 @@ export function LinkDialog({
 
   useEffect(() => {
     if (state?.success) {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
       setOpen(false);
       router.refresh();
     }

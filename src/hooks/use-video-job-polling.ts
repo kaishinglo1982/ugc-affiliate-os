@@ -24,9 +24,12 @@ export function useVideoJobPolling(
     ),
   );
   const stateRef = useRef(states);
-  stateRef.current = states;
+  useEffect(() => {
+    stateRef.current = states;
+  });
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setStates((prev) => {
       const next = { ...prev };
       for (const job of jobs) {

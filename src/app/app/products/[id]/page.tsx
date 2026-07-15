@@ -36,7 +36,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
     name: product.name,
     description: product.description,
     vendor: product.vendor,
-    category: product.category,
+    category: product.categoryLabel,
     tags: product.tags,
     targetUrl: product.targetUrl,
     imageUrl: product.imageUrl,
@@ -76,7 +76,7 @@ export default async function ProductDetailPage({ params }: ProductDetailPagePro
             <Badge variant="outline">{PRODUCT_STATUS_LABELS[product.status]}</Badge>
           </div>
           <p className="text-sm text-[var(--color-foreground-muted)]">
-            {product.category ?? "Ohne Kategorie"} · {product.vendor ?? "Ohne Anbieter"}
+            {product.categoryLabel ?? "Ohne Kategorie"} · {product.vendor ?? "Ohne Anbieter"}
           </p>
         </div>
         <DeleteProductButton id={product.id} name={product.name} />

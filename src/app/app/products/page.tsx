@@ -31,7 +31,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
   const rows: ProductRow[] = products.map((p) => ({
     id: p.id,
     name: p.name,
-    category: p.category,
+    category: p.categoryLabel,
     status: p.status,
     trend: p.trend,
     price: p.price ? Number(p.price) : null,

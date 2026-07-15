@@ -16,17 +16,17 @@ export const productScoreDimensionsSchema = z.object({
 });
 
 export const productStatusEnum = z.enum([
-  "IDEA",
-  "RESEARCHING",
-  "VALIDATED",
-  "ACTIVE",
-  "PAUSED",
+  "DISCOVERED",
+  "UNDER_REVIEW",
+  "APPROVED",
   "REJECTED",
+  "PAUSED",
+  "UNAVAILABLE",
   "ARCHIVED",
 ]);
 
 export const trendStatusEnum = z.enum(["EMERGING", "GROWING", "STABLE", "DECLINING", "SATURATED"]);
-export const riskLevelEnum = z.enum(["LOW", "MEDIUM", "HIGH"]);
+export const riskLevelEnum = z.enum(["LOW", "MEDIUM", "HIGH", "CRITICAL"]);
 
 export const productFormSchema = z.object({
   name: z.string().trim().min(2, "Name wird benötigt").max(160),

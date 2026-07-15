@@ -32,6 +32,7 @@ export function MediaUploadZone() {
 
   useEffect(() => {
     if (state?.success) {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
       setSelectedFiles([]);
       if (inputRef.current) inputRef.current.value = "";
       router.refresh();
