@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { listAgentTools } from "@/server/services/agents";
 import { ToolsView, type ToolRow } from "@/components/agents/tools-view";
 
 export const metadata: Metadata = { title: "Tool Governance" };
 
 export default async function AgentToolsPage() {
-  const tools = await listAgentTools();
+  const workspaceId = await resolveWorkspaceId();
+  const tools = await listAgentTools(workspaceId);
 
   const rows: ToolRow[] = tools.map((t) => ({
     id: t.id,

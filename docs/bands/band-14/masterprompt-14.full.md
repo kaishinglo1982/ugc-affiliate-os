@@ -1,102 +1,95 @@
 # CarryOS Universe – Band 14
-# Masterprompt: Business and Finance (VOLLSTÄNDIG)
+# Masterprompt: Business & Finance OS (VOLLSTÄNDIG)
 
-> Band: 14
-> Masterprompt: 14.0 (vollständig, konsolidiert)
-> Status: PLANNED
-> Abhängigkeit: Band 10 (API), Band 13 (Revenue-Daten)
-> Ziel: Finance-Engine, Budgets, Invoices, Payouts, Affiliate-Commissions — auditierbar.
+> Band: 14 | Masterprompt: 14.0 | Status: DOCUMENTED | Gruppe: Core Intelligence
+> Abhängigkeit: Band 10 (API Governance)
 
----
+> Hinweis: Dieser Band hat Code-Bezug im Repository; Masterprompt verweist auf bestehende Module.
 
 ## Kapitel 1 – Architektur
 
-Basis: `src/lib/finance`. **Keine zweite Finance Engine.** Alle
-Finanzoperationen idempotent und auditiert. Bestehende Module erweitern.
+Beschreibt die Schichten, Komponenten und verbindlichen Prinzipien dieses Bandes. Bestehende Systeme werden erweitert, nicht dupliziert. Keine zweite Runtime/Engine/Queue/Finance.
 
----
+- Thema: Business & Finance OS
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 2 – Datenmodelle
 
-- `Budget` (tenantId, amount, period)
-- `Invoice` (tenantId, partnerId, lines[], total)
-- `Payout` (tenantId, amount, status)
-- `Commission` (tenantId, affiliateId, amount, status)
-- Erweiterung `ApiAuditLog` für Finanz-Aktionen
+Relevante Entitäten (Prisma), durchgehend tenant-isoliert. Kein Modell ohne tenantId-Filter.
 
----
+- Thema: Business & Finance OS
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 3 – APIs
 
-- `POST /api/v1/finance/budgets`
-- `POST /api/v1/finance/invoices`
-- `POST /api/v1/finance/payouts`
-- `POST /api/v1/finance/commissions`
+Endpunkte im Band-10-Standard (Envelope, withApiContext, Zod). Versionierung im Pfad.
 
-Alle nutzen Band-10-Envelope + `withApiContext` + Audit.
-
----
+- Thema: Business & Finance OS
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 4 – Events
 
-- `finance.budget.updated.v1`
-- `finance.invoice.created.v1`
-- `finance.payout.executed.v1`
-- `finance.commission.accrued.v1`
+Versionierte Events über bestehende Outbox/Queue. event.name.v1.
 
-Versioniert, auditiert.
-
----
+- Thema: Business & Finance OS
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 5 – Workflows
 
-Budget → Spend-Tracking → Invoice → Commission → Payout. Jeder Schritt
-idempotent (ExecutionKey) und auditiert.
+Prozesse: Request-Kontext → Validation → Authorization → Service → Repository → Event → Envelope. Idempotent via ExecutionKey.
 
----
+- Thema: Business & Finance OS
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 6 – Agenten
 
-Finance-Agent (optional) für Reconciliation, registered in Band 11 Runtime.
+Agenten/Rollen dieses Bandes, registriert in Band 11 Runtime (falls zutreffend).
 
----
+- Thema: Business & Finance OS
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 7 – UI
 
-Finanz-Dashboards: Budgets, Invoices, Payouts, Commissions, Profitability.
+Betroffene Dashboards/Komponenten. Keine Fachlogik in Client-Komponenten.
 
----
+- Thema: Business & Finance OS
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 8 – Tests
 
-- Unit: Berechnungen (Commission, Tax-Reserve)
-- Integration: Invoice→Payout
-- Security: Tenant-Isolation, Audit-Vollständigkeit
+Unit (Vitest), Integration, Security (Tenant-Isolation). Abdeckung der Erfolgs- und Fehlerpfade.
 
----
+- Thema: Business & Finance OS
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 9 – Security
 
-- Strikte Tenant-Isolation (Finanzdaten hochsensibel)
-- Audit für jede kritische Änderung (Pflicht)
-- Keine Secrets in Logs
+Authentifizierung (keine zweite), Autorisierung via requireApiPermission, Tenant-Isolation, Secrets nie in Code/Logs/Docs.
 
----
+- Thema: Business & Finance OS
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 10 – Performance
 
-- Aggregationen über indizierte Finanz-Tabellen
-- Report-Queries materialisiert/cached pro Tenant
+Indizes auf tenantId, asynchrone Verarbeitung, Caching, p95-Ziele.
 
----
+- Thema: Business & Finance OS
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Quality Gates
 
 1. TypeScript Strict, keine `any`. 2. Lint grün. 3. Typecheck grün.
-4. Unit-Tests grün. 5. Integrationstests grün.
-6. Architekturtests: KEINE zweite Finance Engine.
-
----
+4. Unit-Tests grün. 5. Integrationstests grün. 6. Architekturtests: keine zweiten Engines.
 
 ## Abschlussbericht (Struktur)
 

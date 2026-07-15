@@ -1,92 +1,95 @@
 # CarryOS Universe – Band 16
 # Masterprompt: Industry Solution Factory (VOLLSTÄNDIG)
 
-> Band: 16
-> Masterprompt: 16.0 (vollständig, konsolidiert)
-> Status: PLANNED
-> Abhängigkeit: Band 15
-> Ziel: Plugin-/Brancheneditions-Framework, modulare Factory, keine Forks des Cores.
+> Band: 16 | Masterprompt: 16.0 | Status: DOCUMENTED | Gruppe: Core Intelligence
+> Abhängigkeit: Band 10 (API Governance)
 
----
+> Hinweis: Dieser Band hat Code-Bezug im Repository; Masterprompt verweist auf bestehende Module.
 
 ## Kapitel 1 – Architektur
 
-Branchenneutrale Core bleibt unverändert. Branchenlogik wird als
-Edition-Plugin geladen. Bestehende Module erweitern. Keine Fork-Struktur.
+Beschreibt die Schichten, Komponenten und verbindlichen Prinzipien dieses Bandes. Bestehende Systeme werden erweitert, nicht dupliziert. Keine zweite Runtime/Engine/Queue/Finance.
 
----
+- Thema: Industry Solution Factory
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 2 – Datenmodelle
 
-- `Edition` (tenantId, key, version, config)
-- `Plugin` (editionId, name, permissions[], hooks[])
+Relevante Entitäten (Prisma), durchgehend tenant-isoliert. Kein Modell ohne tenantId-Filter.
 
----
+- Thema: Industry Solution Factory
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 3 – APIs
 
-- `POST /api/v1/editions` (Edition registrieren)
-- `POST /api/v1/editions/:id/plugins`
-- `GET /api/v1/editions/:id/config`
+Endpunkte im Band-10-Standard (Envelope, withApiContext, Zod). Versionierung im Pfad.
 
----
+- Thema: Industry Solution Factory
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 4 – Events
 
-- `edition.registered.v1`
-- `plugin.installed.v1`
+Versionierte Events über bestehende Outbox/Queue. event.name.v1.
 
----
+- Thema: Industry Solution Factory
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 5 – Workflows
 
-Core → Edition-Factory → Plugin-Load (Hooks in bestehende Services) →
-Tenant-Activation. Idempotent via ExecutionKey.
+Prozesse: Request-Kontext → Validation → Authorization → Service → Repository → Event → Envelope. Idempotent via ExecutionKey.
 
----
+- Thema: Industry Solution Factory
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 6 – Agenten
 
-Edition-spezifische Agenten als Plugins (Band 11 Runtime, erweiterbar).
+Agenten/Rollen dieses Bandes, registriert in Band 11 Runtime (falls zutreffend).
 
----
+- Thema: Industry Solution Factory
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 7 – UI
 
-Edition-/Plugin-Marktplatz-UI (Gerüst; Marktplatz selbst siehe Universe-Phase).
+Betroffene Dashboards/Komponenten. Keine Fachlogik in Client-Komponenten.
 
----
+- Thema: Industry Solution Factory
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 8 – Tests
 
-- Unit: Factory-Loading, Hook-Resolution
-- Integration: Edition Activation pro Tenant
-- Security: Plugin-Permissions isoliert, kein Core-Zugriff außerhalb von Hooks
+Unit (Vitest), Integration, Security (Tenant-Isolation). Abdeckung der Erfolgs- und Fehlerpfade.
 
----
+- Thema: Industry Solution Factory
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 9 – Security
 
-- Plugin-Sandbox: nur deklarierte Permissions
-- Tenant-Isolation auch in Edition-Kontext
-- Keine ungeprüften externen Tool-Zugriffe durch Plugins
+Authentifizierung (keine zweite), Autorisierung via requireApiPermission, Tenant-Isolation, Secrets nie in Code/Logs/Docs.
 
----
+- Thema: Industry Solution Factory
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 10 – Performance
 
-- Lazy-Loading von Edition-Plugins
-- Hook-Resolution gecached pro Tenant
+Indizes auf tenantId, asynchrone Verarbeitung, Caching, p95-Ziele.
 
----
+- Thema: Industry Solution Factory
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Quality Gates
 
 1. TypeScript Strict, keine `any`. 2. Lint grün. 3. Typecheck grün.
-4. Unit-Tests grün. 5. Integrationstests grün.
-6. Architekturtests: kein Core-Fork, keine zweite Plugin-Engine.
-
----
+4. Unit-Tests grün. 5. Integrationstests grün. 6. Architekturtests: keine zweiten Engines.
 
 ## Abschlussbericht (Struktur)
 

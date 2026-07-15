@@ -1,94 +1,95 @@
 # CarryOS Universe – Band 13
-# Masterprompt: Growth and Publishing (VOLLSTÄNDIG)
+# Masterprompt: Growth & Marketing OS (VOLLSTÄNDIG)
 
-> Band: 13
-> Masterprompt: 13.0 (vollständig, konsolidiert)
-> Status: PLANNED
-> Abhängigkeit: Band 12 (Content), Band 11 (Agents)
-> Ziel: Publishing-Worker, Distributionskanäle, Scheduling, Recommendations, Analytics-Optimierung.
+> Band: 13 | Masterprompt: 13.0 | Status: DOCUMENTED | Gruppe: Core Intelligence
+> Abhängigkeit: Band 10 (API Governance)
 
----
+> Hinweis: Dieser Band hat Code-Bezug im Repository; Masterprompt verweist auf bestehende Module.
 
 ## Kapitel 1 – Architektur
 
-Bestehende `src/lib/recommendation` und `src/lib/analytics` erweitern.
-Publishing über bestehende Worker/Queue. Keine zweite Publishing-Engine.
+Beschreibt die Schichten, Komponenten und verbindlichen Prinzipien dieses Bandes. Bestehende Systeme werden erweitert, nicht dupliziert. Keine zweite Runtime/Engine/Queue/Finance.
 
----
+- Thema: Growth & Marketing OS
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 2 – Datenmodelle
 
-- `PublishJob` (tenantId, contentId, channel, scheduledAt, status)
-- `Channel` (tenantId, type, credentialsRef)
-- `Recommendation` (tenantId, itemId, score, features)
+Relevante Entitäten (Prisma), durchgehend tenant-isoliert. Kein Modell ohne tenantId-Filter.
 
----
+- Thema: Growth & Marketing OS
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 3 – APIs
 
-- `POST /api/v1/publishing/jobs` (nutzt bestehende `publishing/*`)
-- `POST /api/v1/recommendations` (nutzt bestehende `recommendations/*`)
-- `GET /api/v1/analytics/optimize`
+Endpunkte im Band-10-Standard (Envelope, withApiContext, Zod). Versionierung im Pfad.
 
----
+- Thema: Growth & Marketing OS
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 4 – Events
 
-- `publish.job.queued.v1`
-- `publish.job.completed.v1`
-- `recommendation.computed.v1`
+Versionierte Events über bestehende Outbox/Queue. event.name.v1.
 
----
+- Thema: Growth & Marketing OS
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 5 – Workflows
 
-Content (Band 12) → Publish-Job (Scheduler/Worker) → Kanal → Recommendation-
-Loop → Analytics → Optimierung. Idempotent via ExecutionKey.
+Prozesse: Request-Kontext → Validation → Authorization → Service → Repository → Event → Envelope. Idempotent via ExecutionKey.
 
----
+- Thema: Growth & Marketing OS
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 6 – Agenten
 
-Publishing-Agent und Recommendation-Agent registered in Band 11 Runtime.
+Agenten/Rollen dieses Bandes, registriert in Band 11 Runtime (falls zutreffend).
 
----
+- Thema: Growth & Marketing OS
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 7 – UI
 
-Publishing-Kalender, Kanal-Config, Recommendation-Dashboard.
+Betroffene Dashboards/Komponenten. Keine Fachlogik in Client-Komponenten.
 
----
+- Thema: Growth & Marketing OS
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 8 – Tests
 
-- Unit: Recommendation-Scoring, Scheduling-Logik
-- Integration: Publish-Job über Worker
-- Security: Tenant-Isolation der Kanäle/Recommendations
+Unit (Vitest), Integration, Security (Tenant-Isolation). Abdeckung der Erfolgs- und Fehlerpfade.
 
----
+- Thema: Growth & Marketing OS
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 9 – Security
 
-- Channel-Credentials verschlüsselt (kein Plaintext)
-- Tenant-Isolation über Publish/Recommendation
-- Keine ungeprüften externen API-Zugriffe
+Authentifizierung (keine zweite), Autorisierung via requireApiPermission, Tenant-Isolation, Secrets nie in Code/Logs/Docs.
 
----
+- Thema: Growth & Marketing OS
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 10 – Performance
 
-- Publishing asynchron (Worker)
-- Recommendation-Berechnung gecached pro Tenant
+Indizes auf tenantId, asynchrone Verarbeitung, Caching, p95-Ziele.
 
----
+- Thema: Growth & Marketing OS
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Quality Gates
 
 1. TypeScript Strict, keine `any`. 2. Lint grün. 3. Typecheck grün.
-4. Unit-Tests grün. 5. Integrationstests grün.
-6. Architekturtests: keine zweite Publishing/Recommendation-Engine.
-
----
+4. Unit-Tests grün. 5. Integrationstests grün. 6. Architekturtests: keine zweiten Engines.
 
 ## Abschlussbericht (Struktur)
 

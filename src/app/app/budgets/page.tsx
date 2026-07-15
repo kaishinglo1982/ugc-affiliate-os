@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { listBudgets } from "@/server/services/budgets";
 import { BudgetsView, type PolicyRow } from "@/components/budgets/budgets-view";
 
 export const metadata: Metadata = { title: "Budgets" };
 
 export default async function BudgetsPage() {
-  const policies = await listBudgets();
+  const workspaceId = await resolveWorkspaceId();
+  const policies = await listBudgets(workspaceId);
 
   const rows: PolicyRow[] = policies.map((p) => ({
     id: p.id,

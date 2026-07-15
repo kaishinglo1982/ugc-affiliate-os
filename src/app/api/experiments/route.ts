@@ -107,7 +107,7 @@ export async function POST(request: Request) {
   };
 
   try {
-    const experiment = await createExperiment(input, actor);
+    const experiment = await createExperiment(input, actor, workspaceId);
     return NextResponse.json({ experiment }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Anlage fehlgeschlagen." }, { status: 400 });

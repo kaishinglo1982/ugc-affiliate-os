@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
+import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { reviewRecommendation, createVariantDraftFromRecommendation, createExperimentDraftFromRecommendation } from "@/features/recommendation/service";
 
@@ -13,6 +14,15 @@ const bodySchema = z.object({
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const guard = await requireApiPermission(Permission.MANAGE_RECOMMENDATIONS);
   if (guard) return guard.response;
+  let workspaceId: string;
+  try {
+    workspaceId = await resolveWorkspaceId();
+  } catch (e) {
+    if (e instanceof InvalidTenantTokenError) {
+      return NextResponse.json({ error: "Ungültiges Tenant-Token." }, { status: 401 });
+    }
+    throw e;
+  }
   const { id } = await context.params;
   const actor = (await getCurrentUser())?.id ?? "owner";
 
@@ -26,15 +36,15 @@ export async function POST(request: Request, context: { params: Promise<{ id: st
 
   try {
     if (action === "review") {
-      const rec = await reviewRecommendation(id, actor, parsed.data.status, parsed.data.note);
+      const rec = await reviewRecommendation(id, actor, parsed.data.status, workspaceId, parsed.data.note);
       return NextResponse.json({ recommendation: rec });
     }
     if (action === "variant-draft") {
-      const variant = await createVariantDraftFromRecommendation(id, actor);
+      const variant = await createVariantDraftFromRecommendation(id, actor, workspaceId);
       return NextResponse.json({ variant });
     }
     if (action === "experiment-draft") {
-      const experiment = await createExperimentDraftFromRecommendation(id, actor);
+      const experiment = await createExperimentDraftFromRecommendation(id, actor, workspaceId);
       return NextResponse.json({ experiment });
     }
     return NextResponse.json({ error: "Unbekannte Aktion." }, { status: 400 });

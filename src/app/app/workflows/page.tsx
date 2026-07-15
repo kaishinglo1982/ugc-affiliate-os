@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { listWorkflows } from "@/server/services/workflows";
 import { WorkflowsView, type WorkflowRow } from "@/components/workflows/workflows-view";
 
 export const metadata: Metadata = { title: "Workflows" };
 
 export default async function WorkflowsPage() {
-  const workflows = await listWorkflows();
+  const workspaceId = await resolveWorkspaceId();
+  const workflows = await listWorkflows(workspaceId);
 
   const rows: WorkflowRow[] = workflows.map((w) => ({
     id: w.id,

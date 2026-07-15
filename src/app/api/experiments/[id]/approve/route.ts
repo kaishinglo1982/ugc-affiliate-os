@@ -18,13 +18,10 @@ export async function POST(_request: Request, context: { params: Promise<{ id: s
     }
     throw e;
   }
-  // ponytail: workspaceId resolved but not yet enforced — approveExperiment()
-  // doesn't accept it (service-layer gap, tracked outside this sweep).
-  void workspaceId;
   const { id } = await context.params;
   const actor = (await getCurrentUser())?.id ?? "owner";
   try {
-    const experiment = await approveExperiment(id, actor);
+    const experiment = await approveExperiment(id, actor, workspaceId);
     return NextResponse.json({ experiment });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Freigabe fehlgeschlagen." }, { status: 400 });

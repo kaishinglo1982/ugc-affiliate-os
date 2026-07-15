@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { listContentBriefs } from "@/server/services/content";
 import { listCampaigns } from "@/server/services/campaigns";
 import { BriefsView, type BriefRow } from "@/components/content/briefs-view";
@@ -6,7 +7,8 @@ import { BriefsView, type BriefRow } from "@/components/content/briefs-view";
 export const metadata: Metadata = { title: "Content Briefs" };
 
 export default async function ContentBriefsPage() {
-  const [briefs, campaigns] = await Promise.all([listContentBriefs(), listCampaigns()]);
+  const workspaceId = await resolveWorkspaceId();
+  const [briefs, campaigns] = await Promise.all([listContentBriefs(workspaceId), listCampaigns()]);
 
   const rows: BriefRow[] = briefs.map((b) => ({
     id: b.id,

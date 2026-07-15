@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { listWorkflowRuns } from "@/server/services/workflows";
 import { Badge } from "@/components/ui/badge";
 import { WORKFLOW_RUN_STATUS_LABELS } from "@/lib/status-labels";
@@ -7,7 +8,8 @@ import { WORKFLOW_RUN_STATUS_LABELS } from "@/lib/status-labels";
 export const metadata: Metadata = { title: "Workflow Runs" };
 
 export default async function WorkflowRunsPage() {
-  const runs = await listWorkflowRuns();
+  const workspaceId = await resolveWorkspaceId();
+  const runs = await listWorkflowRuns(workspaceId);
 
   return (
     <div className="space-y-6">

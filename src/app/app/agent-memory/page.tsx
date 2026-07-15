@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { listAgentMemory } from "@/server/services/agent-memory";
 import { AgentMemoryView, type MemoryRow } from "@/components/agent-memory/agent-memory-view";
 
 export const metadata: Metadata = { title: "Agent Memory" };
 
 export default async function AgentMemoryPage() {
-  const entries = await listAgentMemory();
+  const workspaceId = await resolveWorkspaceId();
+  const entries = await listAgentMemory(workspaceId);
 
   const rows: MemoryRow[] = entries.map((m) => ({
     id: m.id,

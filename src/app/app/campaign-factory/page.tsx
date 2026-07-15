@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { listCampaignCandidates } from "@/server/services/campaign-candidates";
 import { CandidateBoard, type CandidateRow } from "@/components/campaign-factory/candidate-board";
 
 export const metadata: Metadata = { title: "Campaign Factory" };
 
 export default async function CampaignFactoryPage() {
-  const candidates = await listCampaignCandidates();
+  const workspaceId = await resolveWorkspaceId();
+  const candidates = await listCampaignCandidates(workspaceId);
 
   const rows: CandidateRow[] = candidates.map((c) => ({
     id: c.id,

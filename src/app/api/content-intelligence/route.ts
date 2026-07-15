@@ -3,7 +3,7 @@ import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
 import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
 import { prisma } from "@/lib/db/client";
-import { analyzeContent, createVariant, listVariants } from "@/features/content-intelligence/service";
+import { analyzeContent } from "@/features/content-intelligence/service";
 
 export async function POST(request: Request) {
   const guard = await requireApiPermission(Permission.MANAGE_CONTENT_INTELLIGENCE);
@@ -20,7 +20,7 @@ export async function POST(request: Request) {
   }
   const body = await request.json().catch(() => null);
   try {
-    const profile = await analyzeContent({ ...body, workspaceId: workspaceId });
+    const profile = await analyzeContent(body, workspaceId);
     return NextResponse.json({ profile }, { status: 201 });
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Analyse fehlgeschlagen." }, { status: 400 });

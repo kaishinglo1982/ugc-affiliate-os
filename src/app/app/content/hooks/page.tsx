@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { listContentHooks, listContentBriefs } from "@/server/services/content";
 import { HooksView, type HookRow } from "@/components/content/hooks-view";
 
 export const metadata: Metadata = { title: "Content Hooks" };
 
 export default async function ContentHooksPage() {
-  const [hooks, briefs] = await Promise.all([listContentHooks(), listContentBriefs()]);
+  const workspaceId = await resolveWorkspaceId();
+  const [hooks, briefs] = await Promise.all([listContentHooks(workspaceId), listContentBriefs(workspaceId)]);
 
   const rows: HookRow[] = hooks.map((h) => ({
     id: h.id,

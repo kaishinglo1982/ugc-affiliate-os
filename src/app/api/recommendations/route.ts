@@ -19,12 +19,9 @@ export async function GET(request: Request) {
     }
     throw e;
   }
-  // ponytail: workspaceId resolved but not yet enforced — listRecommendations()
-  // reads DEFAULT_WORKSPACE_ID internally (service-layer gap, tracked outside this sweep).
-  void workspaceId;
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status") ?? undefined;
-  const recommendations = await listRecommendations(status);
+  const recommendations = await listRecommendations(workspaceId, status);
   return NextResponse.json({ recommendations });
 }
 
@@ -41,13 +38,10 @@ export async function POST(request: Request) {
     }
     throw e;
   }
-  // ponytail: workspaceId resolved but not yet enforced — generateRecommendations()
-  // reads DEFAULT_WORKSPACE_ID internally (service-layer gap, tracked outside this sweep).
-  void workspaceId;
   const actor = (await getCurrentUser())?.id ?? "owner";
   const { searchParams } = new URL(request.url);
   if (searchParams.get("action") === "generate") {
-    const result = await generateRecommendations(actor);
+    const result = await generateRecommendations(actor, workspaceId);
     return NextResponse.json(result);
   }
   return NextResponse.json({ error: "Unbekannte Aktion." }, { status: 400 });

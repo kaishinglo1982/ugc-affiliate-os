@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { listApprovals } from "@/server/services/approvals";
 import { ApprovalsView, type ApprovalRow } from "@/components/approvals/approvals-view";
 
 export const metadata: Metadata = { title: "Freigaben" };
 
 export default async function ApprovalsPage() {
-  const approvals = await listApprovals();
+  const workspaceId = await resolveWorkspaceId();
+  const approvals = await listApprovals(workspaceId);
 
   const rows: ApprovalRow[] = approvals.map((a) => ({
     id: a.id,

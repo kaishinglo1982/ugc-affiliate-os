@@ -1,95 +1,95 @@
 # CarryOS Universe – Band 15
 # Masterprompt: Enterprise Infrastructure (VOLLSTÄNDIG)
 
-> Band: 15
-> Masterprompt: 15.0 (vollständig, konsolidiert)
-> Status: PLANNED
-> Abhängigkeit: Band 10–14
-> Ziel: Multi-Tenant-Härtung, Observability, Secrets, Deployment-Readiness, Scheduler-Entscheidung.
+> Band: 15 | Masterprompt: 15.0 | Status: DOCUMENTED | Gruppe: Core Intelligence
+> Abhängigkeit: Band 10 (API Governance)
 
----
+> Hinweis: Dieser Band hat Code-Bezug im Repository; Masterprompt verweist auf bestehende Module.
 
 ## Kapitel 1 – Architektur
 
-Erweitert `src/lib/observability`, `src/lib/config`, Secrets-Handling.
-Buildet auf `docs/agent-swarm-deploy-roadmap.md` (P0/P1/P2). Keine neuen
-Infra-Engines.
+Beschreibt die Schichten, Komponenten und verbindlichen Prinzipien dieses Bandes. Bestehende Systeme werden erweitert, nicht dupliziert. Keine zweite Runtime/Engine/Queue/Finance.
 
----
+- Thema: Enterprise Infrastructure
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 2 – Datenmodelle
 
-- `TenantConfig` (tenantId, flags, limits)
-- `DeploymentCheck` (runId, status, artifacts)
+Relevante Entitäten (Prisma), durchgehend tenant-isoliert. Kein Modell ohne tenantId-Filter.
 
----
+- Thema: Enterprise Infrastructure
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 3 – APIs
 
-- `GET /api/v1/health` (vorhanden, erweitern)
-- `GET /api/v1/health/database`
-- `GET /api/v1/infra/tenant-config`
+Endpunkte im Band-10-Standard (Envelope, withApiContext, Zod). Versionierung im Pfad.
 
----
+- Thema: Enterprise Infrastructure
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 4 – Events
 
-- `infra.deploy.check.v1`
-- `infra.tenant.config.changed.v1`
+Versionierte Events über bestehende Outbox/Queue. event.name.v1.
 
----
+- Thema: Enterprise Infrastructure
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 5 – Workflows
 
-Prisma module-scope-Init fixen (siehe deploy-roadmap P0) → Health-Checks
-→ Scheduler-Entscheidung (Vercel Cron / system cron / queue runner) →
-Smoke-Checks nach Deploy.
+Prozesse: Request-Kontext → Validation → Authorization → Service → Repository → Event → Envelope. Idempotent via ExecutionKey.
 
----
+- Thema: Enterprise Infrastructure
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 6 – Agenten
 
-Infra-Agent für Deployment-Smoke-Checks (Band 11 Runtime).
+Agenten/Rollen dieses Bandes, registriert in Band 11 Runtime (falls zutreffend).
 
----
+- Thema: Enterprise Infrastructure
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 7 – UI
 
-Infra-Dashboard: Health, Tenant-Limits, Deploy-Status.
+Betroffene Dashboards/Komponenten. Keine Fachlogik in Client-Komponenten.
 
----
+- Thema: Enterprise Infrastructure
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 8 – Tests
 
-- Unit: Tenant-Config-Logik
-- Integration: Health-Endpunkte gegen DB
-- Security: Secrets nie im Klartext
+Unit (Vitest), Integration, Security (Tenant-Isolation). Abdeckung der Erfolgs- und Fehlerpfade.
 
----
+- Thema: Enterprise Infrastructure
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 9 – Security
 
-- Produktions-Secrets provisonieren (DATABASE_URL, AUTH_SECRET,
-  CREDENTIAL_ENCRYPTION_KEY, APP_URL, WORKER_SECRET)
-- Persistente Objekt-Speicherung (S3-kompatibel) in Produktion
-- Tenant-Isolation durchgehend erzwungen
+Authentifizierung (keine zweite), Autorisierung via requireApiPermission, Tenant-Isolation, Secrets nie in Code/Logs/Docs.
 
----
+- Thema: Enterprise Infrastructure
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Kapitel 10 – Performance
 
-- Health-Checks < 200 ms
-- Observability-Sampling konfigurierbar
+Indizes auf tenantId, asynchrone Verarbeitung, Caching, p95-Ziele.
 
----
+- Thema: Enterprise Infrastructure
+- Gruppe: Core Intelligence
+- Ist-Zustand: bestehende Artefakte in `src/` werden erweitert (Gap-Analyse erforderlich).
 
 ## Quality Gates
 
 1. TypeScript Strict, keine `any`. 2. Lint grün. 3. Typecheck grün.
-4. Unit-Tests grün. 5. Integrationstests grün.
-6. Architekturtests: keine zweiten Infra-Engines.
-
----
+4. Unit-Tests grün. 5. Integrationstests grün. 6. Architekturtests: keine zweiten Engines.
 
 ## Abschlussbericht (Struktur)
 

@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { getAgent } from "@/server/services/agents";
 import { listAgentMemory } from "@/server/services/agent-memory";
 import { prisma } from "@/lib/db/client";
@@ -19,10 +20,11 @@ export async function generateMetadata({ params }: { params: Promise<{ id: strin
 
 export default async function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  const workspaceId = await resolveWorkspaceId();
   const agent = await getAgent(id);
   if (!agent) notFound();
 
-  const memory = await listAgentMemory({ agentKey: agent.key });
+  const memory = await listAgentMemory(workspaceId, { agentKey: agent.key });
   const audit = await prisma.auditLog.findMany({
     where: { entityId: agent.id },
     orderBy: { createdAt: "desc" },

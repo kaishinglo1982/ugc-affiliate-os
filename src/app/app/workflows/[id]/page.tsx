@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { getWorkflow } from "@/server/services/workflows";
 import { WorkflowDetailView } from "@/components/workflows/workflow-detail-view";
 
@@ -7,7 +8,8 @@ export const metadata: Metadata = { title: "Workflow Detail" };
 
 export default async function WorkflowDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const workflow = await getWorkflow(id);
+  const workspaceId = await resolveWorkspaceId();
+  const workflow = await getWorkflow(id, workspaceId);
   if (!workflow) notFound();
 
   return (

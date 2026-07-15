@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { FileText, Quote, Clapperboard, Image as ImageIcon, ShieldCheck } from "lucide-react";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { contentOverview } from "@/server/services/content";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -9,7 +10,8 @@ import { CONTENT_BRIEF_STATUS_LABELS } from "@/lib/status-labels";
 export const metadata: Metadata = { title: "Content Studio" };
 
 export default async function ContentOverviewPage() {
-  const overview = await contentOverview();
+  const workspaceId = await resolveWorkspaceId();
+  const overview = await contentOverview(workspaceId);
 
   const stats = [
     { label: "Briefe", value: overview.briefs, href: "/app/content/briefs", icon: FileText },

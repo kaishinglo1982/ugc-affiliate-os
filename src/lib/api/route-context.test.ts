@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { NextResponse } from "next/server";
 
 vi.mock("server-only", () => ({}));
 vi.mock("next/headers", () => ({
@@ -22,8 +23,9 @@ import { withApiContext } from "@/lib/api/route-context";
 import { requireApiPermission } from "@/lib/api/guard";
 import { resolveWorkspaceId, InvalidTenantTokenError } from "@/lib/auth/tenant";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import type { Permission } from "@/lib/api/route-context";
 
-const perm = "experiments.edit" as unknown as (typeof import("@/lib/auth/rbac"))["Permission"];
+const perm: Permission = "experiments.edit";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -32,7 +34,7 @@ beforeEach(() => {
 describe("withApiContext", () => {
   it("returns 401 envelope when permission guard fails", async () => {
     vi.mocked(requireApiPermission).mockResolvedValue({
-      response: new Response(null, { status: 403 }),
+      response: NextResponse.json(null, { status: 403 }),
     });
     const result = await withApiContext(perm);
     expect("response" in result).toBe(true);
