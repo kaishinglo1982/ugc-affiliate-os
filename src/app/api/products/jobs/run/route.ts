@@ -1,28 +1,28 @@
-import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth/current-user";
+import { authorizeWorkerRequest } from "@/lib/api/worker-auth";
+import { resolveWorkspaceId, InvalidTenantTokenError } from "@/lib/auth/tenant";
+import { ok, serverError, unauthorized } from "@/lib/api/response";
 import { runAll } from "@/features/products/application/research-job";
 
-export async function POST(request: Request) {
-  const secret = process.env.WORKER_SECRET;
-  let actor = "owner";
-  if (secret) {
-    const auth = request.headers.get("authorization");
-    if (auth !== `Bearer ${secret}`) {
-      return NextResponse.json({ error: "Ungültiges Worker-Token." }, { status: 401 });
-    }
-  } else {
-    const user = await getCurrentUser();
-    if (!user) {
-      return NextResponse.json({ error: "Nicht authentifiziert." }, { status: 401 });
-    }
-    actor = user.id ?? "owner";
-  }
-
+async function runProductResearch(request: Request, allowUserFallback: boolean) {
+  const auth = await authorizeWorkerRequest(request, { allowUserFallback });
+  if ("response" in auth) return auth.response;
   try {
-    const summary = await runAll(actor, crypto.randomUUID());
-    return NextResponse.json({ summary });
+    const workspaceId = await resolveWorkspaceId();
+    const summary = await runAll(auth.actor, crypto.randomUUID());
+    return ok({ summary, workspaceId });
   } catch (error) {
+    if (error instanceof InvalidTenantTokenError) {
+      return unauthorized("Ungültiges Tenant-Token.");
+    }
     const message = error instanceof Error ? error.message : "Phase-7-Job fehlgeschlagen.";
-    return NextResponse.json({ error: message }, { status: 500 });
+    return serverError(message);
   }
+}
+
+export async function POST(request: Request) {
+  return runProductResearch(request, true);
+}
+
+export async function GET(request: Request) {
+  return runProductResearch(request, false);
 }
