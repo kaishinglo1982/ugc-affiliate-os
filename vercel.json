@@ -11,7 +11,7 @@
     },
     {
       "path": "/api/publishing/worker",
-      "schedule": "*/15 * * * *"
+      "schedule": "0 4 * * *"
     }
   ]
 }
