@@ -2,94 +2,93 @@
 # Masterprompt: Testing Framework (VOLLSTÄNDIG)
 
 > Band: 96 | Masterprompt: 96.0 | Status: PLANNED | Gruppe: Developer Platform
-> Abhängigkeit: Band 10–16 (Core), keine Core-Fork erlaubt
-
-> Hinweis: Planungs-Masterprompt. Konkrete Implementierung erfolgt bandweise über Swarm/Codex, ohne Core-Fork.
+> Abhängigkeit: Band 10–16 (Core), keine Core-Fork
 
 ## Kapitel 1 – Architektur
 
-Beschreibt die Schichten, Komponenten und verbindlichen Prinzipien dieses Bandes. Bestehende Systeme werden erweitert, nicht dupliziert. Keine zweite Runtime/Engine/Queue/Finance.
-
-- Thema: Testing Framework
-- Gruppe: Developer Platform
-- Ist-Zustand: kein eigener Code in diesem Repository; baut auf CarryOS Core auf.
+- Das CarryOS Testing Framework (`@carryos/testkit`) ist eine Test-Harness-Schicht über Vitest/Jest, die Band-10-Standard (Envelope, Tenant-Context, Zod) als Test-Primitive bereitstellt – keine eigene Test-Runtime, Integration in bestehende Toolchain.
+- Bestandteile: `TenantTestContext` (isoliertes tenantId pro Test), `ApiContractHarness` (Envelope-Assert), `EventHarness` (Outbox-Assert), `SdkMock` (generierter Client-Mock).
+- Fixtures werden aus Band-93-generierten Modellen abgeleitet, sodass Tests immer gegen aktuelle Contracts laufen (Drift-Erkennung).
+- Framework ist deklarativ: Test-Autoren beschreiben `given(resource).when(action).expect(envelope/event)`, Harness führt gegen echte Services aus.
+- Keine Duplikate zu Band-10-Logik – Tests üben bestehende Repository/Service-Layer aus, forken nichts.
 
 ## Kapitel 2 – Datenmodelle
 
-Relevante Entitäten (Prisma), durchgehend tenant-isoliert. Kein Modell ohne tenantId-Filter.
-
-- Thema: Testing Framework
-- Gruppe: Developer Platform
-- Ist-Zustand: kein eigener Code in diesem Repository; baut auf CarryOS Core auf.
+- `TenantTestContext` trägt `{ tenantId, workspaceId, role, permissions[] }`, isolation per Test-Transaction/Rollback.
+- `ContractFixture<T>` wird aus generiertem Zod-Schema gebaut; `Factory.build()` erzeugt valide Modelle inkl. `tenantId`.
+- `EventAssertion` modelliert erwartete Outbox-Einträge (`event.name.v1` + payload-Hash), typisiert.
+- `ApiExpectation` erfasst Envelope-Struktur, HTTP-Status, Permission-`403`-Fall und Idempotenz-`409`.
+- `SdkMockSpec` hält aufgezeichnete Calls (tenantId, endpoint, payload) für Consumer-Tests ohne echtes Netz.
 
 ## Kapitel 3 – APIs
 
-Endpunkte im Band-10-Standard (Envelope, withApiContext, Zod). Versionierung im Pfad.
-
-- Thema: Testing Framework
-- Gruppe: Developer Platform
-- Ist-Zustand: kein eigener Code in diesem Repository; baut auf CarryOS Core auf.
+- `ApiContractHarness` startet Band-10-Routes gegen Test-DB und Asserted Envelope `{ ok, data, error, meta }`.
+- Tenant-Isolation-Test-Primitive: `expectTenantIsolation(() => sdk.lead.list())` prüft, dass Query `tenantId` erzwingt.
+- Idempotenz-Primitive: `expectIdempotent(mutation, key)` sendet doppelt, Assert `409` + einmaliger Write.
+- Permission-Primitive: `expectForbidden(scope)` ruft ohne Recht, Assert `403` ohne Datenleak.
+- Drift-Check: Harness vergleicht laufende Route-Contracts mit Band-93-Client, Warnung bei Mismatch.
 
 ## Kapitel 4 – Events
 
-Versionierte Events über bestehende Outbox/Queue. event.name.v1.
-
-- Thema: Testing Framework
-- Gruppe: Developer Platform
-- Ist-Zustand: kein eigener Code in diesem Repository; baut auf CarryOS Core auf.
+- `EventHarness` liest Band-10-Outbox und Asserted `event.name.v1` + versionierten Payload gegen Zod.
+- Test primitiv `expectEvent('lead.created.v1', {tenantId})` wartet asynchron auf Outbox-Eintrag (Timeout).
+- `event.skipped`-Pfad testbar: korrupte Payload muss auditiert statt gecrasht werden (Resilience-Test).
+- Webhook-Test: `expectWebhook(signature)` verifiziert HMAC über Band-10-Secret, kein Hardcoded Secret im Test.
+- Kein eigener EventBus im Framework – es konsumiert bestehende Outbox/Queue (Band 5/10).
 
 ## Kapitel 5 – Workflows
 
-Prozesse: Request-Kontext → Validation → Authorization → Service → Repository → Event → Envelope. Idempotent via ExecutionKey.
-
-- Thema: Testing Framework
-- Gruppe: Developer Platform
-- Ist-Zustand: kein eigener Code in diesem Repository; baut auf CarryOS Core auf.
+- `WorkflowHarness` startet Band-9/Band-11-Prozesse via SDK und Asserted `WorkflowState`/Phasen/Audit-Trail.
+- Idempotenz: `expectWorkflowIdempotent(def, input)` mit ExecutionKey, Assert einmaliger Lauf bei Replay.
+- Fehlerpfad: `expectWorkflowFailed(def)` Asserted `WorkflowFailed`-Event + Retry-Hinweis, kein verlorener State.
+- Long-running Tests nutzen Fake-Timer/Worker, um Phasenübergänge deterministisch zu prüfen.
+- Keine Workflow-Engine im Framework – nur Ausführung gegen bestehende Runtime.
 
 ## Kapitel 6 – Agenten
 
-Agenten/Rollen dieses Bandes, registriert in Band 11 Runtime (falls zutreffend).
-
-- Thema: Testing Framework
-- Gruppe: Developer Platform
-- Ist-Zustand: kein eigener Code in diesem Repository; baut auf CarryOS Core auf.
+- `AgentHarness` ruft Band-11 Agent Runtime über SDK auf und Asserted `ToolResult<T>` gegen Schema.
+- RoleId-Enum (Band 93) steuert verfügbare Test-Rollen; System-Prompts bleiben serverseitig (nie im Test-Bundle).
+- Streaming-Test: `expectAgentStream(role, prompt)` Asserted Chunk-Reihenfolge + sauberer `AbortController`-Abbruch.
+- `expectToolCall(toolId, args)` Asserted typsichere Tool-Argumente und validiertes Resultat.
+- Keine Agent-Engine im Framework – nur Consumer-Tests gegen Band-11 Runtime.
 
 ## Kapitel 7 – UI
 
-Betroffene Dashboards/Komponenten. Keine Fachlogik in Client-Komponenten.
-
-- Thema: Testing Framework
-- Gruppe: Developer Platform
-- Ist-Zustand: kein eigener Code in diesem Repository; baut auf CarryOS Core auf.
+- `UiHarness` kombiniert Testing-Library mit `SdkMock`, rendert generierte Komponenten (Band 94) ohne echtes Netz.
+- Tenant-Scope-Test: generierte View darf ohne tenantId keine Daten anfordern (Mock verweigert).
+- Envelope-Fehler-State-Test: `403`/`409` mappen auf sichtbare UI-States, kein Silent-Fail im DOM.
+- a11y-Test-Primitive: `expectAccessible(form)` prüft Label/ARIA via axe (WCAG AA), automatisch im CI.
+- Keine UI-Fachlogik getestet – nur Contracts der generierten Komponenten (Consumer-Sicht).
 
 ## Kapitel 8 – Tests
 
-Unit (Vitest), Integration, Security (Tenant-Isolation). Abdeckung der Erfolgs- und Fehlerpfade.
-
-- Thema: Testing Framework
-- Gruppe: Developer Platform
-- Ist-Zustand: kein eigener Code in diesem Repository; baut auf CarryOS Core auf.
+- Framework-Selbsttests (Meta): Unit für Harness-Primitive (TenantContext, EventHarness, ApiContract) mit Fake-DB.
+- Beispiel-Suite gegen Band-10-Module als Reference-Implementation (Lead/Workflow/Agent) als Golden-Master.
+- Determinismus: Fixtures mit Seed, gleiche Test-Runs reproduzierbar; Snapshot-Stability-Gate.
+- Coverage-Gate: kritische Pfade (Tenant-Isolation, Idempotenz, Permission) > 95 % Abdeckung.
+- Architektur-Test: Framework darf keine zweite Test-Runtime/Engine einführen (nutzt Vitest).
 
 ## Kapitel 9 – Security
 
-Authentifizierung (keine zweite), Autorisierung via requireApiPermission, Tenant-Isolation, Secrets nie in Code/Logs/Docs.
-
-- Thema: Testing Framework
-- Gruppe: Developer Platform
-- Ist-Zustand: kein eigener Code in diesem Repository; baut auf CarryOS Core auf.
+- Test-Harness nutzt isolierte Test-Tenants, niemals Produktionsdaten oder echte Secrets.
+- Secrets in Tests nur via env/Test-Vault; niemals Hardcoded, niemals in Logs/Reports.
+- Tenant-Isolation ist erstklassiges Security-Primitive – Leak-Test schlägt Suite bei Verstoß fehl.
+- Permission-Tests Asserten explizit `403` ohne Datenrückgabe (verhindert Over-Permission-Bugs).
+- Framework-Report enthält keine sensiblen Payloads; Maskierung in CI-Logs aktiv.
 
 ## Kapitel 10 – Performance
 
-Indizes auf tenantId, asynchrone Verarbeitung, Caching, p95-Ziele.
-
-- Thema: Testing Framework
-- Gruppe: Developer Platform
-- Ist-Zustand: kein eigener Code in diesem Repository; baut auf CarryOS Core auf.
+- `TenantTestContext` nutzt Transaction-Rollback statt Truncate → Setup < 50 ms pro Test, Suite < 2 min (1000 Tests).
+- `SdkMock` vermeidet Netz-Overhead, Consumer-Tests < 10 ms je Case; echt Integration nur wo nötig.
+- Parallele Worker (Vitest) über Tenant-Partitionen, p95-Suite-Lauf < 5 min für volle Universe-Tests.
+- EventHarness poll mit Backoff statt busy-wait, Outbox-Assert < 200 ms typisch.
+- Memory-Cap < 512 MB für volle Suite; Fixtures werden gestreamt, nicht voll materialisiert.
 
 ## Quality Gates
 
-1. TypeScript Strict, keine `any`. 2. Lint grün. 3. Typecheck grün.
-4. Unit-Tests grün. 5. Integrationstests grün. 6. Architekturtests: keine zweiten Engines.
+1. TypeScript Strict, keine `any`. 2. Lint grün. 3. Typecheck grün. 4. Framework-Unit-Tests grün.
+5. Reference-Suite grün. 6. Architekturtests: keine zweiten Engines/Runtimes.
+7. Tenant-Isolation/Idempotenz-Primitive grün. 8. Coverage-Gate (> 95 % kritisch) eingehalten.
 
 ## Abschlussbericht (Struktur)
 

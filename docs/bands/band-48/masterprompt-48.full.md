@@ -4,92 +4,83 @@
 > Band: 48 | Masterprompt: 48.0 | Status: PLANNED | Gruppe: Commerce & Sales
 > Abhängigkeit: Band 10–16 (Core), keine Core-Fork erlaubt
 
-> Hinweis: Planungs-Masterprompt. Konkrete Implementierung erfolgt bandweise über Swarm/Codex, ohne Core-Fork.
+> Hinweis: Fachmodul baut ohne Fork auf CarryOS Core auf. Externer Zugang für Lieferanten aus Band 45/46; eigene Auth-Rolle, kein Fork.
 
 ## Kapitel 1 – Architektur
 
-Beschreibt die Schichten, Komponenten und verbindlichen Prinzipien dieses Bandes. Bestehende Systeme werden erweitert, nicht dupliziert. Keine zweite Runtime/Engine/Queue/Finance.
-
-- Thema: Lieferantenportal
-- Gruppe: Commerce & Sales
-- Ist-Zustand: kein eigener Code in diesem Repository; baut auf CarryOS Core auf.
+- Lieferantenportal als Package `src/modules/commerce/supplier-portal/`; keine eigene Runtime, DB oder Queue.
+- Supplier-Profile, Angebote und ASNs sind fachliche Aggregate über Core-Repository mit `tenantId` + `supplierId`-Filter.
+- Externer Zugriff über bestehende Core-Auth mit Lieferanten-Rolle; keine zweite Authentifizierung.
+- Nutzt Band-11-Agenten für Angebots-Validierung und ASN-Abgleich.
 
 ## Kapitel 2 – Datenmodelle
 
-Relevante Entitäten (Prisma), durchgehend tenant-isoliert. Kein Modell ohne tenantId-Filter.
-
-- Thema: Lieferantenportal
-- Gruppe: Commerce & Sales
-- Ist-Zustand: kein eigener Code in diesem Repository; baut auf CarryOS Core auf.
+- Entität `SupplierProfile` (id, tenantId, supplierId, name, contactEnc, catalogRef, active) – Lieferantenstamm.
+- Entität `SupplierOffer` (id, tenantId, supplierId, prId, linesJson, totalEnc, validUntil) – Angebot für PR.
+- Entität `AdvanceShippingNotice` (id, tenantId, supplierId, poId, linesJson, etaAt) – ASN.
+- Entität `SupplierInvoiceRef` (id, tenantId, supplierId, poId, invoiceRefEnc, status) – Rechnungs-Ref (Band 14).
+- Alle Modelle zwingend `tenantId` + `supplierId`; Schema nur im Commerce-Namespace.
 
 ## Kapitel 3 – APIs
 
-Endpunkte im Band-10-Standard (Envelope, withApiContext, Zod). Versionierung im Pfad.
-
-- Thema: Lieferantenportal
-- Gruppe: Commerce & Sales
-- Ist-Zustand: kein eigener Code in diesem Repository; baut auf CarryOS Core auf.
+- `POST /api/v1/commerce/supplier/offers` – Angebot zu PR; Zod `supplierOfferSchema`, Envelope.
+- `POST /api/v1/commerce/supplier/asn` – ASN zu PO; `supplier.asn.submitted.v1`.
+- `GET /api/v1/commerce/supplier/orders?status=` – PO-Sicht für Lieferant, tenant+supplier-isoliert.
+- `POST /api/v1/commerce/supplier/invoice-refs` – Rechnungs-Ref; delegiert an Band 14.
+- `GET /api/v1/commerce/supplier/profile` – eigenes Profil (Lieferanten-Rolle).
 
 ## Kapitel 4 – Events
 
-Versionierte Events über bestehende Outbox/Queue. event.name.v1.
-
-- Thema: Lieferantenportal
-- Gruppe: Commerce & Sales
-- Ist-Zustand: kein eigener Code in diesem Repository; baut auf CarryOS Core auf.
+- `supplier.offer.submitted.v1` – nach Angebot; konsumiert von Band 45 (Vergleich).
+- `supplier.asn.submitted.v1` – nach ASN; konsumiert von Band 46/47 (Wareneingang).
+- `supplier.invoice.registered.v1` – nach Rechnungs-Ref; konsumiert von Band 14.
+- `supplier.po.assigned.v1` – bei PO-Zuweisung; Notification an Lieferant.
+- Events versioniert über Outbox; Beträge nur verschlüsselt im Payload.
 
 ## Kapitel 5 – Workflows
 
-Prozesse: Request-Kontext → Validation → Authorization → Service → Repository → Event → Envelope. Idempotent via ExecutionKey.
-
-- Thema: Lieferantenportal
-- Gruppe: Commerce & Sales
-- Ist-Zustand: kein eigener Code in diesem Repository; baut auf CarryOS Core auf.
+- Angebot: ApiContext (Supplier-Role) → Zod → requireApiPermission(supplier:write) → PortalService → Repository → Outbox → Envelope.
+- ASN: Service → `AdvanceShippingNotice` → `supplier.asn.submitted.v1`; idempotent via PO-Id.
+- Rechnungs-Ref: Service → Band-14-Event → `supplier.invoice.registered.v1`; keine Logik im Handler.
 
 ## Kapitel 6 – Agenten
 
-Agenten/Rollen dieses Bandes, registriert in Band 11 Runtime (falls zutreffend).
-
-- Thema: Lieferantenportal
-- Gruppe: Commerce & Sales
-- Ist-Zustand: kein eigener Code in diesem Repository; baut auf CarryOS Core auf.
+- `SupplierOfferAgent`: validiert Angebot gegen PR und flaggt Abweichungen.
+- `AsnMatchAgent`: gleicht ASN mit PO-Positionen ab und meldet Differenzen.
+- `SupplierScoreAgent`: bewertet Lieferzuverlässigkeit aus ASN/Invoice-Historie.
+- Registrierung in Band-11-Runtime; bestehende Tool-Schnittstellen.
 
 ## Kapitel 7 – UI
 
-Betroffene Dashboards/Komponenten. Keine Fachlogik in Client-Komponenten.
-
-- Thema: Lieferantenportal
-- Gruppe: Commerce & Sales
-- Ist-Zustand: kein eigener Code in diesem Repository; baut auf CarryOS Core auf.
+- `SupplierOfferForm` für Angebotserfassung, isoliert nach `supplierId`.
+- `SupplierAsnView` zeigt zugewiesene POs und ASN-Abgabe; schreibt nur via APIs.
+- `SupplierScorecard` rendert Score aus paginierter API; reine Darstellung.
+- Komponenten unter `src/modules/commerce/supplier-portal/ui/`, nur v1-APIs.
 
 ## Kapitel 8 – Tests
 
-Unit (Vitest), Integration, Security (Tenant-Isolation). Abdeckung der Erfolgs- und Fehlerpfade.
-
-- Thema: Lieferantenportal
-- Gruppe: Commerce & Sales
-- Ist-Zustand: kein eigener Code in diesem Repository; baut auf CarryOS Core auf.
+- Unit (Vitest): Angebots-Validierung, ASN-Abgleich, Score-Berechnung.
+- Integration: PR → Lieferant-Angebot → PO; Tenant+Supplier-Isolation verifiziert.
+- Security: Supplier-Role-Verweigerung, Cross-Supplier blockiert, verschlüsselte Beträge.
+- Fehlerpfade: ungültige PR, abgelaufenes Angebot, falsche PO-Zuweisung.
 
 ## Kapitel 9 – Security
 
-Authentifizierung (keine zweite), Autorisierung via requireApiPermission, Tenant-Isolation, Secrets nie in Code/Logs/Docs.
-
-- Thema: Lieferantenportal
-- Gruppe: Commerce & Sales
-- Ist-Zustand: kein eigener Code in diesem Repository; baut auf CarryOS Core auf.
+- Auth über Core (keine zweite); Autorisierung via Lieferanten-Rolle + `requireApiPermission`.
+- Tenant- und Supplier-Isolation durchgehend; Beträge verschlüsselt, nie in Logs.
+- Audit über Band-10 für alle Lieferanten-Schreiboperationen.
 
 ## Kapitel 10 – Performance
 
-Indizes auf tenantId, asynchrone Verarbeitung, Caching, p95-Ziele.
-
-- Thema: Lieferantenportal
-- Gruppe: Commerce & Sales
-- Ist-Zustand: kein eigener Code in diesem Repository; baut auf CarryOS Core auf.
+- Indizes auf `(tenantId, supplierId, prId)`, `(tenantId, supplierId, poId)`.
+- Angebots- und ASN-Queries gecached; List mit Cursor, p95 < 200 ms.
+- Bulk-ASN batchweise; keine N+1 bei PO-Positionen.
 
 ## Quality Gates
 
 1. TypeScript Strict, keine `any`. 2. Lint grün. 3. Typecheck grün.
-4. Unit-Tests grün. 5. Integrationstests grün. 6. Architekturtests: keine zweiten Engines.
+4. Unit-Tests grün. 5. Integrationstests grün. 6. Architekturtests: keine zweiten Engines, keine Core-Fork.
+7. Tenant+Supplier-Isolation-Test grün. 8. Encryption-Verifizierung Beträge.
 
 ## Abschlussbericht (Struktur)
 
