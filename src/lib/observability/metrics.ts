@@ -50,6 +50,10 @@ export const METRICS = {
   productProviderRateLimitedTotal: "ugc_product_provider_rate_limited_total",
   productProviderFailedTotal: "ugc_product_provider_failed_total",
   productResearchQueueLagSeconds: "ugc_product_research_queue_lag_seconds",
+  // Phase 4 — agentic operations
+  agentRunsTotal: "ugc_agent_runs_total",
+  agentRunsSucceededTotal: "ugc_agent_runs_succeeded_total",
+  agentRunsFailedTotal: "ugc_agent_runs_failed_total",
 } as const;
 
 type MetricValue = number;

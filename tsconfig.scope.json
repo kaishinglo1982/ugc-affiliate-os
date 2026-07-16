@@ -1,0 +1,16 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "skipLibCheck": true,
+    "incremental": false,
+    "noEmit": true
+  },
+  "include": [
+    "next-env.d.ts",
+    "src/server/services/agents.ts",
+    "src/server/services/__tests__/agents.test.ts",
+    "src/lib/observability/metrics.ts",
+    "src/test/stubs/server-only.ts",
+    "src/lib/db/client.ts"
+  ]
+}
