@@ -3,9 +3,46 @@ import path from "node:path";
 
 const ROOT = process.cwd();
 const SOURCE_ROOTS = ["src/lib", "src/features", "src/app"];
-const TENANT_TABLE_PATTERN = /FROM\s+"(?:Product|Campaign|WorkflowRun|WorkflowStepRun|Approval|AgentToolCall|AnalyticsEvent)"|UPDATE\s+"(?:Product|Campaign|WorkflowRun|WorkflowStepRun|Approval|AgentToolCall|AnalyticsEvent)"|DELETE\s+FROM\s+"(?:Product|Campaign|WorkflowRun|WorkflowStepRun|Approval|AgentToolCall|AnalyticsEvent)"/i;
-const WORKSPACE_SCOPE_PATTERN = /"workspaceId"\s*=|workspaceId\s*:/;
 const ALLOW_MARKER = "tenant-scope-reviewed";
+const SAFE_BOUNDARIES = [
+  "src/lib/tenancy/",
+  "src/lib/repositories/",
+  "src/features/products/repository.ts",
+  "src/features/campaigns/repository.ts",
+];
+
+const TENANT_DELEGATES = [
+  "product",
+  "affiliateProgram",
+  "affiliateLink",
+  "linkClick",
+  "campaign",
+  "script",
+  "scriptVersion",
+  "videoJob",
+  "mediaAsset",
+  "socialPost",
+  "revenue",
+  "expense",
+  "encryptedCredential",
+  "contentBrief",
+  "workflowRun",
+  "workflowStepRun",
+  "approval",
+  "agentToolCall",
+  "analyticsEvent",
+];
+
+const delegatePattern = new RegExp(
+  `\\bprisma\\.(?:${TENANT_DELEGATES.join("|")})\\b`,
+);
+const rawTenantSqlPattern = new RegExp(
+  `(?:FROM|UPDATE|INTO|DELETE\\s+FROM)\\s+"(?:${TENANT_DELEGATES
+    .map((name) => name[0].toUpperCase() + name.slice(1))
+    .join("|")})"`,
+  "i",
+);
+const scopedBoundaryPattern = /withPrismaWorkspace|executeTenantService|Prisma\.TransactionClient|workspaceId\s*:/;
 
 async function walk(directory) {
   const entries = await readdir(directory, { withFileTypes: true });
@@ -28,19 +65,34 @@ for (const relativeRoot of SOURCE_ROOTS) {
   } catch {
     continue;
   }
+
   for (const file of files) {
+    const relativeFile = path.relative(ROOT, file).replaceAll("\\", "/");
     const source = await readFile(file, "utf8");
     if (source.includes(ALLOW_MARKER)) continue;
-    if (TENANT_TABLE_PATTERN.test(source) && !WORKSPACE_SCOPE_PATTERN.test(source)) {
-      violations.push(path.relative(ROOT, file));
+
+    const isApprovedBoundary = SAFE_BOUNDARIES.some((boundary) =>
+      relativeFile.startsWith(boundary),
+    );
+    const usesGlobalTenantDelegate = delegatePattern.test(source);
+    const usesTenantRawSql = rawTenantSqlPattern.test(source);
+    const establishesScope = scopedBoundaryPattern.test(source);
+
+    if (usesGlobalTenantDelegate && !isApprovedBoundary) {
+      violations.push(`${relativeFile}: direct global Prisma tenant delegate`);
+      continue;
+    }
+
+    if (usesTenantRawSql && !establishesScope && !isApprovedBoundary) {
+      violations.push(`${relativeFile}: tenant SQL without scoped boundary`);
     }
   }
 }
 
 if (violations.length > 0) {
   console.error("Tenant scoping violations detected:");
-  for (const file of violations) console.error(`- ${file}`);
-  console.error(`Add an explicit workspace scope or the audited marker: ${ALLOW_MARKER}`);
+  for (const violation of violations) console.error(`- ${violation}`);
+  console.error(`Move access behind a scoped repository/service or add the audited marker: ${ALLOW_MARKER}`);
   process.exit(1);
 }
 
