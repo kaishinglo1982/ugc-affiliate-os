@@ -33,7 +33,7 @@ export async function POST(
   const payload = parsed.success ? (parsed.data?.context as object | undefined) : undefined;
 
   const workflow = await prisma.workflowDefinition.findFirst({
-    where: { id, workspaceId: workspaceId },
+    where: { id, workspaceId },
   });
   if (!workflow) {
     return NextResponse.json({ error: "Workflow nicht gefunden." }, { status: 404 });
@@ -41,7 +41,12 @@ export async function POST(
 
   const actor = (await getCurrentUser())?.id ?? "owner";
   const run = await prisma.workflowRun.create({
-    data: { workflowId: id, status: "RUNNING", context: payload },
+    data: {
+      workspaceId,
+      workflowId: id,
+      status: "RUNNING",
+      context: payload,
+    },
   });
 
   await writeAuditLog({
