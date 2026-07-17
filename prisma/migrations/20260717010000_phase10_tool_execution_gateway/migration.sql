@@ -1,0 +1,11 @@
+-- Phase 10.5 — mandatory tool execution gateway
+--
+-- Adds the single new approval-resource type the gateway needs to gate
+-- tool invocations that carry `AgentToolPolicy.requiresApproval = true`.
+-- No new tables are introduced: `AgentToolDefinition`, `AgentToolPolicy`
+-- and `AgentToolCall` already carry every column the gateway enforces
+-- (enabled flag, allowedAgentKeys, maxCostPerCall, rateLimitPerMin, and
+-- the call audit trail). Adding an enum value must run in its own
+-- migration/transaction so the value is committed before any statement
+-- that reads or writes it.
+ALTER TYPE "ApprovalResourceType" ADD VALUE IF NOT EXISTS 'agent_tool_invocation';

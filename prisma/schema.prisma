@@ -1005,6 +1005,7 @@ enum ApprovalResourceType {
   subtitle_track
   media_asset
   media_variant
+  agent_tool_invocation
 }
 
 /// Phase 5/7 approval workflow. One row per approval request; the resource's

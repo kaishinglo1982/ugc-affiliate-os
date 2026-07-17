@@ -1,15 +1,36 @@
-# Default repository owner for review routing.
+# Default repository owner
 * @kaishinglo1982
 
-# Swarm governance and deployment controls.
+# Repository governance
 /.agents/ @kaishinglo1982
 /.github/ @kaishinglo1982
-/docs/ @kaishinglo1982
+/architecture.config.mjs @kaishinglo1982
 /deploy/ @kaishinglo1982
+/docs/architecture/ @kaishinglo1982
 /scripts/ @kaishinglo1982
 
-# Durable data contracts.
+# Data platform
 /prisma/ @kaishinglo1982
+/src/generated/ @kaishinglo1982
+/src/lib/db/ @kaishinglo1982
+/src/lib/analytics/ @kaishinglo1982
 
-# Application runtime and UI.
-/src/ @kaishinglo1982
+# Security and platform core
+/src/lib/auth/ @kaishinglo1982
+/src/lib/security/ @kaishinglo1982
+/src/lib/agents/ @kaishinglo1982
+/src/lib/workflows/ @kaishinglo1982
+
+# Business domains
+/src/lib/affiliate/ @kaishinglo1982
+/src/lib/campaigns/ @kaishinglo1982
+/src/lib/content/ @kaishinglo1982
+/src/lib/finance/ @kaishinglo1982
+/src/lib/media/ @kaishinglo1982
+/src/lib/products/ @kaishinglo1982
+/src/lib/publishing/ @kaishinglo1982
+
+# User experience
+/src/app/ @kaishinglo1982
+/src/components/ @kaishinglo1982
+/src/hooks/ @kaishinglo1982
