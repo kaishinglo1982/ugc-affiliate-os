@@ -1,6 +1,7 @@
 import type { Pool, PoolClient } from "pg";
 
-const WORKSPACE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+// Accept canonical UUID text, including the existing all-zero legacy workspace id.
+const WORKSPACE_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export class InvalidWorkspaceIdError extends Error {
   constructor(workspaceId: string) {
