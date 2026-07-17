@@ -1,8 +1,6 @@
-import type { PrismaClient } from "@/generated/prisma/client";
+import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 
 import { assertWorkspaceId } from "@/lib/tenancy/workspace-context";
-
-type TransactionClient = Parameters<Parameters<PrismaClient["$transaction"]>[0]>[0];
 
 export interface PrismaWorkspaceContext {
   workspaceId: string;
@@ -18,7 +16,7 @@ export interface PrismaWorkspaceContext {
 export async function withPrismaWorkspace<T>(
   prisma: PrismaClient,
   context: PrismaWorkspaceContext,
-  work: (tx: TransactionClient) => Promise<T>,
+  work: (tx: Prisma.TransactionClient) => Promise<T>,
 ): Promise<T> {
   assertWorkspaceId(context.workspaceId);
 
