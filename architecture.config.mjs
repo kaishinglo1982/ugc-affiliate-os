@@ -11,10 +11,13 @@ export const architecture = Object.freeze({
   allowedSourceAreas: [
     "app",
     "components",
+    "features",
     "generated",
     "hooks",
     "lib",
+    "server",
     "styles",
+    "test",
     "types",
   ],
   platformDomains: [
@@ -51,11 +54,12 @@ export const architecture = Object.freeze({
     "docs/architecture/DOMAIN_OWNERSHIP.md",
     ".github/CODEOWNERS",
   ],
+  // "new" is intentionally not forbidden: it is the standard Next.js App
+  // Router segment for create-flows (e.g. app/campaigns/new/page.tsx).
   forbiddenSourceDirectoryNames: [
     "common",
     "helpers",
     "misc",
-    "new",
     "old",
     "temp",
     "tmp",

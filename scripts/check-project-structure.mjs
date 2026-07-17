@@ -23,6 +23,7 @@ const sourceRoot = join(repositoryRoot, architecture.sourceRoot);
 if (existsSync(sourceRoot)) {
   for (const entry of readdirSync(sourceRoot, { withFileTypes: true })) {
     if (entry.name.startsWith(".")) continue;
+    if (!entry.isDirectory()) continue;
     if (!architecture.allowedSourceAreas.includes(entry.name)) {
       fail(`Unregistered source area: src/${entry.name}. Add it to architecture.config.mjs or move it.`);
     }
