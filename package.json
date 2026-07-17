@@ -20,6 +20,7 @@
     "test:e2e": "playwright test",
     "architecture:check": "node scripts/check-project-structure.mjs",
     "tenancy:check": "node scripts/check-tenant-scoping.mjs",
+    "tenancy:migrations:check": "node scripts/check-tenancy-migration-contract.mjs",
     "db:reconcile-tenancy": "node scripts/reconcile-prisma-tenancy.mjs",
     "db:check-tenancy": "node scripts/reconcile-prisma-tenancy.mjs --check",
     "db:generate": "pnpm run db:reconcile-tenancy && prisma generate",
@@ -29,8 +30,8 @@
     "db:status": "prisma migrate status",
     "db:studio": "pnpm run db:generate && prisma studio",
     "db:reset": "pnpm run db:reconcile-tenancy && prisma migrate reset",
-    "validate": "pnpm run db:generate && pnpm run architecture:check && pnpm run tenancy:check && pnpm run db:check-tenancy && pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run build",
-    "validate:deploy": "pnpm run db:generate && pnpm run architecture:check && pnpm run tenancy:check && pnpm run db:check-tenancy && pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run build"
+    "validate": "pnpm run db:generate && pnpm run architecture:check && pnpm run tenancy:check && pnpm run tenancy:migrations:check && pnpm run db:check-tenancy && pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run build",
+    "validate:deploy": "pnpm run db:generate && pnpm run architecture:check && pnpm run tenancy:check && pnpm run tenancy:migrations:check && pnpm run db:check-tenancy && pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run build"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1085.0",
