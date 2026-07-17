@@ -2,7 +2,7 @@
 
 ## Status
 
-Execution started on branch `phase-10-agentic-automation`. Subphases 10.1–10.5 are implemented and locally validated (typecheck, lint, test, migrations); repository-wide CI evidence is still required before any subphase or the phase as a whole is marked complete. Current work packet: 10.6 (Human Approval Gates).
+Execution started on branch `phase-10-agentic-automation`. Subphases 10.1–10.6 are implemented and locally validated (typecheck, lint, test, migrations). Repository-wide CI evidence is still required before any subphase or the phase as a whole is marked complete, and is currently **blocked**: `.github/workflows/ci.yml` fails on every push repo-wide (see `10.6-completion-report.md`, "CI status") for a cause outside this session's access (likely an account-level Actions spending limit). Current work packet: 10.7 (Budget and Cost Controls).
 
 ## Objective
 
