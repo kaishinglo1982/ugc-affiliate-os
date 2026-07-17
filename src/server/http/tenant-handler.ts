@@ -1,7 +1,8 @@
-import type { PrismaClient } from "@/generated/prisma/client";
+import type { Prisma, PrismaClient } from "@/generated/prisma/client";
 
 import {
   executeTenantRoute,
+  type TenantRouteContext,
   type WorkspaceRole,
 } from "@/server/tenancy/tenant-route-service";
 
@@ -25,10 +26,16 @@ export class TenantHttpError extends Error {
   }
 }
 
-export function createTenantHandler(
+export type TenantHttpWork<T> = (
+  request: Request,
+  tx: Prisma.TransactionClient,
+  context: TenantRouteContext,
+) => Promise<T>;
+
+export function createTenantHandler<T>(
   dependencies: TenantHandlerDependencies,
   minimumRole: WorkspaceRole,
-  handle: Parameters<typeof executeTenantRoute>[0]["work"],
+  handle: TenantHttpWork<T>,
 ) {
   return async function tenantHandler(request: Request): Promise<Response> {
     try {
@@ -38,7 +45,7 @@ export function createTenantHandler(
         principal: { userId: identity.userId },
         workspaceId: identity.workspaceId,
         minimumRole,
-        work: handle,
+        work: (tx, context) => handle(request, tx, context),
       });
       return Response.json({ data });
     } catch (error) {
@@ -47,7 +54,10 @@ export function createTenantHandler(
       }
       const message = error instanceof Error ? error.message : "Request failed";
       const status = message.includes("Workspace access denied") ? 403 : 500;
-      return Response.json({ error: status === 403 ? "Forbidden" : "Internal server error" }, { status });
+      return Response.json(
+        { error: status === 403 ? "Forbidden" : "Internal server error" },
+        { status },
+      );
     }
   };
 }
