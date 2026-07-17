@@ -48,6 +48,8 @@ Point 1 of the enterprise-hardening sequence is complete at architecture, persis
 
 The implementation is complete, but remote CI must still provide the final operational proof. The PR must remain draft until migration deploy, typecheck, lint, tests and build are observed green.
 
+A documentation-only push was issued to retrigger CI for PR #18 after the workflow dispatch endpoint was unavailable in the connected environment.
+
 ## Rollback
 
 Application rollback can stop using tenant context helpers while leaving workspace metadata intact. RLS should only be disabled through a separately reviewed emergency migration. Removing workspace tables or tenant columns is destructive and is outside this rollback plan.
