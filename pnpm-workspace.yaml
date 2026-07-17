@@ -1,3 +1,6 @@
+minimumReleaseAgeExclude:
+  - tailwindcss@4.3.3
+
 allowBuilds:
   '@prisma/engines': true
   esbuild: true
