@@ -30,7 +30,7 @@ export async function GET(request: Request) {
 
   const workflows = await prisma.workflowDefinition.findMany({
     where: {
-      workspaceId: workspaceId,
+      workspaceId,
       ...(status ? { status: status as WorkflowStatus } : {}),
     },
     orderBy: { createdAt: "desc" },
@@ -81,16 +81,17 @@ export async function POST(request: Request) {
 
   const workflow = await prisma.workflowDefinition.create({
     data: {
-      workspaceId: workspaceId,
+      workspaceId,
       ...rest,
       config: rest.config as Prisma.InputJsonValue | undefined,
       steps: steps
         ? {
-            create: steps.map((s, index) => ({
+            create: steps.map((step, index) => ({
+              workspaceId,
               stepOrder: index,
-              type: s.type as WorkflowStepType,
-              name: s.name,
-              config: s.config as Prisma.InputJsonValue | undefined,
+              type: step.type as WorkflowStepType,
+              name: step.name,
+              config: step.config as Prisma.InputJsonValue | undefined,
             })),
           }
         : undefined,
