@@ -1,14 +1,19 @@
 name: CI
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches:
       - master
       - main
+      - phase-10-agentic-automation
+
+permissions:
+  contents: read
 
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 env:
@@ -42,6 +47,7 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: ${{ env.CI_DATABASE_URL }}
+      DATABASE_URL_TEST: ${{ env.CI_DATABASE_URL }}
       AUTH_SECRET: ${{ env.CI_AUTH_SECRET }}
       CREDENTIAL_ENCRYPTION_KEY: ${{ env.CI_CREDENTIAL_ENCRYPTION_KEY }}
       WORKER_SECRET: ${{ env.CI_WORKER_SECRET }}
@@ -56,6 +62,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: pnpm
 
       - name: Enable pnpm
         run: |
@@ -80,7 +87,7 @@ jobs:
       - name: Lint
         run: pnpm run lint
 
-      - name: Unit tests
+      - name: Unit and integration tests
         run: pnpm run test
 
       - name: Build
@@ -106,6 +113,7 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ugc_affiliate_e2e?schema=public
+      DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/ugc_affiliate_e2e?schema=public
       AUTH_SECRET: ${{ env.CI_AUTH_SECRET }}
       CREDENTIAL_ENCRYPTION_KEY: ${{ env.CI_CREDENTIAL_ENCRYPTION_KEY }}
       WORKER_SECRET: ${{ env.CI_WORKER_SECRET }}
@@ -123,6 +131,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: pnpm
 
       - name: Enable pnpm
         run: |
