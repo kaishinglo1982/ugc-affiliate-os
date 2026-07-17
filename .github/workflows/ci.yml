@@ -8,6 +8,7 @@ on:
       - master
       - main
       - phase-10-agentic-automation
+      - hardening/multi-tenancy-10
 
 permissions:
   contents: read
@@ -74,6 +75,9 @@ jobs:
 
       - name: Validate project structure
         run: pnpm run architecture:check
+
+      - name: Validate tenant scoping
+        run: pnpm run tenancy:check
 
       - name: Generate Prisma client
         run: pnpm run db:generate
@@ -143,6 +147,9 @@ jobs:
 
       - name: Validate project structure
         run: pnpm run architecture:check
+
+      - name: Validate tenant scoping
+        run: pnpm run tenancy:check
 
       - name: Generate Prisma client
         run: pnpm run db:generate
