@@ -1,5 +1,6 @@
 import type { PrismaClient } from "@/generated/prisma/client";
 
+import { withPrismaIdentity } from "@/lib/tenancy/prisma-identity";
 import { TenantHttpError, type TenantHttpIdentity } from "@/server/http/tenant-handler";
 
 export interface AuthenticatedSession {
@@ -27,18 +28,20 @@ export function createSessionIdentityResolver(input: {
     if (!session) throw new TenantHttpError(401, "Unauthorized");
 
     const requestedWorkspaceId = input.resolveRequestedWorkspaceId?.(request);
-    const membership = await input.prisma.workspaceMember.findFirst({
-      where: {
-        userId: session.userId,
-        status: "ACTIVE",
-        ...(requestedWorkspaceId ? { workspaceId: requestedWorkspaceId } : {}),
-        workspace: { status: "ACTIVE" },
-      },
-      orderBy: [{ role: "asc" }, { createdAt: "asc" }],
-      select: {
-        workspaceId: true,
-      },
-    });
+    const membership = await withPrismaIdentity(
+      input.prisma,
+      session.userId,
+      (tx) =>
+        tx.workspaceMember.findFirst({
+          where: {
+            userId: session.userId,
+            status: "ACTIVE",
+            ...(requestedWorkspaceId ? { workspaceId: requestedWorkspaceId } : {}),
+          },
+          orderBy: [{ createdAt: "asc" }],
+          select: { workspaceId: true },
+        }),
+    );
 
     if (!membership) throw new TenantHttpError(403, "Forbidden");
 
