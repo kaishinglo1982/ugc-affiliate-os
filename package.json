@@ -7,6 +7,11 @@
     "node": ">=20.9.0 <25",
     "pnpm": "11.13.0"
   },
+  "pnpm": {
+    "minimumReleaseAgeExclude": [
+      "tailwindcss@4.3.3"
+    ]
+  },
   "scripts": {
     "dev": "pnpm run db:generate && next dev",
     "build": "pnpm run db:generate && next build",
