@@ -19,6 +19,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "architecture:check": "node scripts/check-project-structure.mjs",
+    "tenancy:check": "node scripts/check-tenant-scoping.mjs",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
@@ -26,8 +27,8 @@
     "db:status": "prisma migrate status",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset",
-    "validate": "pnpm run architecture:check && pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run build",
-    "validate:deploy": "pnpm run db:generate && pnpm run architecture:check && pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run build"
+    "validate": "pnpm run architecture:check && pnpm run tenancy:check && pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run build",
+    "validate:deploy": "pnpm run db:generate && pnpm run architecture:check && pnpm run tenancy:check && pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run build"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1085.0",
