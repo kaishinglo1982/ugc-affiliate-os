@@ -2,7 +2,7 @@
 
 ## Status
 
-Execution started on branch `phase-10-agentic-automation`.
+Execution started on branch `phase-10-agentic-automation`. Subphases 10.1–10.5 are implemented and locally validated (typecheck, lint, test, migrations); repository-wide CI evidence is still required before any subphase or the phase as a whole is marked complete. Current work packet: 10.6 (Human Approval Gates).
 
 ## Objective
 
