@@ -23,58 +23,40 @@ async function readJson<T>(request: Request): Promise<T> {
 
 export function createCoreTenantHandlers(dependencies: TenantHandlerDependencies) {
   return {
-    listProducts: createTenantHandler(dependencies, "VIEWER", async (tx) =>
+    listProducts: createTenantHandler(dependencies, "VIEWER", async (_request, tx) =>
       createTenantProductRepository(tx).list(),
     ),
-    createProduct: createTenantHandler(dependencies, "OPERATOR", async (tx, _context) => {
-      const data = await readJson<Prisma.ProductCreateInput>(currentRequest());
+    createProduct: createTenantHandler(dependencies, "OPERATOR", async (request, tx) => {
+      const data = await readJson<Prisma.ProductCreateInput>(request);
       return createTenantProductRepository(tx).create(data);
     }),
-    listCampaigns: createTenantHandler(dependencies, "VIEWER", async (tx) =>
+    listCampaigns: createTenantHandler(dependencies, "VIEWER", async (_request, tx) =>
       createTenantCampaignRepository(tx).list(),
     ),
-    createCampaign: createTenantHandler(dependencies, "OPERATOR", async (tx) => {
-      const data = await readJson<Prisma.CampaignCreateInput>(currentRequest());
+    createCampaign: createTenantHandler(dependencies, "OPERATOR", async (request, tx) => {
+      const data = await readJson<Prisma.CampaignCreateInput>(request);
       return createTenantCampaignRepository(tx).create(data);
     }),
-    listAffiliatePrograms: createTenantHandler(dependencies, "VIEWER", (tx) =>
+    listAffiliatePrograms: createTenantHandler(dependencies, "VIEWER", (_request, tx) =>
       listAffiliatePrograms(tx),
     ),
-    createAffiliateProgram: createTenantHandler(dependencies, "ADMIN", async (tx) => {
-      const data = await readJson<Prisma.AffiliateProgramCreateInput>(currentRequest());
+    createAffiliateProgram: createTenantHandler(dependencies, "ADMIN", async (request, tx) => {
+      const data = await readJson<Prisma.AffiliateProgramCreateInput>(request);
       return createAffiliateProgram(tx, data);
     }),
-    listAffiliateLinks: createTenantHandler(dependencies, "VIEWER", (tx) =>
+    listAffiliateLinks: createTenantHandler(dependencies, "VIEWER", (_request, tx) =>
       listAffiliateLinks(tx),
     ),
-    createAffiliateLink: createTenantHandler(dependencies, "OPERATOR", async (tx) => {
-      const data = await readJson<Prisma.AffiliateLinkCreateInput>(currentRequest());
+    createAffiliateLink: createTenantHandler(dependencies, "OPERATOR", async (request, tx) => {
+      const data = await readJson<Prisma.AffiliateLinkCreateInput>(request);
       return createAffiliateLink(tx, data);
     }),
-    listVideoJobs: createTenantHandler(dependencies, "VIEWER", (tx) => listVideoJobs(tx)),
-    createVideoJob: createTenantHandler(dependencies, "OPERATOR", async (tx) => {
-      const data = await readJson<Prisma.VideoJobCreateInput>(currentRequest());
+    listVideoJobs: createTenantHandler(dependencies, "VIEWER", (_request, tx) =>
+      listVideoJobs(tx),
+    ),
+    createVideoJob: createTenantHandler(dependencies, "OPERATOR", async (request, tx) => {
+      const data = await readJson<Prisma.VideoJobCreateInput>(request);
       return createVideoJob(tx, data);
     }),
-  };
-}
-
-// Next.js route modules should bind their Request through createRequestBoundHandler.
-let activeRequest: Request | undefined;
-function currentRequest(): Request {
-  if (!activeRequest) throw new Error("Tenant handler request is not bound.");
-  return activeRequest;
-}
-
-export function createRequestBoundHandler(
-  handler: (request: Request) => Promise<Response>,
-): (request: Request) => Promise<Response> {
-  return async (request) => {
-    activeRequest = request;
-    try {
-      return await handler(request);
-    } finally {
-      activeRequest = undefined;
-    }
   };
 }
