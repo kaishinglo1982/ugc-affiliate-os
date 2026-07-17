@@ -7,11 +7,6 @@
     "node": ">=20.9.0 <25",
     "pnpm": "11.13.0"
   },
-  "pnpm": {
-    "minimumReleaseAgeExclude": [
-      "tailwindcss@4.3.3"
-    ]
-  },
   "scripts": {
     "dev": "pnpm run db:generate && next dev",
     "build": "pnpm run db:generate && next build",
@@ -104,7 +99,7 @@
     "tailwindcss": "^4",
     "tailwindcss-animate": "1.0.7",
     "tsx": "^4.23.0",
-    "typescript": "^7",
+    "typescript": "5.9.3",
     "vitest": "4.1.10"
   }
 }
