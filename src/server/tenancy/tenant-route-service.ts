@@ -39,16 +39,22 @@ export async function executeTenantRoute<T>(input: {
       userId: input.principal.userId,
     },
     async (tx) => {
-      const membership = await tx.workspaceMember.findFirst({
-        where: {
-          workspaceId: input.workspaceId,
-          userId: input.principal.userId,
-          status: "ACTIVE",
-        },
-        select: { role: true },
-      });
+      const [workspace, membership] = await Promise.all([
+        tx.workspace.findFirst({
+          where: { id: input.workspaceId, status: "ACTIVE" },
+          select: { id: true },
+        }),
+        tx.workspaceMember.findFirst({
+          where: {
+            workspaceId: input.workspaceId,
+            userId: input.principal.userId,
+            status: "ACTIVE",
+          },
+          select: { role: true },
+        }),
+      ]);
 
-      if (!membership) throw new WorkspaceAccessDeniedError();
+      if (!workspace || !membership) throw new WorkspaceAccessDeniedError();
 
       const role = membership.role as WorkspaceRole;
       const minimumRole = input.minimumRole ?? "VIEWER";
