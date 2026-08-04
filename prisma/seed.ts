@@ -584,6 +584,7 @@ async function seedIntegrations() {
     { providerKey: "google_ai", displayName: "Google AI", category: "AI" },
     { providerKey: "mistral", displayName: "Mistral", category: "AI" },
     { providerKey: "openrouter", displayName: "OpenRouter", category: "AI" },
+    { providerKey: "huggingface", displayName: "HuggingFace", category: "AI" },
     { providerKey: "tiktok", displayName: "TikTok", category: "SOCIAL_MEDIA" },
     { providerKey: "instagram", displayName: "Instagram", category: "SOCIAL_MEDIA" },
     { providerKey: "facebook", displayName: "Facebook", category: "SOCIAL_MEDIA" },

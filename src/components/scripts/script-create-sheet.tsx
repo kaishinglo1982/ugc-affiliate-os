@@ -29,6 +29,7 @@ const PROVIDER_LABELS: Record<string, string> = {
   google: "Google AI",
   mistral: "Mistral",
   openrouter: "OpenRouter",
+  huggingface: "HuggingFace",
   custom: "Benutzerdefiniert",
 };
 

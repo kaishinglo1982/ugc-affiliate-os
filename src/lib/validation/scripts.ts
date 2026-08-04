@@ -10,7 +10,7 @@ export const scriptGenerateSchema = z.object({
   tone: z.string().trim().min(1),
   hookType: z.string().trim().min(1),
   cta: z.string().trim().min(2).max(200),
-  provider: z.enum(["template", "openai", "anthropic", "google", "mistral", "openrouter", "custom"]),
+  provider: z.enum(["template", "openai", "anthropic", "google", "mistral", "openrouter", "huggingface", "custom"]),
 });
 export type ScriptGenerateInput = z.infer<typeof scriptGenerateSchema>;
 
