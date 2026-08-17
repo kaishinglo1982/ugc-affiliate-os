@@ -5,7 +5,7 @@
  * No provider-specific types leak past a concrete adapter: adapters implement
  * these interfaces, the core only ever sees the interface. Real adapters are
  * NOT included — in-memory adapters for tests live in
- * `src/lib/commerce-core/__tests__/helpers/`.
+ * `src/lib/commerce-core/__tests__/fixtures/`.
  */
 import { z } from "zod";
 

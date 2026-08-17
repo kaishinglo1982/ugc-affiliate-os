@@ -8,7 +8,7 @@ import {
 import {
   InMemoryAffiliateProvider,
   InMemorySocialPublisher,
-} from "./helpers/test-adapters";
+} from "./fixtures/test-adapters";
 
 describe("AffiliateProvider contract", () => {
   it("runs the full sync chain and deep link creation", async () => {
