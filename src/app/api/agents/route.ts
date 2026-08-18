@@ -3,6 +3,7 @@ import { created, ok, parseBody, validateValue } from "@/lib/api";
 import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/log";
 import { createAgent, listAgents } from "@/server/services/agents";
 
@@ -35,7 +36,8 @@ export async function GET(request: Request) {
   );
   if ("response" in validated) return validated.response;
 
-  const agents = await listAgents(validated.data);
+  const workspaceId = await resolveWorkspaceId();
+  const agents = await listAgents(workspaceId, validated.data);
   return ok({ agents });
 }
 
@@ -47,13 +49,15 @@ export async function POST(request: Request) {
   if ("response" in validated) return validated.response;
 
   const actor = (await getCurrentUser())?.id ?? "owner";
-  const agent = await createAgent(validated.data);
+  const workspaceId = await resolveWorkspaceId();
+  const agent = await createAgent(workspaceId, validated.data);
 
   await writeAuditLog({
     action: "agent.create",
     entityType: "Agent",
     entityId: agent.id,
     actor,
+    workspaceId,
   });
 
   return created({ agent });
