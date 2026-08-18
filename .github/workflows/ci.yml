@@ -87,6 +87,9 @@ jobs:
       - name: Verify Phase 30 go-live database gates
         run: pnpm run db:verify:phase30
 
+      - name: Verify Phase 40 scale database gates
+        run: pnpm run db:verify:phase40
+
       - name: Typecheck
         run: pnpm run typecheck
 
@@ -161,6 +164,9 @@ jobs:
 
       - name: Verify Phase 30 go-live database gates
         run: pnpm run db:verify:phase30
+
+      - name: Verify Phase 40 scale database gates
+        run: pnpm run db:verify:phase40
 
       - name: Seed database
         run: pnpm run db:seed
