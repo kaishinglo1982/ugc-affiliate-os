@@ -1,28 +1,16 @@
-import { NextResponse } from "next/server";
-import { requireApiPermission } from "@/lib/api/guard";
+import { ok, withApiContext } from "@/lib/api";
 import { Permission } from "@/lib/auth/rbac";
-import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
 import { env } from "@/lib/config/env";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const guard = await requireApiPermission(Permission.VIEW_WORKSPACE);
-  if (guard) return guard.response;
+  const result = await withApiContext(Permission.VIEW_WORKSPACE);
+  if ("response" in result) return result.response;
 
-  let workspaceId: string;
-  try {
-    workspaceId = await resolveWorkspaceId();
-  } catch (e) {
-    if (e instanceof InvalidTenantTokenError) {
-      return NextResponse.json({ error: "Ungültiges Tenant-Token." }, { status: 401 });
-    }
-    throw e;
-  }
-
-  return NextResponse.json({
+  return ok({
     workspace: {
-      id: workspaceId,
+      id: result.context.workspaceId,
       mode: "multi-tenant",
       environment: env.nodeEnv,
       appUrl: env.appUrl() ?? null,
