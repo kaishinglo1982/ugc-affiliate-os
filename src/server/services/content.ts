@@ -87,8 +87,8 @@ export async function contentOverview(workspaceId: string) {
   const [briefs, hooks, scripts, assets] = await Promise.all([
     prisma.contentBrief.count({ where: { workspaceId } }),
     prisma.contentHook.count({ where: { workspaceId } }),
-    prisma.script.count(),
-    prisma.mediaAsset.count(),
+    prisma.script.count({ where: { workspaceId } }),
+    prisma.mediaAsset.count({ where: { workspaceId } }),
   ]);
   const recent = await prisma.contentBrief.findMany({
     where: { workspaceId },
