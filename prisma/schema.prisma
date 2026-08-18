@@ -138,7 +138,7 @@ model Product {
 }
 
 model ProductScore {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id                    String   @id @default(uuid())
   productId             String
   product               Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -185,7 +185,7 @@ enum IntegrationMode {
 }
 
 model AffiliateProgram {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id             String               @id @default(uuid())
   provider       AffiliateProviderKey
   customName     String?
@@ -208,7 +208,7 @@ model AffiliateProgram {
 }
 
 model AffiliateLink {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id               String            @id @default(uuid())
   programId        String
   program          AffiliateProgram  @relation(fields: [programId], references: [id], onDelete: Cascade)
@@ -240,7 +240,7 @@ model AffiliateLink {
 }
 
 model LinkClick {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id        String        @id @default(uuid())
   linkId    String
   link      AffiliateLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
@@ -270,7 +270,7 @@ enum CampaignStatus {
 }
 
 model Campaign {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id             String         @id @default(uuid())
   name           String
   productId      String?
@@ -313,7 +313,7 @@ enum ScriptStatus {
 }
 
 model Script {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id          String       @id @default(uuid())
   title       String
   productId   String?
@@ -340,7 +340,7 @@ model Script {
 }
 
 model ScriptVersion {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id             String   @id @default(uuid())
   scriptId       String
   script         Script   @relation(fields: [scriptId], references: [id], onDelete: Cascade)
@@ -391,7 +391,7 @@ enum VideoProviderKey {
 }
 
 model VideoJob {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id           String         @id @default(uuid())
   scriptId     String?
   script       Script?        @relation(fields: [scriptId], references: [id])
@@ -438,7 +438,7 @@ enum MediaKind {
 }
 
 model MediaAsset {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id          String    @id @default(uuid())
   kind        MediaKind
   fileName    String
@@ -485,7 +485,7 @@ enum SocialPlatform {
 }
 
 model SocialAccount {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id           String          @id @default(uuid())
   platform     SocialPlatform
   handle       String
@@ -515,7 +515,7 @@ enum SocialPostStatus {
 }
 
 model SocialPost {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id              String            @id @default(uuid())
   campaignId      String?
   campaign        Campaign?         @relation(fields: [campaignId], references: [id])
@@ -566,7 +566,7 @@ enum PublishJobStatus {
  * indefinitely without an owner's intervention.
  */
 model PublishJob {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id              String           @id @default(uuid())
   postId          String
   post            SocialPost       @relation(fields: [postId], references: [id], onDelete: Cascade)
@@ -595,7 +595,7 @@ enum RevenueStatus {
 }
 
 model Revenue {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id            String        @id @default(uuid())
   date          DateTime
   programId     String?
@@ -634,7 +634,7 @@ enum ExpenseCategory {
 }
 
 model Expense {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id           String          @id @default(uuid())
   date         DateTime
   category     ExpenseCategory
@@ -659,7 +659,7 @@ model Expense {
 }
 
 model TaxSetting {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id                    String   @id @default(uuid())
   reserveRatePercent    Decimal  @db.Decimal(5, 2) @default(30)
   vatRatePercent        Decimal  @db.Decimal(5, 2) @default(19)
@@ -686,9 +686,9 @@ enum IntegrationCategory {
 }
 
 model Integration {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id            String              @id @default(uuid())
-  providerKey   String              @unique
+  providerKey   String
   displayName   String
   category      IntegrationCategory
   mode          IntegrationMode     @default(MOCK)
@@ -703,11 +703,12 @@ model Integration {
 
   @@index([category])
 
+  @@unique([workspaceId, providerKey])
   @@index([workspaceId])
 }
 
 model EncryptedCredential {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id            String   @id @default(uuid())
   label         String
   cipherText    String
@@ -736,9 +737,9 @@ enum AgentStatus {
 }
 
 model Agent {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id             String      @id @default(uuid())
-  key            String      @unique
+  key            String
   name           String
   role           String
   description    String
@@ -755,6 +756,7 @@ model Agent {
 
   runs AgentRun[]
 
+  @@unique([workspaceId, key])
   @@index([workspaceId])
 }
 
@@ -765,7 +767,7 @@ enum AgentRunStatus {
 }
 
 model AgentRun {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id         String         @id @default(uuid())
   agentId    String
   agent      Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
@@ -804,7 +806,7 @@ enum AutomationActionType {
 }
 
 model Automation {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id           String            @id @default(uuid())
   name         String
   isActive     Boolean           @default(true)
@@ -828,7 +830,7 @@ enum AutomationRunStatus {
 }
 
 model AutomationRun {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id           String               @id @default(uuid())
   automationId String
   automation   Automation           @relation(fields: [automationId], references: [id], onDelete: Cascade)
@@ -853,7 +855,7 @@ enum NotificationLevel {
 }
 
 model Notification {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id        String             @id @default(uuid())
   level     NotificationLevel  @default(INFO)
   title     String
@@ -878,7 +880,7 @@ model ContactRequest {
 }
 
 model AuditLog {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id         String   @id @default(uuid())
   actor      String   @default("owner")
   action     String
@@ -1620,7 +1622,7 @@ model ContentExperiment {
 }
 
 model ExperimentVariant {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id                      String                  @id @default(uuid())
   experimentId            String
   contentVariantId        String?
@@ -1659,7 +1661,7 @@ model ExperimentAssignment {
 }
 
 model ExperimentResult {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id                    String                @id @default(uuid())
   experimentId          String
   analyzedAt            DateTime              @default(now())
@@ -1777,7 +1779,7 @@ model DataQualityReport {
 }
 
 model DataQualityIssue {
-  workspaceId String @default("00000000-0000-0000-0000-000000000001")
+  workspaceId String
   id                String               @id @default(uuid())
   reportId          String
   issueType         DataQualityIssueType
