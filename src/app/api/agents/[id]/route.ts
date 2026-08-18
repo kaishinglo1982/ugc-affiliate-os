@@ -54,6 +54,7 @@ export async function PATCH(
       entityType: "Agent",
       entityId: agent.id,
       actor: auth.context.actor,
+      workspaceId: auth.context.workspaceId,
       metadata: { status: agent.status },
     });
 
