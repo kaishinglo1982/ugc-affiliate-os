@@ -45,7 +45,10 @@ export interface NavSection {
 export const NAV_SECTIONS: NavSection[] = [
   {
     title: "Übersicht",
-    items: [{ href: "/app/dashboard", label: "CEO-Dashboard", icon: LayoutDashboard }],
+    items: [
+      { href: "/app/dashboard", label: "CEO-Dashboard", icon: LayoutDashboard },
+      { href: "/app/creator-cockpit", label: "Creator Cockpit", icon: Activity },
+    ],
   },
   {
     title: "Affiliate & Produkte",
