@@ -4254,3 +4254,204 @@ model ProviderHealthCheck {
 
   @@index([workspaceId, providerKey, checkedAt])
 }
+
+
+// ---------------------------------------------------------------------------
+// Bulk Phase 23-30: CRM, Creator Marketplace, Compliance and Go-Live Control
+// ---------------------------------------------------------------------------
+
+enum ContactLawfulBasis {
+  CONSENT
+  CONTRACT
+  LEGITIMATE_INTEREST
+}
+
+enum CreatorProfileStatus {
+  DRAFT
+  VERIFIED
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum CreatorEngagementStatus {
+  DRAFT
+  OFFERED
+  ACCEPTED
+  IN_PRODUCTION
+  IN_REVIEW
+  COMPLETED
+  CANCELLED
+}
+
+enum CreatorDeliverableStatus {
+  REQUESTED
+  SUBMITTED
+  CHANGES_REQUESTED
+  APPROVED
+  REJECTED
+}
+
+enum ExecutiveObjectiveStatus {
+  DRAFT
+  ACTIVE
+  AT_RISK
+  ACHIEVED
+  PAUSED
+  CANCELLED
+}
+
+enum GoLiveGateStatus {
+  PENDING
+  PASS
+  FAIL
+  WAIVED
+}
+
+model AudienceContact {
+  id                    String             @id @default(uuid())
+  workspaceId           String
+  pseudonymousKey       String
+  displayName           String?
+  email                 String?
+  phone                 String?
+  lawfulBasis           ContactLawfulBasis
+  marketingConsent      Boolean            @default(false)
+  consentEvidenceRef    String?
+  consentedAt           DateTime?
+  optedOutAt            DateTime?
+  retentionUntil        DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@unique([workspaceId, pseudonymousKey])
+  @@index([workspaceId, marketingConsent, optedOutAt])
+}
+
+model CreatorProfile {
+  id                    String               @id @default(uuid())
+  workspaceId           String
+  displayName           String
+  status                CreatorProfileStatus @default(DRAFT)
+  countryCode           String?
+  languageCodes         String[]             @default([])
+  platformHandles       Json?
+  capabilityTags        String[]             @default([])
+  rateCard              Json?
+  identityVerifiedAt    DateTime?
+  rightsVerifiedAt      DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  engagements CreatorEngagement[]
+
+  @@index([workspaceId, status])
+}
+
+model CreatorEngagement {
+  id                    String                  @id @default(uuid())
+  workspaceId           String
+  creatorId             String
+  creator               CreatorProfile          @relation(fields: [creatorId], references: [id], onDelete: Restrict)
+  campaignId            String?
+  campaign              Campaign?               @relation(fields: [campaignId], references: [id])
+  status                CreatorEngagementStatus @default(DRAFT)
+  brief                  Json
+  agreedAmount          Decimal?                @db.Decimal(12, 2)
+  currency              String                  @default("EUR")
+  dueAt                 DateTime?
+  acceptedAt            DateTime?
+  completedAt           DateTime?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+
+  deliverables CreatorDeliverable[]
+
+  @@index([workspaceId, status, dueAt])
+  @@index([workspaceId, creatorId])
+}
+
+model CreatorDeliverable {
+  id                    String                   @id @default(uuid())
+  workspaceId           String
+  engagementId          String
+  engagement            CreatorEngagement        @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  mediaAssetId          String?
+  mediaAsset            MediaAsset?               @relation(fields: [mediaAssetId], references: [id])
+  status                CreatorDeliverableStatus @default(REQUESTED)
+  version               Int                      @default(1)
+  notes                 String?
+  rightsApproved        Boolean                  @default(false)
+  submittedAt           DateTime?
+  reviewedAt            DateTime?
+  createdAt             DateTime                 @default(now())
+
+  @@unique([engagementId, version])
+  @@index([workspaceId, status])
+}
+
+model ComplianceEvidence {
+  id                    String   @id @default(uuid())
+  workspaceId           String
+  entityType            String
+  entityId              String
+  evidenceKind          String
+  reference             String
+  checksum              String?
+  verifiedBy            String?
+  verifiedAt            DateTime?
+  expiresAt             DateTime?
+  createdAt             DateTime @default(now())
+
+  @@index([workspaceId, entityType, entityId])
+  @@index([workspaceId, expiresAt])
+}
+
+model ExecutiveObjective {
+  id                    String                   @id @default(uuid())
+  workspaceId           String
+  title                 String
+  metricKey             String
+  targetValue           Decimal                  @db.Decimal(14, 4)
+  currentValue          Decimal?                 @db.Decimal(14, 4)
+  status                ExecutiveObjectiveStatus @default(DRAFT)
+  riskTolerance         String                   @default("conservative")
+  startsAt              DateTime?
+  endsAt                DateTime?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+
+  @@index([workspaceId, status])
+}
+
+model OperationalKillSwitch {
+  id                    String   @id @default(uuid())
+  workspaceId           String
+  scopeType             String
+  scopeId               String?
+  reason                String
+  active                Boolean  @default(true)
+  activatedBy           String
+  activatedAt           DateTime @default(now())
+  releasedBy            String?
+  releasedAt            DateTime?
+
+  @@index([workspaceId, active, scopeType])
+}
+
+model GoLiveGate {
+  id                    String           @id @default(uuid())
+  workspaceId           String
+  gateKey               String
+  status                GoLiveGateStatus @default(PENDING)
+  required              Boolean          @default(true)
+  evidenceReference     String?
+  notes                 String?
+  checkedAt             DateTime?
+  checkedBy             String?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  @@unique([workspaceId, gateKey])
+  @@index([workspaceId, status, required])
+}
