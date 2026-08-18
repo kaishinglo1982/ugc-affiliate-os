@@ -4171,3 +4171,86 @@ model MediaLicenseReference {
 
   @@index([workspaceId, status])
 }
+
+
+// ---------------------------------------------------------------------------
+// Phase 21: BYOK Provider Gateway
+// ---------------------------------------------------------------------------
+
+enum ProviderCapability {
+  LLM_TEXT
+  IMAGE
+  VIDEO
+  VOICE
+  AVATAR
+  SEARCH
+  AUTOMATION
+}
+
+enum ProviderRoutingStrategy {
+  FREE_FIRST
+  COST_FIRST
+  QUALITY_FIRST
+  MANUAL
+}
+
+enum ProviderHealthStatus {
+  HEALTHY
+  DEGRADED
+  UNAVAILABLE
+  DISABLED
+}
+
+model ProviderRoutingPolicy {
+  id                       String                  @id @default(uuid())
+  workspaceId              String
+  name                     String
+  capability               ProviderCapability
+  strategy                 ProviderRoutingStrategy @default(FREE_FIRST)
+  enabled                  Boolean                 @default(true)
+  allowedProviderKeys      String[]                @default([])
+  deniedProviderKeys       String[]                @default([])
+  fallbackProviderKeys     String[]                @default([])
+  premiumRequiresApproval  Boolean                 @default(true)
+  maxCostPerCall           Decimal?                @db.Decimal(12, 6)
+  dailyBudget              Decimal?                @db.Decimal(12, 2)
+  regionAllowList          String[]                @default([])
+  createdAt                DateTime                @default(now())
+  updatedAt                DateTime                @updatedAt
+
+  @@unique([workspaceId, capability, name])
+  @@index([workspaceId, capability, enabled])
+}
+
+model ProviderUsageRecord {
+  id             String             @id @default(uuid())
+  workspaceId    String
+  providerKey    String
+  capability     ProviderCapability
+  modelKey       String?
+  requestId      String?
+  inputUnits     Int                @default(0)
+  outputUnits    Int                @default(0)
+  estimatedCost  Decimal            @db.Decimal(12, 6) @default(0)
+  currency       String             @default("EUR")
+  success        Boolean
+  latencyMs      Int?
+  errorCode      String?
+  createdAt      DateTime           @default(now())
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, providerKey, capability])
+  @@index([requestId])
+}
+
+model ProviderHealthCheck {
+  id           String               @id @default(uuid())
+  workspaceId  String
+  providerKey  String
+  status       ProviderHealthStatus
+  latencyMs    Int?
+  errorCode    String?
+  checkedAt    DateTime             @default(now())
+
+  @@index([workspaceId, providerKey, checkedAt])
+}
