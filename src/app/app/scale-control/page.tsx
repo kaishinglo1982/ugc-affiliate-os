@@ -4,6 +4,7 @@ import { evaluateScaleReadiness } from "@/server/services/phase31-40";
 import { Badge } from "@/components/ui/badge";
 import { ScaleControlActions } from "./scale-control-actions";
 import { OperationalControlActions } from "./operational-control-actions";
+import { GoLiveGateActions } from "./go-live-gate-actions";
 import {
   Card,
   CardContent,
@@ -69,6 +70,47 @@ export default async function ScaleControlPage() {
       </div>
 
       <ScaleControlActions />
+
+      <GoLiveGateActions />
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Phase-30-Go-live-Gates</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {readiness.goLiveGates.length === 0 ? (
+            <p className="text-sm text-[var(--color-foreground-muted)]">
+              Noch keine Phase-30-Gates initialisiert.
+            </p>
+          ) : (
+            readiness.goLiveGates.map((gate) => (
+              <div
+                key={gate.id}
+                className="flex flex-wrap items-start justify-between gap-3 rounded-md border border-[var(--color-border)] p-3"
+              >
+                <div>
+                  <p className="font-medium">{gate.gateKey}</p>
+                  <p className="text-xs text-[var(--color-foreground-subtle)]">
+                    {gate.required ? "Pflichtgate" : "Optional"}
+                    {gate.checkedBy ? ` · ${gate.checkedBy}` : ""}
+                  </p>
+                  {gate.notes ? (
+                    <p className="mt-1 text-sm text-[var(--color-foreground-muted)]">
+                      {gate.notes}
+                    </p>
+                  ) : null}
+                </div>
+                <div className="text-right">
+                  <Badge variant="outline">{gate.status}</Badge>
+                  <p className="mt-1 max-w-72 truncate text-xs text-[var(--color-foreground-subtle)]">
+                    {gate.evidenceReference ?? "Keine Evidenz"}
+                  </p>
+                </div>
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
 
       <OperationalControlActions />
 
