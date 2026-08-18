@@ -163,3 +163,56 @@ export async function recordProviderHealth(
 ) {
   return prisma.providerHealthCheck.create({ data: { workspaceId, ...input } });
 }
+
+
+export type ProviderUsageInput = {
+  providerKey: string;
+  capability: ProviderCapability;
+  modelKey?: string;
+  requestId?: string;
+  inputUnits: number;
+  outputUnits: number;
+  estimatedCost: number;
+  currency: string;
+  success: boolean;
+  latencyMs?: number;
+  errorCode?: string;
+};
+
+export async function recordProviderUsage(
+  workspaceId: string,
+  input: ProviderUsageInput,
+) {
+  const integration = await prisma.integration.findFirst({
+    where: {
+      workspaceId,
+      providerKey: input.providerKey,
+      status: "CONNECTED",
+    },
+    select: { id: true },
+  });
+  if (!integration) throw new Error("PROVIDER_CONNECTION_NOT_FOUND");
+
+  const usage = await prisma.providerUsageRecord.create({
+    data: { workspaceId, ...input },
+  });
+
+  if (!input.success) {
+    const recent = await prisma.providerUsageRecord.findMany({
+      where: { workspaceId, providerKey: input.providerKey },
+      orderBy: { createdAt: "desc" },
+      take: 5,
+      select: { success: true },
+    });
+    if (recent.length >= 3 && recent.slice(0, 3).every((item) => !item.success)) {
+      await recordProviderHealth(workspaceId, {
+        providerKey: input.providerKey,
+        status: "UNAVAILABLE",
+        latencyMs: input.latencyMs,
+        errorCode: input.errorCode ?? "CIRCUIT_OPEN",
+      });
+    }
+  }
+
+  return usage;
+}
