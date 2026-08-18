@@ -23,8 +23,6 @@ env:
   CI_CREDENTIAL_ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
   CI_WORKER_SECRET: ci-worker-secret-at-least-thirty-two-characters
   CI_APP_URL: http://127.0.0.1:3000
-  CI_ADMIN_EMAIL: owner@example.com
-  CI_ADMIN_PASSWORD: ChangeMe123!
 
 jobs:
   validate:
@@ -52,8 +50,6 @@ jobs:
       CREDENTIAL_ENCRYPTION_KEY: ${{ env.CI_CREDENTIAL_ENCRYPTION_KEY }}
       WORKER_SECRET: ${{ env.CI_WORKER_SECRET }}
       APP_URL: ${{ env.CI_APP_URL }}
-      ADMIN_EMAIL: ${{ env.CI_ADMIN_EMAIL }}
-      ADMIN_PASSWORD: ${{ env.CI_ADMIN_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -128,10 +124,6 @@ jobs:
       WORKER_SECRET: ${{ env.CI_WORKER_SECRET }}
       APP_URL: ${{ env.CI_APP_URL }}
       E2E_BASE_URL: ${{ env.CI_APP_URL }}
-      ADMIN_EMAIL: ${{ env.CI_ADMIN_EMAIL }}
-      ADMIN_PASSWORD: ${{ env.CI_ADMIN_PASSWORD }}
-      E2E_EMAIL: ${{ env.CI_ADMIN_EMAIL }}
-      E2E_PASSWORD: ${{ env.CI_ADMIN_PASSWORD }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -167,6 +159,18 @@ jobs:
 
       - name: Verify Phase 40 scale database gates
         run: pnpm run db:verify:phase40
+
+      - name: Generate ephemeral E2E login
+        shell: bash
+        run: |
+          E2E_EMAIL_VALUE="e2e-$(cat /proc/sys/kernel/random/uuid)@example.invalid"
+          E2E_PASSWORD_VALUE="$(openssl rand -base64 24 | tr -d '\n')Aa1!"
+          echo "::add-mask::$E2E_EMAIL_VALUE"
+          echo "::add-mask::$E2E_PASSWORD_VALUE"
+          echo "ADMIN_EMAIL=$E2E_EMAIL_VALUE" >> "$GITHUB_ENV"
+          echo "ADMIN_PASSWORD=$E2E_PASSWORD_VALUE" >> "$GITHUB_ENV"
+          echo "E2E_EMAIL=$E2E_EMAIL_VALUE" >> "$GITHUB_ENV"
+          echo "E2E_PASSWORD=$E2E_PASSWORD_VALUE" >> "$GITHUB_ENV"
 
       - name: Seed database
         run: pnpm run db:seed
