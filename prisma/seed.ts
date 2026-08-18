@@ -15,16 +15,21 @@ function hasText(value: string | undefined): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-function assertProductionSeedConfig() {
-  if (!IS_PRODUCTION) return;
-
-  const missing = [];
+function assertSeedConfig() {
+  const missing: string[] = [];
   if (!hasText(process.env.ADMIN_EMAIL)) missing.push("ADMIN_EMAIL");
-  if (!hasText(process.env.ADMIN_PASSWORD_HASH)) missing.push("ADMIN_PASSWORD_HASH");
+  if (
+    IS_PRODUCTION
+      ? !hasText(process.env.ADMIN_PASSWORD_HASH)
+      : !hasText(process.env.ADMIN_PASSWORD_HASH) &&
+        !hasText(process.env.ADMIN_PASSWORD)
+  ) {
+    missing.push(IS_PRODUCTION ? "ADMIN_PASSWORD_HASH" : "ADMIN_PASSWORD_HASH or ADMIN_PASSWORD");
+  }
 
   if (missing.length > 0) {
     throw new Error(
-      `Production seed requires ${missing.join(" and ")}. Refusing to create a default admin user in production.`,
+      `Seed requires explicit ${missing.join(" and ")}. No default login is created.`,
     );
   }
 }
@@ -37,12 +42,10 @@ function daysAgo(n: number): Date {
 }
 
 async function seedAdminUser() {
-  const email = process.env.ADMIN_EMAIL || "owner@example.com";
-  const passwordHash = IS_PRODUCTION
-    ? process.env.ADMIN_PASSWORD_HASH!
-    : hasText(process.env.ADMIN_PASSWORD_HASH)
-      ? process.env.ADMIN_PASSWORD_HASH
-      : await bcrypt.hash(process.env.ADMIN_PASSWORD || "ChangeMe123!", 12);
+  const email = process.env.ADMIN_EMAIL!;
+  const passwordHash = hasText(process.env.ADMIN_PASSWORD_HASH)
+    ? process.env.ADMIN_PASSWORD_HASH
+    : await bcrypt.hash(process.env.ADMIN_PASSWORD!, 12);
 
   const user = await prisma.user.upsert({
     where: { email },
@@ -730,7 +733,7 @@ async function seedNotifications() {
 }
 
 async function main() {
-  assertProductionSeedConfig();
+  assertSeedConfig();
 
   await seedAdminUser();
   await seedTaxSettings();
