@@ -12,6 +12,8 @@ import {
   updateAgentMemoryEntry,
   deleteAgentMemoryEntry,
   updateAgent,
+  createAgentTool,
+  updateAgentToolEnabled,
 } from "../agents";
 import { incrementMetric } from "@/lib/observability/metrics";
 
@@ -29,6 +31,9 @@ vi.mock("@/lib/db/client", () => ({
     },
     agentToolDefinition: {
       findMany: vi.fn(),
+      create: vi.fn(),
+      findFirst: vi.fn(),
+      update: vi.fn(),
     },
     agentMemoryEntry: {
       create: vi.fn(),
@@ -51,7 +56,12 @@ const prismaMock = prisma as unknown as {
     findUnique: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
   };
-  agentToolDefinition: { findMany: ReturnType<typeof vi.fn> };
+  agentToolDefinition: {
+    findMany: ReturnType<typeof vi.fn>;
+    create: ReturnType<typeof vi.fn>;
+    findFirst: ReturnType<typeof vi.fn>;
+    update: ReturnType<typeof vi.fn>;
+  };
   agentMemoryEntry: {
     create: ReturnType<typeof vi.fn>;
     findMany: ReturnType<typeof vi.fn>;
@@ -219,6 +229,68 @@ describe("agents service — capabilities", () => {
         },
       ],
     });
+  });
+});
+
+describe("agents service — governed tools", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("creates tools inside the resolved workspace", async () => {
+    prismaMock.agentToolDefinition.create.mockResolvedValueOnce({ id: "t1" });
+
+    await createAgentTool("ws-1", {
+      name: "web_search",
+      riskLevel: "MEDIUM",
+      policy: { requiresApproval: true },
+    });
+
+    expect(prismaMock.agentToolDefinition.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        workspaceId: "ws-1",
+        name: "web_search",
+        riskLevel: "MEDIUM",
+        enabled: true,
+        policies: {
+          create: {
+            requiresApproval: true,
+            maxCostPerCall: undefined,
+            rateLimitPerMin: undefined,
+            allowedAgentKeys: [],
+          },
+        },
+      }),
+      include: { policies: true },
+    });
+  });
+
+  it("updates a tool only after a tenant-scoped lookup", async () => {
+    prismaMock.agentToolDefinition.findFirst.mockResolvedValueOnce({ id: "t1" });
+    prismaMock.agentToolDefinition.update.mockResolvedValueOnce({
+      id: "t1",
+      enabled: false,
+    });
+
+    await updateAgentToolEnabled("t1", "ws-1", false);
+
+    expect(prismaMock.agentToolDefinition.findFirst).toHaveBeenCalledWith({
+      where: { id: "t1", workspaceId: "ws-1" },
+      select: { id: true },
+    });
+    expect(prismaMock.agentToolDefinition.update).toHaveBeenCalledWith({
+      where: { id: "t1" },
+      data: { enabled: false },
+      include: { policies: true },
+    });
+  });
+
+  it("does not update tools from another workspace", async () => {
+    prismaMock.agentToolDefinition.findFirst.mockResolvedValueOnce(null);
+
+    await expect(
+      updateAgentToolEnabled("t1", "ws-other", false),
+    ).rejects.toThrow("AGENT_TOOL_NOT_FOUND");
+
+    expect(prismaMock.agentToolDefinition.update).not.toHaveBeenCalled();
   });
 });
 
