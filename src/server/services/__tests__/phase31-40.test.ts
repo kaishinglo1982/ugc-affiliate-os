@@ -12,12 +12,12 @@ vi.mock("@/lib/db/client", () => ({
   prisma: {
     campaign: { findFirst: vi.fn() },
     attributionTouchpoint: { create: vi.fn() },
-    operationalKillSwitch: { count: vi.fn() },
+    operationalKillSwitch: { count: vi.fn(), findMany: vi.fn() },
     distributionSyndication: { upsert: vi.fn() },
     partnerConnection: { create: vi.fn() },
     goLiveGate: { count: vi.fn(), createMany: vi.fn() },
     scaleCertificationGate: { count: vi.fn(), findMany: vi.fn(), createMany: vi.fn() },
-    reliabilityIncident: { count: vi.fn() },
+    reliabilityIncident: { count: vi.fn(), findMany: vi.fn() },
     $transaction: vi.fn(),
   },
 }));
@@ -25,7 +25,7 @@ vi.mock("@/lib/db/client", () => ({
 const db = prisma as unknown as {
   campaign: { findFirst: ReturnType<typeof vi.fn> };
   attributionTouchpoint: { create: ReturnType<typeof vi.fn> };
-  operationalKillSwitch: { count: ReturnType<typeof vi.fn> };
+  operationalKillSwitch: { count: ReturnType<typeof vi.fn>; findMany: ReturnType<typeof vi.fn> };
   distributionSyndication: { upsert: ReturnType<typeof vi.fn> };
   partnerConnection: { create: ReturnType<typeof vi.fn> };
   goLiveGate: { count: ReturnType<typeof vi.fn>; createMany: ReturnType<typeof vi.fn> };
@@ -34,7 +34,7 @@ const db = prisma as unknown as {
     findMany: ReturnType<typeof vi.fn>;
     createMany: ReturnType<typeof vi.fn>;
   };
-  reliabilityIncident: { count: ReturnType<typeof vi.fn> };
+  reliabilityIncident: { count: ReturnType<typeof vi.fn>; findMany: ReturnType<typeof vi.fn> };
   $transaction: ReturnType<typeof vi.fn>;
 };
 
@@ -115,6 +115,8 @@ describe("bulk Phase 31-40 scale and tenant gates", () => {
     db.operationalKillSwitch.count.mockResolvedValue(0);
     db.reliabilityIncident.count.mockResolvedValue(1);
     db.scaleCertificationGate.findMany.mockResolvedValue([]);
+    db.operationalKillSwitch.findMany.mockResolvedValue([]);
+    db.reliabilityIncident.findMany.mockResolvedValue([]);
 
     const readiness = await evaluateScaleReadiness("ws-a");
 
@@ -141,6 +143,8 @@ describe("bulk Phase 31-40 scale and tenant gates", () => {
     db.operationalKillSwitch.count.mockResolvedValue(0);
     db.reliabilityIncident.count.mockResolvedValue(0);
     db.scaleCertificationGate.findMany.mockResolvedValue([]);
+    db.operationalKillSwitch.findMany.mockResolvedValue([]);
+    db.reliabilityIncident.findMany.mockResolvedValue([]);
 
     const result = await initializeReadinessGates(
       "ws-a",
