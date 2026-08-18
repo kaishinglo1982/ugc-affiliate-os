@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/client";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { runMutation } from "@/server/actions/action-helpers";
 import {
   ALLOWED_MIME_TYPES,
@@ -17,7 +18,25 @@ import { writeAuditLog } from "@/lib/audit/log";
 
 function splitTags(input?: string): string[] {
   if (!input) return [];
-  return input.split(",").map((t) => t.trim()).filter(Boolean);
+  return input.split(",").map((tag) => tag.trim()).filter(Boolean);
+}
+
+async function validateMediaRelations(
+  workspaceId: string,
+  input: { productId?: string | null; campaignId?: string | null },
+) {
+  const [product, campaign] = await Promise.all([
+    input.productId
+      ? prisma.product.findFirst({ where: { id: input.productId, workspaceId }, select: { id: true } })
+      : null,
+    input.campaignId
+      ? prisma.campaign.findFirst({ where: { id: input.campaignId, workspaceId }, select: { id: true } })
+      : null,
+  ]);
+  return {
+    validProduct: !input.productId || Boolean(product),
+    validCampaign: !input.campaignId || Boolean(campaign),
+  };
 }
 
 export interface UploadedAssetSummary {
@@ -42,10 +61,13 @@ export async function uploadMediaAction(
     return fail("Metadaten ungültig.", requestId, metaParsed.error.flatten().fieldErrors);
   }
 
-  const files = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
-  if (files.length === 0) {
-    return fail("Keine Datei ausgewählt.", requestId);
-  }
+  const files = formData.getAll("files").filter((file): file is File => file instanceof File && file.size > 0);
+  if (files.length === 0) return fail("Keine Datei ausgewählt.", requestId);
+
+  const workspaceId = await resolveWorkspaceId();
+  const relations = await validateMediaRelations(workspaceId, metaParsed.data);
+  if (!relations.validProduct) return fail("Produkt nicht gefunden.", requestId);
+  if (!relations.validCampaign) return fail("Kampagne nicht gefunden.", requestId);
 
   const storage = await resolveStorageProvider();
   const uploaded: UploadedAssetSummary[] = [];
@@ -60,9 +82,9 @@ export async function uploadMediaAction(
 
     const buffer = Buffer.from(await file.arrayBuffer());
     const stored = await storage.put(file.name, buffer, file.type);
-
     const asset = await prisma.mediaAsset.create({
       data: {
+        workspaceId,
         kind: mimeToKind(file.type),
         fileName: file.name,
         storageKey: stored.storageKey,
@@ -74,7 +96,6 @@ export async function uploadMediaAction(
         campaignId: metaParsed.data.campaignId || null,
       },
     });
-
     uploaded.push({ id: asset.id, fileName: asset.fileName });
   }
 
@@ -83,9 +104,9 @@ export async function uploadMediaAction(
     entityType: "MediaAsset",
     requestId,
     actor: user.email,
+    workspaceId,
     metadata: { count: uploaded.length },
   });
-
   revalidatePath("/app/media");
   return ok({ uploaded }, requestId);
 }
@@ -109,8 +130,15 @@ export async function updateMediaAction(
   });
   if (!parsed.success) return fail("Eingabe ungültig.", requestId);
 
+  const workspaceId = await resolveWorkspaceId();
+  const existing = await prisma.mediaAsset.findFirst({ where: { id, workspaceId }, select: { id: true } });
+  if (!existing) return fail("Medien-Datei nicht gefunden.", requestId);
+  const relations = await validateMediaRelations(workspaceId, parsed.data);
+  if (!relations.validProduct) return fail("Produkt nicht gefunden.", requestId);
+  if (!relations.validCampaign) return fail("Kampagne nicht gefunden.", requestId);
+
   const asset = await prisma.mediaAsset.update({
-    where: { id },
+    where: { id: existing.id },
     data: {
       tags: splitTags(parsed.data.tags),
       productId: parsed.data.productId || null,
@@ -124,8 +152,8 @@ export async function updateMediaAction(
     entityId: asset.id,
     requestId,
     actor: user.email,
+    workspaceId,
   });
-
   revalidatePath("/app/media");
   return ok({ id: asset.id }, requestId);
 }
@@ -136,8 +164,11 @@ export async function archiveMediaAction(id: string) {
     input: { id },
     auditAction: "media.archive",
     entityType: "MediaAsset",
-    handler: async (input) =>
-      prisma.mediaAsset.update({ where: { id: input.id }, data: { archivedAt: new Date() } }),
+    handler: async (input, _user, workspaceId) => {
+      const asset = await prisma.mediaAsset.findFirst({ where: { id: input.id, workspaceId }, select: { id: true } });
+      if (!asset) throw new Error("MEDIA_ASSET_NOT_FOUND");
+      return prisma.mediaAsset.update({ where: { id: asset.id }, data: { archivedAt: new Date() } });
+    },
     entityId: (output) => output.id,
   });
   revalidatePath("/app/media");
@@ -150,12 +181,13 @@ export async function deleteMediaAction(id: string) {
     input: { id },
     auditAction: "media.delete",
     entityType: "MediaAsset",
-    handler: async (input) => {
-      const asset = await prisma.mediaAsset.findUniqueOrThrow({ where: { id: input.id } });
+    handler: async (input, _user, workspaceId) => {
+      const asset = await prisma.mediaAsset.findFirst({ where: { id: input.id, workspaceId } });
+      if (!asset) throw new Error("MEDIA_ASSET_NOT_FOUND");
       const storage = await resolveStorageProvider();
       await storage.remove(asset.storageKey).catch(() => undefined);
-      await prisma.mediaAsset.delete({ where: { id: input.id } });
-      return { id: input.id };
+      await prisma.mediaAsset.delete({ where: { id: asset.id } });
+      return { id: asset.id };
     },
     entityId: (output) => output.id,
   });
