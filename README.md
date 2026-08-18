@@ -118,8 +118,10 @@ pnpm install
 
 Für Seed und Administration werden `ADMIN_EMAIL` sowie entweder
 `ADMIN_PASSWORD_HASH` für Produktion oder `ADMIN_PASSWORD` für lokale/CI-
-Umgebungen benötigt. Vor dem Aktivieren geplanter Worker muss `WORKER_SECRET`
-gesetzt sein.
+Umgebungen benötigt. Es existieren keine voreingestellten Login-Daten; der Seed
+bricht ohne explizite Zugangsdaten ab. CI erzeugt ausschließlich kurzlebige,
+maskierte E2E-Zugangsdaten zur Laufzeit. Vor dem Aktivieren geplanter Worker muss
+`WORKER_SECRET` gesetzt sein.
 
 ## Datenbank
 
