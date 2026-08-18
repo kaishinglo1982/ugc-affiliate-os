@@ -117,3 +117,12 @@ export const scaleGateSchema = z.object({
     });
   }
 });
+
+
+export const initializeScaleGatesSchema = z.object({
+  regionCodes: z
+    .array(z.string().trim().min(2).max(10))
+    .min(1)
+    .max(25)
+    .transform((values) => [...new Set(values.map((value) => value.toUpperCase()))]),
+});
