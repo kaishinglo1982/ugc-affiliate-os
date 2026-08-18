@@ -27,11 +27,13 @@ export interface CreateApprovalRequestInput {
   cost?: Prisma.Decimal | number | null;
   currency?: string | null;
   note?: string | null;
+  payload?: unknown;
+  requestedBy?: string;
   expiresAt?: Date | null;
 }
 
 export async function createApprovalRequest(input: CreateApprovalRequestInput, workspaceId: string) {
-  const actor = (await getCurrentUser())?.id ?? "owner";
+  const actor = input.requestedBy ?? (await getCurrentUser())?.id ?? "owner";
   const approval = await prisma.approval.create({
     data: {
       workspaceId,
@@ -42,8 +44,61 @@ export async function createApprovalRequest(input: CreateApprovalRequestInput, w
       cost: input.cost != null ? new Prisma.Decimal(Number(input.cost)) : null,
       currency: input.currency ?? null,
       expiresAt: input.expiresAt ?? null,
-      payload: input.note ? { note: input.note } : Prisma.JsonNull,
+      payload:
+        input.payload !== undefined
+          ? (input.payload as Prisma.InputJsonValue)
+          : input.note
+            ? { note: input.note }
+            : Prisma.JsonNull,
     },
   });
+  return approval;
+}
+
+
+export type ApprovalDecision = "APPROVED" | "REJECTED";
+
+export async function decideApproval(
+  id: string,
+  workspaceId: string,
+  input: {
+    decision: ApprovalDecision;
+    decisionReason?: string;
+    decidedBy: string;
+  },
+) {
+  const existing = await prisma.approval.findFirst({
+    where: { id, workspaceId },
+    select: { id: true, status: true, expiresAt: true },
+  });
+  if (!existing) {
+    throw new Error("APPROVAL_NOT_FOUND");
+  }
+  if (existing.status !== "PENDING") {
+    throw new Error("APPROVAL_ALREADY_DECIDED");
+  }
+  if (existing.expiresAt && existing.expiresAt.getTime() <= Date.now()) {
+    throw new Error("APPROVAL_EXPIRED");
+  }
+
+  const updated = await prisma.approval.updateMany({
+    where: { id, workspaceId, status: "PENDING" },
+    data: {
+      status: input.decision,
+      decidedBy: input.decidedBy,
+      decisionReason: input.decisionReason,
+      decidedAt: new Date(),
+    },
+  });
+  if (updated.count !== 1) {
+    throw new Error("APPROVAL_ALREADY_DECIDED");
+  }
+
+  const approval = await prisma.approval.findFirst({
+    where: { id, workspaceId },
+  });
+  if (!approval) {
+    throw new Error("APPROVAL_NOT_FOUND");
+  }
   return approval;
 }
