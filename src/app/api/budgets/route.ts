@@ -1,78 +1,58 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireApiPermission } from "@/lib/api/guard";
+import {
+  created,
+  ok,
+  parseBody,
+  withApiContext,
+} from "@/lib/api";
 import { Permission } from "@/lib/auth/rbac";
-import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
-import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
 import { writeAuditLog } from "@/lib/audit/log";
+import {
+  createBudgetPolicy,
+  listBudgets,
+} from "@/server/services/budgets";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
-  const guard = await requireApiPermission(Permission.VIEW_BUDGETS);
-  if (guard) return guard.response;
-
-  let workspaceId: string;
-  try {
-    workspaceId = await resolveWorkspaceId();
-  } catch (e) {
-    if (e instanceof InvalidTenantTokenError) {
-      return NextResponse.json({ error: "Ungültiges Tenant-Token." }, { status: 401 });
-    }
-    throw e;
-  }
-
-  const policies = await prisma.budgetPolicy.findMany({
-    where: { workspaceId: workspaceId },
-    orderBy: { createdAt: "desc" },
-    include: { _count: { select: { reservations: true } } },
-  });
-
-  return NextResponse.json({ policies });
-}
+const currencySchema = z.string().trim().length(3).transform((value) => value.toUpperCase());
 
 const createSchema = z.object({
-  name: z.string().min(1).max(200),
-  scope: z.string().max(50).optional(),
-  limitAmount: z.number().positive(),
-  currency: z.string().max(3).optional(),
-  period: z.string().max(20).optional(),
+  name: z.string().trim().min(1).max(200),
+  scope: z.string().trim().min(1).max(50).optional(),
+  limitAmount: z.number().finite().positive(),
+  currency: currencySchema.optional(),
+  period: z.string().trim().min(1).max(20).optional(),
   alertThresholdPct: z.number().int().min(1).max(100).optional(),
   action: z.enum(["alert", "block"]).optional(),
   enabled: z.boolean().optional(),
 });
 
+export async function GET() {
+  const auth = await withApiContext(Permission.VIEW_BUDGETS);
+  if ("response" in auth) return auth.response;
+
+  const policies = await listBudgets(auth.context.workspaceId);
+  return ok({ policies });
+}
+
 export async function POST(request: Request) {
-  const guard = await requireApiPermission(Permission.MANAGE_BUDGETS);
-  if (guard) return guard.response;
+  const auth = await withApiContext(Permission.MANAGE_BUDGETS);
+  if ("response" in auth) return auth.response;
 
-  let workspaceId: string;
-  try {
-    workspaceId = await resolveWorkspaceId();
-  } catch (e) {
-    if (e instanceof InvalidTenantTokenError) {
-      return NextResponse.json({ error: "Ungültiges Tenant-Token." }, { status: 401 });
-    }
-    throw e;
-  }
+  const validated = await parseBody(request, createSchema);
+  if ("response" in validated) return validated.response;
 
-  const parsed = createSchema.safeParse(await request.json());
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Ungültige Eingabe." }, { status: 400 });
-  }
-
-  const actor = (await getCurrentUser())?.id ?? "owner";
-  const policy = await prisma.budgetPolicy.create({
-    data: { workspaceId: workspaceId, ...parsed.data },
-  });
+  const policy = await createBudgetPolicy(
+    auth.context.workspaceId,
+    validated.data,
+  );
 
   await writeAuditLog({
     action: "budget_policy.create",
     entityType: "BudgetPolicy",
     entityId: policy.id,
-    actor,
+    actor: auth.context.actor,
   });
 
-  return NextResponse.json({ policy }, { status: 201 });
+  return created({ policy });
 }
