@@ -78,3 +78,26 @@ export const goLiveGateSchema = z.object({
     });
   }
 });
+
+
+export const creatorDeliverableSchema = z.object({
+  engagementId: z.string().uuid(),
+  mediaAssetId: z.string().uuid().optional(),
+  version: z.number().int().positive().default(1),
+  notes: z.string().trim().max(4000).optional(),
+});
+
+export const creatorDeliverableReviewSchema = z.object({
+  deliverableId: z.string().uuid(),
+  decision: z.enum(["APPROVED", "CHANGES_REQUESTED", "REJECTED"]),
+  rightsApproved: z.boolean(),
+  notes: z.string().trim().max(4000).optional(),
+}).superRefine((value, context) => {
+  if (value.decision === "APPROVED" && !value.rightsApproved) {
+    context.addIssue({
+      code: "custom",
+      path: ["rightsApproved"],
+      message: "Abnahme benötigt bestätigte Nutzungsrechte.",
+    });
+  }
+});
