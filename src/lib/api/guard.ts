@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { hasPermission, type Permission } from "@/lib/auth/rbac";
-import { newRequestId } from "@/types/result";
+import { forbidden, unauthorized } from "./response";
 
 /**
  * Shared guard for API route handlers. Verifies authentication and the required
@@ -9,22 +9,19 @@ import { newRequestId } from "@/types/result";
  * response when unauthorized, or `null` when the caller may proceed. Every
  * mutation route must also write an audit event.
  *
- * Tenant resolution (BAND-60) is a separate concern — call
- * `resolveWorkspaceId()` from `@/lib/auth/tenant` in routes that need it,
- * after this guard passes. Keeping them separate avoids changing this
- * function's return contract for all ~95 callers, most of which don't read
- * tenant-scoped data.
+ * Tenant resolution is layered on top by `withApiContext()`. Keeping this
+ * guard's return contract stable avoids breaking existing callers while still
+ * ensuring every rejection uses the canonical API envelope.
  */
 export async function requireApiPermission(
   permission: string,
 ): Promise<{ response: NextResponse } | null> {
-  const requestId = newRequestId();
   const user = await getCurrentUser();
   if (!user) {
-    return { response: NextResponse.json({ error: "Nicht authentifiziert.", requestId }, { status: 401 }) };
+    return { response: unauthorized() };
   }
   if (!hasPermission(user, permission as Permission)) {
-    return { response: NextResponse.json({ error: "Keine Berechtigung.", requestId }, { status: 403 }) };
+    return { response: forbidden() };
   }
   return null;
 }
