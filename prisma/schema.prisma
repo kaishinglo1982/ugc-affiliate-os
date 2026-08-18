@@ -296,6 +296,7 @@ model Campaign {
   expenses    Expense[]
   mediaAssets MediaAsset[]
   briefs      ContentBrief[]
+  creatorEngagements CreatorEngagement[]
 
   @@index([status])
 
@@ -462,6 +463,7 @@ model MediaAsset {
   socialPosts SocialPost[]
 
   primaryImageProducts Product[] @relation("ProductPrimaryImage")
+  creatorDeliverables CreatorDeliverable[]
 
   @@index([kind])
   @@index([campaignId])
