@@ -8,6 +8,7 @@ import {
   financialForecastSchema,
   governedExportSchema,
   growthExperimentSchema,
+  initializeScaleGatesSchema,
   localizationProjectSchema,
   partnerConnectionSchema,
   reliabilityIncidentSchema,
@@ -21,6 +22,7 @@ import {
   createLocalizationProject,
   createPartnerConnection,
   evaluateScaleReadiness,
+  initializeReadinessGates,
   openReliabilityIncident,
   queueSyndication,
   recordAttributionTouchpoint,
@@ -42,6 +44,7 @@ const commandSchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("open_incident"), payload: reliabilityIncidentSchema }),
   z.object({ action: z.literal("resolve_incident"), payload: resolveIncidentSchema }),
   z.object({ action: z.literal("set_scale_gate"), payload: scaleGateSchema }),
+  z.object({ action: z.literal("initialize_readiness_gates"), payload: initializeScaleGatesSchema }),
 ]);
 
 export async function GET() {
@@ -71,6 +74,15 @@ export async function POST(request: Request) {
     });
 
   switch (parsed.data.action) {
+    case "initialize_readiness_gates": {
+      const initialization = await initializeReadinessGates(
+        workspaceId,
+        actor,
+        parsed.data.payload.regionCodes,
+      );
+      await audit("scale.gates_initialized", "Workspace", workspaceId);
+      return ok({ initialization });
+    }
     case "create_growth_experiment": {
       const experiment = await createGrowthExperiment(workspaceId, parsed.data.payload);
       await audit("growth.experiment_created", "GrowthExperimentPlan", experiment.id);
