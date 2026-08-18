@@ -15,7 +15,7 @@ vi.mock("@/lib/db/client", () => ({
     operationalKillSwitch: { count: vi.fn(), findMany: vi.fn() },
     distributionSyndication: { upsert: vi.fn() },
     partnerConnection: { create: vi.fn() },
-    goLiveGate: { count: vi.fn(), createMany: vi.fn() },
+    goLiveGate: { count: vi.fn(), createMany: vi.fn(), findMany: vi.fn() },
     scaleCertificationGate: { count: vi.fn(), findMany: vi.fn(), createMany: vi.fn() },
     reliabilityIncident: { count: vi.fn(), findMany: vi.fn() },
     $transaction: vi.fn(),
@@ -28,7 +28,7 @@ const db = prisma as unknown as {
   operationalKillSwitch: { count: ReturnType<typeof vi.fn>; findMany: ReturnType<typeof vi.fn> };
   distributionSyndication: { upsert: ReturnType<typeof vi.fn> };
   partnerConnection: { create: ReturnType<typeof vi.fn> };
-  goLiveGate: { count: ReturnType<typeof vi.fn>; createMany: ReturnType<typeof vi.fn> };
+  goLiveGate: { count: ReturnType<typeof vi.fn>; createMany: ReturnType<typeof vi.fn>; findMany: ReturnType<typeof vi.fn> };
   scaleCertificationGate: {
     count: ReturnType<typeof vi.fn>;
     findMany: ReturnType<typeof vi.fn>;
@@ -114,6 +114,7 @@ describe("bulk Phase 31-40 scale and tenant gates", () => {
       .mockResolvedValueOnce(10);
     db.operationalKillSwitch.count.mockResolvedValue(0);
     db.reliabilityIncident.count.mockResolvedValue(1);
+    db.goLiveGate.findMany.mockResolvedValue([]);
     db.scaleCertificationGate.findMany.mockResolvedValue([]);
     db.operationalKillSwitch.findMany.mockResolvedValue([]);
     db.reliabilityIncident.findMany.mockResolvedValue([]);
@@ -142,6 +143,7 @@ describe("bulk Phase 31-40 scale and tenant gates", () => {
       .mockResolvedValueOnce(16);
     db.operationalKillSwitch.count.mockResolvedValue(0);
     db.reliabilityIncident.count.mockResolvedValue(0);
+    db.goLiveGate.findMany.mockResolvedValue([]);
     db.scaleCertificationGate.findMany.mockResolvedValue([]);
     db.operationalKillSwitch.findMany.mockResolvedValue([]);
     db.reliabilityIncident.findMany.mockResolvedValue([]);
