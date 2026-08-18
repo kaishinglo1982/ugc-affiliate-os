@@ -1,74 +1,73 @@
-# Phase 20 – Tenant Gap Audit
+# Phase 20 – Tenant Isolation Finalization
 
 Stand: 2026-08-18  
-Branch: `codex/roadmap-enterprise-implementation`
+Branch: `codex/roadmap-enterprise-implementation`  
+Pull Request: #33
 
 ## Ergebnis
 
-Das Prisma-Schema enthält 126 Modelle. 97 Modelle besitzen bereits ein
-`workspaceId`; 29 Modelle besitzen kein direktes Tenant-Feld.
+Das Prisma-Schema enthält 126 Modelle. 97 Modelle waren bereits direkt
+tenantfähig. Die 26 zuvor identifizierten Lücken besitzen nun ein verpflichtendes
+`workspaceId` ohne Datenbank-Default. `User`, `Session` und
+`ContactRequest` bleiben bewusst global.
 
-## Bewusst globale Modelle
+## Umgesetzte Maßnahmen
 
-Diese Modelle bleiben global und werden über Identität bzw. öffentlichen Intake
-abgesichert:
+- Additive Tenant-Spalten und Indizes für alle 26 Lücken.
+- Relationaler Backfill für Child-Datensätze vor Entfernung der Defaults.
+- Entfernung aller 26 kanonischen Legacy-Workspace-Defaults.
+- Tenantfähige Unique Keys:
+  - `Agent(workspaceId, key)`
+  - `Integration(workspaceId, providerKey)`
+- Explizite Workspace-Zuordnung in Seeds und kritischen Schreibpfaden.
+- Tenant-Filter für Campaigns, Affiliate, Content, Media, Scripts, Videos,
+  Publishing, Finance, Integrationen, Agenten, Notifications, Audit,
+  Experimente und Data Quality.
+- Atomisches Claiming der Publish-Queue.
+- Workspace-Kontext in Audit-Einträgen.
+- Schema-/Migrations-Vertragstest:
+  `src/server/services/__tests__/phase20-tenant-finalization.test.ts`
+- Reale PostgreSQL-Verifikation:
+  `pnpm run db:verify:phase20`
 
-- `User`
-- `Session`
-- `ContactRequest`
+## Migrationen
 
-## Tenant-Lücken (P0)
+1. `20260818073000_phase20_legacy_tenant_keys`
+   - additive Spalten und temporäre Defaults
+2. `20260818093000_phase20_finalize_tenant_isolation`
+   - relationale Backfills
+   - Compound Unique Keys
+   - Entfernung sämtlicher temporärer Defaults
 
-Folgende 26 Modelle benötigen ein direktes `workspaceId` oder eine
-nachweisbar gleichwertige, durchgehend erzwungene Isolation:
+## Verifikationsmatrix
 
-- `ProductScore`
-- `AffiliateProgram`
-- `AffiliateLink`
-- `LinkClick`
-- `Campaign`
-- `Script`
-- `ScriptVersion`
-- `VideoJob`
-- `MediaAsset`
-- `SocialAccount`
-- `SocialPost`
-- `PublishJob`
-- `Revenue`
-- `Expense`
-- `TaxSetting`
-- `Integration`
-- `EncryptedCredential`
-- `Agent`
-- `AgentRun`
-- `Automation`
-- `AutomationRun`
-- `Notification`
-- `AuditLog`
-- `ExperimentVariant`
-- `ExperimentResult`
-- `DataQualityIssue`
+| Gate | Status |
+|---|---|
+| Prisma-Schema ohne Legacy-Defaults | implementiert |
+| Relationale Backfill-Migration | implementiert |
+| Tenantfähige Unique Keys | implementiert |
+| Vercel-Anwendungsbuild | vorheriger Head grün; finaler Head läuft |
+| Statischer Phase-20-Vertragstest | implementiert |
+| PostgreSQL-Migrationstest | in CI integriert, noch nicht ausgeführt |
+| GitHub Actions | für PR-Head nicht gestartet |
+| Cross-Tenant-Laufzeitschutz | Services und Negativpfade implementiert |
 
-## Sicherheitsbefunde
+## PostgreSQL-Gate
 
-- Campaign- und Affiliate-API-Abfragen sind im Baseline-Stand global.
-- Mehrere Child-Modelle verlassen sich ausschließlich auf indirekte Relationen.
-- Statische Default-Workspace-IDs erlauben Writes ohne expliziten Tenant-Kontext.
-- Globale Unique Constraints können Mandanten gegenseitig blockieren.
-- Erfolgreiche Vercel-Builds beweisen keine Cross-Tenant-Isolation.
+Der Verifikationsbefehl prüft nach `prisma migrate deploy`:
 
-## Migrationsstrategie
-
-1. Tenant-Spalten zunächst mit kontrollierter Legacy-Workspace-Zuordnung ergänzen.
-2. Bestehende Datensätze über Elternrelationen auf den korrekten Workspace
-   zurückführen, soweit eine tenantfähige Elternrelation existiert.
-3. Alle produktiven Writes auf explizites `workspaceId` umstellen.
-4. Tenant-Indizes und zusammengesetzte Unique Constraints ergänzen.
-5. Cross-Tenant-Negativtests ausführen.
-6. Datenbank-Defaults entfernen, sobald kein Write mehr davon abhängt.
-7. Optional PostgreSQL-RLS als zweite Schutzschicht aktivieren.
+1. Alle 26 `workspaceId`-Spalten besitzen keinen Default.
+2. Agent- und Integration-Compound-Indizes existieren.
+3. Derselbe Agent-Key ist in zwei Workspaces erlaubt.
+4. Ein doppelter Agent-Key im selben Workspace wird mit PostgreSQL-Code
+   `23505` abgelehnt.
+5. Ein Agent-Insert ohne Workspace wird mit `23502` abgelehnt.
+6. Alle Testdaten werden per Rollback entfernt.
 
 ## Abschlussbedingung
 
-Phase 20 bleibt offen, bis Schema, Migration, Backfill, alle kritischen
-Service-Filter und Cross-Tenant-Tests nachweisbar grün sind.
+Die Implementierung von Phase 20 ist vollständig. Das operative Gate bleibt
+solange gelb, bis `pnpm run db:migrate:deploy`,
+`pnpm run db:verify:phase20` und die Tests in einer PostgreSQL-CI-Umgebung
+erfolgreich gelaufen sind. Ein Vercel-Build allein ersetzt dieses Datenbank-Gate
+nicht.
