@@ -3,6 +3,7 @@ import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { evaluateScaleReadiness } from "@/server/services/phase31-40";
 import { Badge } from "@/components/ui/badge";
 import { ScaleControlActions } from "./scale-control-actions";
+import { OperationalControlActions } from "./operational-control-actions";
 import {
   Card,
   CardContent,
@@ -68,6 +69,75 @@ export default async function ScaleControlPage() {
       </div>
 
       <ScaleControlActions />
+
+      <OperationalControlActions />
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Aktive Kill Switches</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {readiness.killSwitches.length === 0 ? (
+              <p className="text-sm text-[var(--color-foreground-muted)]">
+                Kein Kill Switch aktiv.
+              </p>
+            ) : (
+              readiness.killSwitches.map((killSwitch) => (
+                <div
+                  key={killSwitch.id}
+                  className="rounded-md border border-red-500/40 p-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <Badge variant="outline">{killSwitch.scopeType}</Badge>
+                    <code className="text-xs">{killSwitch.id}</code>
+                  </div>
+                  <p className="mt-2 text-sm">{killSwitch.reason}</p>
+                  <p className="mt-1 text-xs text-[var(--color-foreground-subtle)]">
+                    {killSwitch.activatedBy} ·{" "}
+                    {new Date(killSwitch.activatedAt).toLocaleString("de-DE")}
+                  </p>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Offene Reliability Incidents</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {readiness.incidents.length === 0 ? (
+              <p className="text-sm text-[var(--color-foreground-muted)]">
+                Kein offener Incident.
+              </p>
+            ) : (
+              readiness.incidents.map((incident) => (
+                <div
+                  key={incident.id}
+                  className="rounded-md border border-[var(--color-border)] p-3"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex gap-2">
+                      <Badge variant="outline">{incident.severity}</Badge>
+                      <Badge variant="outline">{incident.status}</Badge>
+                    </div>
+                    <code className="text-xs">{incident.id}</code>
+                  </div>
+                  <p className="mt-2 font-medium">{incident.title}</p>
+                  <p className="text-sm text-[var(--color-foreground-muted)]">
+                    {incident.summary}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--color-foreground-subtle)]">
+                    Runbook: {incident.runbookReference}
+                  </p>
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </div>
 
       {regions.size === 0 ? (
         <Card>
