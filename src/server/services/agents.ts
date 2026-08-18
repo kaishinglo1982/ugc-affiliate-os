@@ -375,6 +375,34 @@ export async function deleteAgentMemoryEntry(id: string, workspaceId: string) {
   });
 }
 
+export type CreateAgentInput = {
+  key: string;
+  name: string;
+  role: string;
+  description?: string;
+  capabilities?: string[];
+  allowedActions?: string[];
+  status?: AgentStatus;
+};
+
+/**
+ * Register one agent through the canonical agent service. Route handlers must
+ * not write agent rows directly.
+ */
+export async function createAgent(input: CreateAgentInput) {
+  return prisma.agent.create({
+    data: {
+      key: input.key,
+      name: input.name,
+      role: input.role,
+      description: input.description ?? "",
+      capabilities: input.capabilities ?? [],
+      allowedActions: input.allowedActions ?? [],
+      status: input.status ?? "IDLE",
+    },
+  });
+}
+
 export async function listAgents(filters?: { status?: string }) {
   return prisma.agent.findMany({
     where: {
