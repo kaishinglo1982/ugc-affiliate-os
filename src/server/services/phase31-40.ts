@@ -278,6 +278,7 @@ export async function evaluateScaleReadiness(workspaceId: string) {
     scaleGateCount,
     activeKillSwitches,
     criticalIncidents,
+    phase30Gates,
     scaleGates,
     killSwitchRecords,
     incidentRecords,
@@ -297,6 +298,10 @@ export async function evaluateScaleReadiness(workspaceId: string) {
         severity: { in: ["SEV1", "SEV2"] },
         status: { in: ["OPEN", "MITIGATING", "MONITORING"] },
       },
+    }),
+    prisma.goLiveGate.findMany({
+      where: { workspaceId },
+      orderBy: { gateKey: "asc" },
     }),
     prisma.scaleCertificationGate.findMany({
       where: { workspaceId },
@@ -348,6 +353,7 @@ export async function evaluateScaleReadiness(workspaceId: string) {
     scaleBlocking,
     activeKillSwitches,
     criticalIncidents,
+    goLiveGates: phase30Gates,
     gates: scaleGates,
     killSwitches: killSwitchRecords,
     incidents: incidentRecords,
