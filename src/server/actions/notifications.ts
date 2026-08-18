@@ -13,12 +13,16 @@ export async function markNotificationReadAction(id: string) {
     input: { id },
     auditAction: "notification.read",
     entityType: "Notification",
-    handler: async (input) => {
-      const notification = await prisma.notification.update({
-        where: { id: input.id },
+    handler: async (input, _user, workspaceId) => {
+      const notification = await prisma.notification.findFirst({
+        where: { id: input.id, workspaceId },
+        select: { id: true },
+      });
+      if (!notification) throw new Error("NOTIFICATION_NOT_FOUND");
+      return prisma.notification.update({
+        where: { id: notification.id },
         data: { readAt: new Date() },
       });
-      return notification;
     },
     entityId: (output) => output.id,
   });
@@ -32,12 +36,12 @@ export async function markAllNotificationsReadAction() {
     input: {},
     auditAction: "notification.read_all",
     entityType: "Notification",
-    handler: async () => {
-      await prisma.notification.updateMany({
-        where: { readAt: null },
+    handler: async (_input, _user, workspaceId) => {
+      const updated = await prisma.notification.updateMany({
+        where: { workspaceId, readAt: null },
         data: { readAt: new Date() },
       });
-      return { updated: true };
+      return { updated: updated.count };
     },
   });
   revalidatePath("/app", "layout");
