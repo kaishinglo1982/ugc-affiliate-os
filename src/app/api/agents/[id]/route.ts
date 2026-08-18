@@ -1,50 +1,74 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireApiPermission } from "@/lib/api/guard";
+import {
+  badRequest,
+  fail,
+  notFound,
+  ok,
+  parseBody,
+  uuidSchema,
+  validateValue,
+  withApiContext,
+} from "@/lib/api";
 import { Permission } from "@/lib/auth/rbac";
-import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
 import { writeAuditLog } from "@/lib/audit/log";
-import type { AgentStatus } from "@/generated/prisma/client";
+import { updateAgent } from "@/server/services/agents";
 
 export const dynamic = "force-dynamic";
 
-const patchSchema = z.object({
-  status: z.enum(["IDLE", "RUNNING", "PAUSED", "ERROR"]),
-  name: z.string().min(1).max(200).optional(),
-  description: z.string().max(2000).optional(),
-});
+const patchSchema = z
+  .object({
+    status: z.enum(["IDLE", "RUNNING", "PAUSED", "ERROR"]).optional(),
+    name: z.string().trim().min(1).max(200).optional(),
+    description: z.string().max(2000).optional(),
+  })
+  .refine(
+    (value) =>
+      value.status !== undefined ||
+      value.name !== undefined ||
+      value.description !== undefined,
+    { message: "Mindestens ein Feld muss geändert werden." },
+  );
 
 export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const guard = await requireApiPermission(Permission.MANAGE_AGENTS);
-  if (guard) return guard.response;
+  const auth = await withApiContext(Permission.MANAGE_AGENTS);
+  if ("response" in auth) return auth.response;
 
   const { id } = await context.params;
-  const parsed = patchSchema.safeParse(await request.json());
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Ungültige Eingabe." }, { status: 400 });
+  const params = validateValue(id, uuidSchema);
+  if ("response" in params) return params.response;
+
+  const validated = await parseBody(request, patchSchema);
+  if ("response" in validated) return validated.response;
+
+  try {
+    const agent = await updateAgent(
+      params.data,
+      auth.context.workspaceId,
+      validated.data,
+    );
+
+    await writeAuditLog({
+      action: "agent.update",
+      entityType: "Agent",
+      entityId: agent.id,
+      actor: auth.context.actor,
+      metadata: { status: agent.status },
+    });
+
+    return ok({ agent });
+  } catch (error) {
+    if (error instanceof Error && error.message === "AGENT_NOT_FOUND") {
+      return notFound("Agent nicht gefunden.");
+    }
+    if (
+      error instanceof Error &&
+      error.message.startsWith("ILLEGAL_AGENT_TRANSITION:")
+    ) {
+      return fail("Ungültiger Agenten-Statuswechsel.", { status: 409 });
+    }
+    return badRequest("Agent konnte nicht aktualisiert werden.");
   }
-
-  const actor = (await getCurrentUser())?.id ?? "owner";
-  const agent = await prisma.agent.update({
-    where: { id },
-    data: {
-      status: parsed.data.status as AgentStatus,
-      ...(parsed.data.name ? { name: parsed.data.name } : {}),
-      ...(parsed.data.description !== undefined ? { description: parsed.data.description } : {}),
-    },
-  });
-
-  await writeAuditLog({
-    action: "agent.update",
-    entityType: "Agent",
-    entityId: agent.id,
-    actor,
-    metadata: { status: agent.status },
-  });
-
-  return NextResponse.json({ agent });
 }
