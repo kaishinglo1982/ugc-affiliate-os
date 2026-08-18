@@ -1,26 +1,44 @@
-import { NextResponse } from "next/server";
-import { requireApiPermission } from "@/lib/api/guard";
+import { z } from "zod";
+import { ok, validateValue, withApiContext } from "@/lib/api";
 import { Permission } from "@/lib/auth/rbac";
-import { prisma } from "@/lib/db/client";
-import type { AffiliateProviderKey } from "@/generated/prisma/client";
+import { listAffiliatePrograms } from "@/server/services/affiliate";
 
 export const dynamic = "force-dynamic";
 
+const listSchema = z.object({
+  provider: z.enum([
+    "AMAZON_ASSOCIATES",
+    "EBAY_PARTNER_NETWORK",
+    "AWIN",
+    "CJ_AFFILIATE",
+    "IMPACT",
+    "RAKUTEN_ADVERTISING",
+    "SHAREASALE",
+    "DIGISTORE24",
+    "ADCELL",
+    "CUSTOM",
+  ]).optional(),
+  status: z.string().trim().min(1).max(50).optional(),
+});
+
 export async function GET(request: Request) {
-  const guard = await requireApiPermission(Permission.VIEW_AFFILIATE_PROGRAMS);
-  if (guard) return guard.response;
+  const auth = await withApiContext(Permission.VIEW_AFFILIATE_PROGRAMS);
+  if ("response" in auth) return auth.response;
 
   const { searchParams } = new URL(request.url);
-  const provider = searchParams.get("provider");
-  const status = searchParams.get("status");
-
-  const programs = await prisma.affiliateProgram.findMany({
-    where: {
-      ...(provider ? { provider: provider as AffiliateProviderKey } : {}),
-      ...(status ? { status } : {}),
+  const validated = validateValue(
+    {
+      provider: searchParams.get("provider") ?? undefined,
+      status: searchParams.get("status") ?? undefined,
     },
-    orderBy: { createdAt: "desc" },
-  });
+    listSchema,
+  );
+  if ("response" in validated) return validated.response;
 
-  return NextResponse.json({ programs });
+  const programs = await listAffiliatePrograms(
+    auth.context.workspaceId,
+    validated.data,
+  );
+
+  return ok({ programs });
 }
