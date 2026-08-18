@@ -375,6 +375,51 @@ export async function deleteAgentMemoryEntry(id: string, workspaceId: string) {
   });
 }
 
+export type UpdateAgentInput = {
+  name?: string;
+  description?: string;
+  status?: AgentStatus;
+};
+
+/**
+ * Update an agent through the canonical service while enforcing workspace
+ * ownership and the lifecycle transition matrix.
+ */
+export async function updateAgent(
+  id: string,
+  workspaceId: string,
+  input: UpdateAgentInput,
+) {
+  const existing = await prisma.agent.findFirst({
+    where: { id, workspaceId },
+    select: { id: true, status: true },
+  });
+  if (!existing) {
+    throw new Error("AGENT_NOT_FOUND");
+  }
+
+  if (
+    input.status !== undefined &&
+    input.status !== existing.status &&
+    !canTransitionAgentStatus(existing.status, input.status)
+  ) {
+    throw new Error(
+      `ILLEGAL_AGENT_TRANSITION: ${existing.status} -> ${input.status}`,
+    );
+  }
+
+  return prisma.agent.update({
+    where: { id: existing.id },
+    data: {
+      ...(input.name !== undefined ? { name: input.name } : {}),
+      ...(input.description !== undefined
+        ? { description: input.description }
+        : {}),
+      ...(input.status !== undefined ? { status: input.status } : {}),
+    },
+  });
+}
+
 export type CreateAgentInput = {
   key: string;
   name: string;
