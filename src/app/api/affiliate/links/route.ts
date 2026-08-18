@@ -1,25 +1,33 @@
-import { NextResponse } from "next/server";
-import { requireApiPermission } from "@/lib/api/guard";
+import { z } from "zod";
+import { ok, validateValue, withApiContext } from "@/lib/api";
 import { Permission } from "@/lib/auth/rbac";
-import { prisma } from "@/lib/db/client";
+import { listAffiliateLinks } from "@/server/services/affiliate";
 
 export const dynamic = "force-dynamic";
 
+const listSchema = z.object({
+  programId: z.string().uuid().optional(),
+  productId: z.string().uuid().optional(),
+});
+
 export async function GET(request: Request) {
-  const guard = await requireApiPermission(Permission.VIEW_AFFILIATE_LINKS);
-  if (guard) return guard.response;
+  const auth = await withApiContext(Permission.VIEW_AFFILIATE_LINKS);
+  if ("response" in auth) return auth.response;
 
   const { searchParams } = new URL(request.url);
-  const programId = searchParams.get("programId");
-  const productId = searchParams.get("productId");
-
-  const links = await prisma.affiliateLink.findMany({
-    where: {
-      ...(programId ? { programId } : {}),
-      ...(productId ? { productId } : {}),
+  const validated = validateValue(
+    {
+      programId: searchParams.get("programId") ?? undefined,
+      productId: searchParams.get("productId") ?? undefined,
     },
-    orderBy: { createdAt: "desc" },
-  });
+    listSchema,
+  );
+  if ("response" in validated) return validated.response;
 
-  return NextResponse.json({ links });
+  const links = await listAffiliateLinks(
+    auth.context.workspaceId,
+    validated.data,
+  );
+
+  return ok({ links });
 }
