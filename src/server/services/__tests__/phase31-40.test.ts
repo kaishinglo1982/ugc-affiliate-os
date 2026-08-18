@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/client";
 import {
   createPartnerConnection,
   evaluateScaleReadiness,
+  initializeReadinessGates,
   queueSyndication,
   recordAttributionTouchpoint,
 } from "@/server/services/phase31-40";
@@ -14,9 +15,10 @@ vi.mock("@/lib/db/client", () => ({
     operationalKillSwitch: { count: vi.fn() },
     distributionSyndication: { upsert: vi.fn() },
     partnerConnection: { create: vi.fn() },
-    goLiveGate: { count: vi.fn() },
-    scaleCertificationGate: { count: vi.fn(), findMany: vi.fn() },
+    goLiveGate: { count: vi.fn(), createMany: vi.fn() },
+    scaleCertificationGate: { count: vi.fn(), findMany: vi.fn(), createMany: vi.fn() },
     reliabilityIncident: { count: vi.fn() },
+    $transaction: vi.fn(),
   },
 }));
 
@@ -26,12 +28,14 @@ const db = prisma as unknown as {
   operationalKillSwitch: { count: ReturnType<typeof vi.fn> };
   distributionSyndication: { upsert: ReturnType<typeof vi.fn> };
   partnerConnection: { create: ReturnType<typeof vi.fn> };
-  goLiveGate: { count: ReturnType<typeof vi.fn> };
+  goLiveGate: { count: ReturnType<typeof vi.fn>; createMany: ReturnType<typeof vi.fn> };
   scaleCertificationGate: {
     count: ReturnType<typeof vi.fn>;
     findMany: ReturnType<typeof vi.fn>;
+    createMany: ReturnType<typeof vi.fn>;
   };
   reliabilityIncident: { count: ReturnType<typeof vi.fn> };
+  $transaction: ReturnType<typeof vi.fn>;
 };
 
 describe("bulk Phase 31-40 scale and tenant gates", () => {
@@ -123,5 +127,41 @@ describe("bulk Phase 31-40 scale and tenant gates", () => {
         status: { in: ["OPEN", "MITIGATING", "MONITORING"] },
       },
     });
+  });
+  it("initializes phase 30 and regional phase 40 gates idempotently", async () => {
+    db.goLiveGate.createMany.mockReturnValue({ operation: "phase30" });
+    db.scaleCertificationGate.createMany.mockReturnValue({ operation: "phase40" });
+    db.$transaction.mockResolvedValue([{ count: 8 }, { count: 16 }]);
+    db.goLiveGate.count
+      .mockResolvedValueOnce(8)
+      .mockResolvedValueOnce(8);
+    db.scaleCertificationGate.count
+      .mockResolvedValueOnce(16)
+      .mockResolvedValueOnce(16);
+    db.operationalKillSwitch.count.mockResolvedValue(0);
+    db.reliabilityIncident.count.mockResolvedValue(0);
+    db.scaleCertificationGate.findMany.mockResolvedValue([]);
+
+    const result = await initializeReadinessGates(
+      "ws-a",
+      "owner@example.com",
+      ["de", "DE", "AT"],
+    );
+
+    expect(result.phase30Created).toBe(8);
+    expect(result.phase40Created).toBe(16);
+    expect(result.regions).toEqual(["DE", "AT"]);
+    expect(db.goLiveGate.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({ skipDuplicates: true }),
+    );
+    expect(db.scaleCertificationGate.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.arrayContaining([
+          expect.objectContaining({ workspaceId: "ws-a", regionCode: "DE" }),
+          expect.objectContaining({ workspaceId: "ws-a", regionCode: "AT" }),
+        ]),
+        skipDuplicates: true,
+      }),
+    );
   });
 });
