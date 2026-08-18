@@ -114,13 +114,13 @@ export async function pollVideoJobAction(id: string): Promise<Result<VideoJob>> 
         data: {
           workspaceId,
           kind: "VIDEO",
-          fileName: `video-job-${id}.svg`,
-          storageKey: `mock/${id}`,
+          fileName: `video-job-${job.id}.svg`,
+          storageKey: `mock/${job.id}`,
           url: state.resultUrl,
           mimeType: "image/svg+xml",
           sizeBytes: 0,
           durationSec: job.durationSec,
-          videoJobId: id,
+          videoJobId: job.id,
           campaignId: job.campaignId,
           productId: job.productId,
           tags: ["mock-result", "video-job"],
@@ -129,9 +129,10 @@ export async function pollVideoJobAction(id: string): Promise<Result<VideoJob>> 
       await writeAuditLog({
         action: "video_job.retry",
         entityType: "VideoJob",
-        entityId: id,
+        entityId: job.id,
         requestId,
         actor: user.email,
+        workspaceId,
         metadata: { event: "completed", createdMediaAsset: true },
       });
     }
@@ -153,7 +154,7 @@ export async function retryVideoJobAction(id: string): Promise<Result<VideoJob>>
 
   const provider = resolveVideoProvider(job.provider);
   await provider.submit({
-    jobId: id,
+    jobId: job.id,
     format: job.format,
     aspectRatio: job.aspectRatio,
     durationSec: job.durationSec,
@@ -195,9 +196,9 @@ export async function cancelVideoJobAction(id: string): Promise<Result<VideoJob>
   if (!job) return fail("Video-Job nicht gefunden.", requestId);
 
   const provider = resolveVideoProvider(job.provider);
-  await provider.cancel(id);
+  await provider.cancel(job.id);
 
-  const updated = await prisma.videoJob.update({ where: { id }, data: { status: "CANCELLED" } });
+  const updated = await prisma.videoJob.update({ where: { id: job.id }, data: { status: "CANCELLED" } });
 
   await writeAuditLog({
     action: "video_job.cancel",
