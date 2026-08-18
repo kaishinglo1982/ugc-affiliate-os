@@ -6,7 +6,18 @@ import { listCampaigns } from "@/server/services/campaigns";
 export const dynamic = "force-dynamic";
 
 const listSchema = z.object({
-  status: z.enum(["DRAFT", "ACTIVE", "PAUSED", "COMPLETED", "ARCHIVED"]).optional(),
+  status: z.enum([
+    "DRAFT",
+    "RESEARCH",
+    "SCRIPTING",
+    "PRODUCTION",
+    "REVIEW",
+    "SCHEDULED",
+    "ACTIVE",
+    "PAUSED",
+    "COMPLETED",
+    "ARCHIVED",
+  ]).optional(),
   productId: z.string().uuid().optional(),
 });
 
