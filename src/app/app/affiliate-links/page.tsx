@@ -1,15 +1,17 @@
 import type { Metadata } from "next";
 import { listAffiliateLinks, listAffiliatePrograms, listProductsForSelect } from "@/server/services/affiliate";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { LinksTable, type LinkRow } from "@/components/affiliate/links-table";
 import { LinkDialog } from "@/components/affiliate/link-dialog";
 
 export const metadata: Metadata = { title: "Affiliate-Links" };
 
 export default async function AffiliateLinksPage() {
+  const workspaceId = await resolveWorkspaceId();
   const [links, programs, products] = await Promise.all([
-    listAffiliateLinks(),
-    listAffiliatePrograms(),
-    listProductsForSelect(),
+    listAffiliateLinks(workspaceId),
+    listAffiliatePrograms(workspaceId),
+    listProductsForSelect(workspaceId),
   ]);
 
   const programOptions = programs.map((p) => ({
