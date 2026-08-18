@@ -11,6 +11,7 @@ import {
   getAgentMemoryEntries,
   updateAgentMemoryEntry,
   deleteAgentMemoryEntry,
+  updateAgent,
 } from "../agents";
 import { incrementMetric } from "@/lib/observability/metrics";
 
@@ -128,6 +129,59 @@ describe("agents service — lifecycle transitions", () => {
     prismaMock.agent.findFirst.mockResolvedValueOnce(null);
 
     await expect(setAgentStatus("missing", "running")).rejects.toThrow("AGENT_NOT_FOUND");
+  });
+});
+
+describe("agents service — governed updates", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("updates only after resolving the agent inside the workspace", async () => {
+    prismaMock.agent.findFirst.mockResolvedValueOnce({
+      id: "a1",
+      status: "IDLE",
+    });
+    prismaMock.agent.update.mockResolvedValueOnce({
+      id: "a1",
+      status: "PAUSED",
+      name: "Research Agent",
+    });
+
+    await updateAgent("a1", "ws-1", {
+      name: "Research Agent",
+      status: "PAUSED",
+    });
+
+    expect(prismaMock.agent.findFirst).toHaveBeenCalledWith({
+      where: { id: "a1", workspaceId: "ws-1" },
+      select: { id: true, status: true },
+    });
+    expect(prismaMock.agent.update).toHaveBeenCalledWith({
+      where: { id: "a1" },
+      data: { name: "Research Agent", status: "PAUSED" },
+    });
+  });
+
+  it("rejects updates when the agent is outside the workspace", async () => {
+    prismaMock.agent.findFirst.mockResolvedValueOnce(null);
+
+    await expect(
+      updateAgent("a1", "ws-other", { name: "Hidden" }),
+    ).rejects.toThrow("AGENT_NOT_FOUND");
+
+    expect(prismaMock.agent.update).not.toHaveBeenCalled();
+  });
+
+  it("rejects illegal lifecycle transitions", async () => {
+    prismaMock.agent.findFirst.mockResolvedValueOnce({
+      id: "a1",
+      status: "ERROR",
+    });
+
+    await expect(
+      updateAgent("a1", "ws-1", { status: "RUNNING" }),
+    ).rejects.toThrow("ILLEGAL_AGENT_TRANSITION");
+
+    expect(prismaMock.agent.update).not.toHaveBeenCalled();
   });
 });
 
