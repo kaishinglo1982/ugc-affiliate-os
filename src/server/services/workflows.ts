@@ -95,3 +95,163 @@ export async function getWorkflowRun(id: string, workspaceId: string) {
     },
   });
 }
+
+
+export async function updateWorkflowStatus(
+  id: string,
+  workspaceId: string,
+  status: WorkflowStatus,
+) {
+  const existing = await prisma.workflowDefinition.findFirst({
+    where: { id, workspaceId },
+    select: { id: true },
+  });
+  if (!existing) throw new Error("WORKFLOW_NOT_FOUND");
+
+  return prisma.workflowDefinition.update({
+    where: { id: existing.id },
+    data: { status },
+  });
+}
+
+export async function addWorkflowStep(
+  workflowId: string,
+  workspaceId: string,
+  input: {
+    name: string;
+    type: WorkflowStepType;
+    config?: unknown;
+  },
+) {
+  const workflow = await prisma.workflowDefinition.findFirst({
+    where: { id: workflowId, workspaceId },
+    select: { id: true },
+  });
+  if (!workflow) throw new Error("WORKFLOW_NOT_FOUND");
+
+  return prisma.$transaction(async (tx) => {
+    const existing = await tx.workflowStepDefinition.count({
+      where: { workflowId: workflow.id, workspaceId },
+    });
+    return tx.workflowStepDefinition.create({
+      data: {
+        workspaceId,
+        workflowId: workflow.id,
+        name: input.name,
+        type: input.type,
+        config: workflowJson(input.config ?? {}),
+        stepOrder: existing,
+      },
+    });
+  });
+}
+
+export async function startWorkflowRun(
+  workflowId: string,
+  workspaceId: string,
+  input: {
+    actor: string;
+    context?: unknown;
+    idempotencyKey?: string;
+  },
+) {
+  const workflow = await prisma.workflowDefinition.findFirst({
+    where: { id: workflowId, workspaceId, status: "ACTIVE", enabled: true },
+    select: { id: true },
+  });
+  if (!workflow) throw new Error("WORKFLOW_NOT_RUNNABLE");
+
+  if (input.idempotencyKey) {
+    const existing = await prisma.workflowRun.findFirst({
+      where: {
+        workspaceId,
+        workflowId,
+        context: {
+          path: ["_execution", "idempotencyKey"],
+          equals: input.idempotencyKey,
+        },
+      },
+    });
+    if (existing) return existing;
+  }
+
+  const base =
+    input.context && typeof input.context === "object" && !Array.isArray(input.context)
+      ? (input.context as Record<string, unknown>)
+      : {};
+
+  return prisma.workflowRun.create({
+    data: {
+      workspaceId,
+      workflowId,
+      triggeredBy: input.actor,
+      status: "RUNNING",
+      context: workflowJson({
+        ...base,
+        _execution: {
+          idempotencyKey: input.idempotencyKey ?? null,
+        },
+      }),
+    },
+  });
+}
+
+export async function retryWorkflowRun(
+  id: string,
+  workspaceId: string,
+  actor: string,
+) {
+  const previous = await prisma.workflowRun.findFirst({
+    where: { id, workspaceId },
+  });
+  if (!previous) throw new Error("WORKFLOW_RUN_NOT_FOUND");
+  if (previous.status !== "FAILED") {
+    throw new Error("WORKFLOW_RUN_NOT_RETRYABLE");
+  }
+
+  const previousContext =
+    previous.context &&
+    typeof previous.context === "object" &&
+    !Array.isArray(previous.context)
+      ? (previous.context as Record<string, unknown>)
+      : {};
+
+  return prisma.workflowRun.create({
+    data: {
+      workspaceId,
+      workflowId: previous.workflowId,
+      triggeredBy: actor,
+      status: "RUNNING",
+      context: workflowJson({
+        ...previousContext,
+        _retry: { previousRunId: previous.id },
+      }),
+    },
+  });
+}
+
+export async function cancelWorkflowRun(
+  id: string,
+  workspaceId: string,
+) {
+  const existing = await prisma.workflowRun.findFirst({
+    where: { id, workspaceId },
+    select: { id: true, status: true },
+  });
+  if (!existing) throw new Error("WORKFLOW_RUN_NOT_FOUND");
+  if (existing.status !== "RUNNING") {
+    throw new Error("WORKFLOW_RUN_NOT_CANCELLABLE");
+  }
+
+  const result = await prisma.workflowRun.updateMany({
+    where: { id, workspaceId, status: "RUNNING" },
+    data: { status: "CANCELLED", finishedAt: new Date() },
+  });
+  if (result.count !== 1) {
+    throw new Error("WORKFLOW_RUN_NOT_CANCELLABLE");
+  }
+
+  const run = await prisma.workflowRun.findFirst({ where: { id, workspaceId } });
+  if (!run) throw new Error("WORKFLOW_RUN_NOT_FOUND");
+  return run;
+}
