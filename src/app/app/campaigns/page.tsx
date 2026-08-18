@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { listCampaigns } from "@/server/services/campaigns";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { CampaignsView } from "@/components/campaigns/campaigns-view";
 import { Button } from "@/components/ui/button";
 import type { CampaignRow } from "@/components/campaigns/campaigns-table";
@@ -9,7 +10,8 @@ import type { CampaignRow } from "@/components/campaigns/campaigns-table";
 export const metadata: Metadata = { title: "Kampagnen" };
 
 export default async function CampaignsPage() {
-  const campaigns = await listCampaigns();
+  const workspaceId = await resolveWorkspaceId();
+  const campaigns = await listCampaigns(workspaceId);
 
   const rows: CampaignRow[] = campaigns.map((c) => ({
     id: c.id,
