@@ -317,3 +317,72 @@ export async function evaluateScaleReadiness(workspaceId: string) {
     gates: scaleGates,
   };
 }
+
+
+export const PHASE_30_GATE_KEYS = [
+  "database_migration",
+  "tenant_rbac_vault_api_security",
+  "quality_suite",
+  "load_retry_dlq_provider_failover",
+  "slo_observability",
+  "backup_restore_disaster_recovery",
+  "compliance_privacy_finance_review",
+  "canary_rollout",
+] as const;
+
+export const PHASE_40_GATE_KEYS = [
+  "regional_legal_tax_disclosure",
+  "platform_policy",
+  "regional_load_slo",
+  "unit_economics_worst_case_cost",
+  "partner_scope_export_revocation",
+  "regional_restore_dr",
+  "incident_response_exercise",
+  "regional_canary",
+] as const;
+
+export async function initializeReadinessGates(
+  workspaceId: string,
+  actor: string,
+  regionCodes: string[],
+) {
+  const normalizedRegions = [...new Set(regionCodes.map((region) => region.toUpperCase()))];
+  if (normalizedRegions.length === 0) throw new Error("REGION_REQUIRED");
+
+  const [phase30, phase40] = await prisma.$transaction([
+    prisma.goLiveGate.createMany({
+      data: PHASE_30_GATE_KEYS.map((gateKey) => ({
+        workspaceId,
+        gateKey,
+        status: "PENDING" as const,
+        required: true,
+        notes: "Initialisiert; belastbare Evidenz erforderlich.",
+        checkedBy: actor,
+        checkedAt: new Date(),
+      })),
+      skipDuplicates: true,
+    }),
+    prisma.scaleCertificationGate.createMany({
+      data: normalizedRegions.flatMap((regionCode) =>
+        PHASE_40_GATE_KEYS.map((gateKey) => ({
+          workspaceId,
+          gateKey,
+          regionCode,
+          status: "PENDING" as const,
+          required: true,
+          notes: "Initialisiert; regionale Evidenz erforderlich.",
+          checkedBy: actor,
+          checkedAt: new Date(),
+        })),
+      ),
+      skipDuplicates: true,
+    }),
+  ]);
+
+  return {
+    phase30Created: phase30.count,
+    phase40Created: phase40.count,
+    regions: normalizedRegions,
+    readiness: await evaluateScaleReadiness(workspaceId),
+  };
+}
