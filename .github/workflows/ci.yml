@@ -81,6 +81,9 @@ jobs:
       - name: Apply migrations
         run: pnpm run db:migrate:deploy
 
+      - name: Verify Phase 20 tenant migration
+        run: pnpm run db:verify:phase20
+
       - name: Typecheck
         run: pnpm run typecheck
 
@@ -149,6 +152,9 @@ jobs:
 
       - name: Apply migrations
         run: pnpm run db:migrate:deploy
+
+      - name: Verify Phase 20 tenant migration
+        run: pnpm run db:verify:phase20
 
       - name: Seed database
         run: pnpm run db:seed
