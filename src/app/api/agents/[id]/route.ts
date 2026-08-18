@@ -1,6 +1,5 @@
 import { z } from "zod";
 import {
-  badRequest,
   fail,
   notFound,
   ok,
@@ -69,6 +68,6 @@ export async function PATCH(
     ) {
       return fail("Ungültiger Agenten-Statuswechsel.", { status: 409 });
     }
-    return badRequest("Agent konnte nicht aktualisiert werden.");
+    throw error;
   }
 }
