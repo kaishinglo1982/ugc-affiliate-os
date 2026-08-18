@@ -28,7 +28,8 @@
     "db:reset": "prisma migrate reset",
     "validate": "pnpm run architecture:check && pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run build",
     "validate:deploy": "pnpm run db:generate && pnpm run architecture:check && pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run build",
-    "db:verify:phase20": "node scripts/verify-phase20-tenant-migration.mjs"
+    "db:verify:phase20": "node scripts/verify-phase20-tenant-migration.mjs",
+    "db:verify:phase30": "node scripts/verify-phase30-go-live.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1085.0",
