@@ -29,6 +29,7 @@ export async function POST(
       entityType: "AgentRun",
       entityId: run.id,
       actor: auth.context.actor,
+      workspaceId: auth.context.workspaceId,
       metadata: { agentId: params.data },
     });
 
