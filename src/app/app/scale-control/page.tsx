@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { evaluateScaleReadiness } from "@/server/services/phase31-40";
 import { Badge } from "@/components/ui/badge";
+import { ScaleControlActions } from "./scale-control-actions";
 import {
   Card,
   CardContent,
@@ -65,6 +66,8 @@ export default async function ScaleControlPage() {
           </Card>
         ))}
       </div>
+
+      <ScaleControlActions />
 
       {regions.size === 0 ? (
         <Card>
