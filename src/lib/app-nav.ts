@@ -48,6 +48,7 @@ export const NAV_SECTIONS: NavSection[] = [
     items: [
       { href: "/app/dashboard", label: "CEO-Dashboard", icon: LayoutDashboard },
       { href: "/app/creator-cockpit", label: "Creator Cockpit", icon: Activity },
+      { href: "/app/scale-control", label: "Scale Control", icon: ShieldCheck },
     ],
   },
   {
