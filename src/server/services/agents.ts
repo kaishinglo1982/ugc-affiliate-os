@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db/client";
 import { incrementMetric } from "@/lib/observability/metrics";
-import type { AgentStatus, AgentRunStatus, AgentMemoryType } from "@/generated/prisma/client";
+import type { AgentStatus, AgentRunStatus, AgentMemoryType, AgentToolRiskLevel } from "@/generated/prisma/client";
 import { Prisma } from "@/generated/prisma/client";
 
 /**
@@ -484,6 +484,69 @@ export async function getAgentRun(id: string) {
       agent: { select: { id: true, name: true, key: true } },
       toolCalls: { orderBy: { createdAt: "desc" } },
     },
+  });
+}
+
+export type CreateAgentToolInput = {
+  name: string;
+  description?: string;
+  provider?: string;
+  riskLevel?: AgentToolRiskLevel;
+  enabled?: boolean;
+  schema?: unknown;
+  policy?: {
+    requiresApproval?: boolean;
+    maxCostPerCall?: number;
+    rateLimitPerMin?: number;
+    allowedAgentKeys?: string[];
+  };
+};
+
+export async function createAgentTool(
+  workspaceId: string,
+  input: CreateAgentToolInput,
+) {
+  const { policy, ...tool } = input;
+  return prisma.agentToolDefinition.create({
+    data: {
+      workspaceId,
+      ...tool,
+      schema:
+        tool.schema === undefined ? undefined : nullableJson(tool.schema),
+      riskLevel: tool.riskLevel ?? "LOW",
+      enabled: tool.enabled ?? true,
+      policies: policy
+        ? {
+            create: {
+              requiresApproval: policy.requiresApproval ?? false,
+              maxCostPerCall: policy.maxCostPerCall,
+              rateLimitPerMin: policy.rateLimitPerMin,
+              allowedAgentKeys: policy.allowedAgentKeys ?? [],
+            },
+          }
+        : undefined,
+    },
+    include: { policies: true },
+  });
+}
+
+export async function updateAgentToolEnabled(
+  id: string,
+  workspaceId: string,
+  enabled: boolean,
+) {
+  const existing = await prisma.agentToolDefinition.findFirst({
+    where: { id, workspaceId },
+    select: { id: true },
+  });
+  if (!existing) {
+    throw new Error("AGENT_TOOL_NOT_FOUND");
+  }
+
+  return prisma.agentToolDefinition.update({
+    where: { id: existing.id },
+    data: { enabled },
+    include: { policies: true },
   });
 }
 
