@@ -279,6 +279,8 @@ export async function evaluateScaleReadiness(workspaceId: string) {
     activeKillSwitches,
     criticalIncidents,
     scaleGates,
+    killSwitchRecords,
+    incidentRecords,
   ] = await Promise.all([
     prisma.goLiveGate.count({
       where: { workspaceId, required: true, status: { in: ["PENDING", "FAIL"] } },
@@ -300,6 +302,38 @@ export async function evaluateScaleReadiness(workspaceId: string) {
       where: { workspaceId },
       orderBy: [{ regionCode: "asc" }, { gateKey: "asc" }],
     }),
+    prisma.operationalKillSwitch.findMany({
+      where: { workspaceId, active: true },
+      orderBy: { activatedAt: "desc" },
+      take: 25,
+      select: {
+        id: true,
+        scopeType: true,
+        scopeId: true,
+        reason: true,
+        activatedBy: true,
+        activatedAt: true,
+      },
+    }),
+    prisma.reliabilityIncident.findMany({
+      where: {
+        workspaceId,
+        status: { in: ["OPEN", "MITIGATING", "MONITORING"] },
+      },
+      orderBy: [{ severity: "asc" }, { openedAt: "desc" }],
+      take: 25,
+      select: {
+        id: true,
+        title: true,
+        severity: true,
+        status: true,
+        scopeType: true,
+        scopeId: true,
+        runbookReference: true,
+        summary: true,
+        openedAt: true,
+      },
+    }),
   ]);
 
   return {
@@ -315,9 +349,10 @@ export async function evaluateScaleReadiness(workspaceId: string) {
     activeKillSwitches,
     criticalIncidents,
     gates: scaleGates,
+    killSwitches: killSwitchRecords,
+    incidents: incidentRecords,
   };
 }
-
 
 export const PHASE_30_GATE_KEYS = [
   "database_migration",
