@@ -193,3 +193,90 @@ export async function evaluateGoLiveReadiness(workspaceId: string) {
     gates,
   };
 }
+
+
+export async function submitCreatorDeliverable(
+  workspaceId: string,
+  input: {
+    engagementId: string;
+    mediaAssetId?: string;
+    version: number;
+    notes?: string;
+  },
+) {
+  const [engagement, mediaAsset] = await Promise.all([
+    prisma.creatorEngagement.findFirst({
+      where: {
+        id: input.engagementId,
+        workspaceId,
+        status: { in: ["ACCEPTED", "IN_PRODUCTION", "IN_REVIEW"] },
+      },
+      select: { id: true },
+    }),
+    input.mediaAssetId
+      ? prisma.mediaAsset.findFirst({
+          where: { id: input.mediaAssetId, workspaceId },
+          select: { id: true },
+        })
+      : null,
+  ]);
+  if (!engagement) throw new Error("ENGAGEMENT_NOT_FOUND");
+  if (input.mediaAssetId && !mediaAsset) throw new Error("MEDIA_ASSET_NOT_FOUND");
+
+  return prisma.$transaction(async (tx) => {
+    const deliverable = await tx.creatorDeliverable.create({
+      data: {
+        workspaceId,
+        engagementId: engagement.id,
+        mediaAssetId: mediaAsset?.id,
+        version: input.version,
+        notes: input.notes,
+        status: "SUBMITTED",
+        submittedAt: new Date(),
+      },
+    });
+    await tx.creatorEngagement.update({
+      where: { id: engagement.id },
+      data: { status: "IN_REVIEW" },
+    });
+    return deliverable;
+  });
+}
+
+export async function reviewCreatorDeliverable(
+  workspaceId: string,
+  input: {
+    deliverableId: string;
+    decision: "APPROVED" | "CHANGES_REQUESTED" | "REJECTED";
+    rightsApproved: boolean;
+    notes?: string;
+  },
+) {
+  if (input.decision === "APPROVED" && !input.rightsApproved) {
+    throw new Error("RIGHTS_APPROVAL_REQUIRED");
+  }
+  const deliverable = await prisma.creatorDeliverable.findFirst({
+    where: { id: input.deliverableId, workspaceId, status: "SUBMITTED" },
+    select: { id: true, engagementId: true },
+  });
+  if (!deliverable) throw new Error("DELIVERABLE_NOT_FOUND");
+
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.creatorDeliverable.update({
+      where: { id: deliverable.id },
+      data: {
+        status: input.decision,
+        rightsApproved: input.rightsApproved,
+        notes: input.notes,
+        reviewedAt: new Date(),
+      },
+    });
+    if (input.decision === "APPROVED") {
+      await tx.creatorEngagement.update({
+        where: { id: deliverable.engagementId },
+        data: { status: "COMPLETED", completedAt: new Date() },
+      });
+    }
+    return updated;
+  });
+}
