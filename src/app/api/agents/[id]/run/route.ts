@@ -12,14 +12,15 @@ export async function POST(
   const auth = await withApiContext(Permission.MANAGE_AGENTS);
   if ("response" in auth) return auth.response;
 
-  const params = validateValue(await context.params, uuidSchema.transform((id) => ({ id })));
+  const { id } = await context.params;
+  const params = validateValue(id, uuidSchema);
   if ("response" in params) return params.response;
 
   const executionKey = request.headers.get("idempotency-key")?.trim() || undefined;
 
   try {
     const run = await startAgentRun(
-      { agentId: params.data.id, executionKey },
+      { agentId: params.data, executionKey },
       { workspaceId: auth.context.workspaceId },
     );
 
@@ -28,7 +29,7 @@ export async function POST(
       entityType: "AgentRun",
       entityId: run.id,
       actor: auth.context.actor,
-      metadata: { agentId: params.data.id },
+      metadata: { agentId: params.data },
     });
 
     return created({ run });
