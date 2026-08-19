@@ -203,6 +203,41 @@ describe("authorizeProductAction — test stays within explicit budget/tool limi
       expect(result.permitted).toBe(false);
     }
   });
+
+  it("denies prepare_action when both budget and tool are omitted, even though neither check individually fires", () => {
+    const result = authorizeProductAction({
+      decision: "test",
+      action: "prepare_action",
+      tenantId: "tenant-1",
+      policy: boundedPolicy,
+    });
+    expect(result.permitted).toBe(false);
+    expect(result.reason).toBe("budget_or_tool_required");
+  });
+
+  it("denies prepare_action when only budget is omitted", () => {
+    const result = authorizeProductAction({
+      decision: "test",
+      action: "prepare_action",
+      tenantId: "tenant-1",
+      policy: boundedPolicy,
+      tool: "draft-variant-tool",
+    });
+    expect(result.permitted).toBe(false);
+    expect(result.reason).toBe("budget_or_tool_required");
+  });
+
+  it("denies prepare_action when only tool is omitted", () => {
+    const result = authorizeProductAction({
+      decision: "test",
+      action: "prepare_action",
+      tenantId: "tenant-1",
+      policy: boundedPolicy,
+      budget: 50,
+    });
+    expect(result.permitted).toBe(false);
+    expect(result.reason).toBe("budget_or_tool_required");
+  });
 });
 
 describe("authorizeProductAction — watch stays read-only", () => {

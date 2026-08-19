@@ -57,7 +57,8 @@ export type ProductActionDenialReason =
   | "action_not_permitted_for_decision"
   | "automation_disabled"
   | "budget_exceeds_limit"
-  | "tool_not_allowlisted";
+  | "tool_not_allowlisted"
+  | "budget_or_tool_required";
 
 export interface ProductActionAuthorization {
   /** false = hard stop, nothing may happen. true = the action may proceed IF requiresHumanApproval is satisfied. */
@@ -108,7 +109,6 @@ export function authorizeProductAction(request: ProductActionRequest): ProductAc
     }
 
     case "reject": {
-      if (action === "data_deletion") return deny("action_not_permitted_for_decision");
       if (action !== "read_only_observation") return deny("action_not_permitted_for_decision");
       return {
         permitted: true,
@@ -126,6 +126,12 @@ export function authorizeProductAction(request: ProductActionRequest): ProductAc
       }
       if (request.tool !== undefined && !policy.allowedToolsForTest.includes(request.tool)) {
         return deny("tool_not_allowlisted");
+      }
+      // Both must be explicitly supplied to reach an authorization: an
+      // omitted budget/tool is not "no limit", it must fail closed exactly
+      // like an out-of-range budget or a non-allow-listed tool does above.
+      if (request.budget === undefined || request.tool === undefined) {
+        return deny("budget_or_tool_required");
       }
       return {
         permitted: true,
