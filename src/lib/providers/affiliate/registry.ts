@@ -2,9 +2,14 @@
  * Affiliate provider registry (infrastructure).
  *
  * Maps each `AffiliateNetwork` to its capabilities and resolves a
- * `ProductSourcePort`. Live adapters are skeletons/disabled for now, so the
- * registry always returns the deterministic mock provider; the structure leaves
- * room to plug a real adapter in later. No runtime Prisma imports.
+ * `ProductSourcePort`. Only `AMAZON_ASSOCIATES` has a real adapter so far
+ * (`./amazon`); every other provider, and Amazon itself when no credentials
+ * are supplied, still resolves to the deterministic mock. This function's
+ * default behavior for existing callers is unchanged: `getProductSourceProvider(provider)`
+ * with no `opts` still always returns the mock, exactly as before. Wiring a
+ * caller to pass real, decrypted credentials here (e.g. from
+ * `AffiliateProgram` + the credential vault) is a separate, deliberate
+ * change — not done as part of adding this adapter. No runtime Prisma imports.
  */
 import {
   type AffiliateNetwork,
@@ -12,6 +17,9 @@ import {
   type ProductSourceCapabilities,
 } from "@/features/products/domain/types";
 import { createMockProvider } from "@/lib/providers/affiliate/mock-provider";
+import { createAmazonProductSource } from "@/lib/providers/affiliate/amazon/product-source";
+import type { AmazonCredentials, AmazonMarketplaceCode } from "@/lib/providers/affiliate/amazon/types";
+import { AMAZON_MARKETPLACES } from "@/lib/providers/affiliate/amazon/types";
 
 /** Local mirror of `AffiliateProviderKey` values (avoid importing Prisma). */
 export const ALL_PROVIDERS: AffiliateNetwork[] = [
@@ -55,16 +63,26 @@ export const PROVIDER_CAPABILITIES: Record<AffiliateNetwork, ProductSourceCapabi
 
 export interface ProviderResolutionOptions {
   mock?: boolean;
+  /** Real Associates credentials. Only used when `providerId` is
+   *  `AMAZON_ASSOCIATES` and `mock` is not `true` — the caller is responsible
+   *  for decrypting these from the credential vault before calling here;
+   *  this registry never reads Prisma or the vault itself. */
+  amazon?: { credentials: AmazonCredentials; marketplace: AmazonMarketplaceCode };
 }
 
 /**
- * Resolves a product source port for the given provider. Live adapters are not
- * implemented yet, so a deterministic mock is always returned.
+ * Resolves a product source port for the given provider. Returns a real
+ * adapter only for `AMAZON_ASSOCIATES` with credentials supplied and
+ * `mock !== true`; every other case returns the deterministic mock.
  */
 export function getProductSourceProvider(
   providerId: AffiliateNetwork,
-  _opts?: ProviderResolutionOptions,
+  opts?: ProviderResolutionOptions,
 ): ProductSourcePort {
+  if (providerId === "AMAZON_ASSOCIATES" && opts?.mock !== true && opts?.amazon) {
+    const { credentials, marketplace } = opts.amazon;
+    return createAmazonProductSource(credentials, AMAZON_MARKETPLACES[marketplace]);
+  }
   return createMockProvider(providerId);
 }
 
