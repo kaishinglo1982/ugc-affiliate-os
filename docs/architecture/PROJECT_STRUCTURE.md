@@ -21,9 +21,15 @@ Configuration files stay at repository root only when required by their toolchai
 - `src/components/` — reusable presentation components. Components may call application-facing services but do not query PostgreSQL directly.
 - `src/generated/` — generated clients and types. Hand-written business logic is forbidden.
 - `src/hooks/` — reusable React hooks.
+- `src/instrumentation.ts` — Next.js instrumentation hook. Framework-mandated exact path; cannot move.
 - `src/lib/` — domain and platform modules.
 - `src/styles/` — global styling primitives.
+- `src/test/` — cross-cutting test-only infrastructure (e.g. module stubs referenced from `vitest.config.ts`), not a domain and not product code.
 - `src/types/` — genuinely cross-cutting public types only; domain types remain in their domain.
+
+`src/features/` and `src/server/` currently exist outside this model and are a known, tracked
+architecture debt — see "Known deviations" below. They are not sanctioned additions to the
+Source layout above.
 
 ## Domain model
 
@@ -86,6 +92,25 @@ The manifest in `architecture.config.mjs` is authoritative. New domains require 
 - Applied Prisma migrations are immutable.
 - A domain may expose an `index.ts` public surface, but internal files must not import through that barrel when it creates cycles.
 - Repository paths must remain shallow enough to understand without tooling.
+
+## Known deviations
+
+`pnpm run architecture:check` intentionally still fails on two pre-existing, unregistered
+top-level areas — this is a deliberate gap, not an oversight:
+
+- `src/features/` (9 domain subdirectories, 44 files, imported from 65 other files as
+  `@/features/*`)
+- `src/server/` (`actions/` + `services/`, 38 files, imported from 84 other files as
+  `@/server/*`)
+
+Both predate this architecture manifest and overlap conceptually with `src/lib`'s business/
+platform domain model. Folding them in would mean moving on the order of 80 files and updating
+~150 import sites — exactly the kind of structural change this document's own "Change
+protocol" requires a dedicated, reviewed migration for (explicit migration and rollback plan,
+not a drive-by rename alongside an unrelated fix). Registering them as allowed source areas
+without that review would silently normalize the duplication instead of resolving it, which is
+worse than leaving the check red. Until that migration is scoped and approved, these two
+failures are expected and should not be "fixed" by loosening `allowedSourceAreas` for them.
 
 ## Enforcement
 
