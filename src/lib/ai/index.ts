@@ -26,7 +26,20 @@ export {
   type AiCredentialStore,
   type AiSecretDecryptor,
 } from "@/lib/ai/vault-credentials";
-
+export {
+  assertProviderDataPolicy,
+  filterEligibleProviders,
+  type AiDataClass,
+  type ProviderDataPolicy,
+  type ProviderDataRequirement,
+} from "@/lib/ai/data-policy";
+export {
+  AgentToolGovernance,
+  type AgentToolGrant,
+  type ToolAuthorizationRequest,
+  type ToolPolicy,
+  type ToolSideEffect,
+} from "@/lib/ai/tool-governance";
 export {
   ProviderCircuitBreaker,
   ProviderCircuitOpenError,
