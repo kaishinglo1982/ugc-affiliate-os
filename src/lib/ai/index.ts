@@ -26,3 +26,15 @@ export {
   type AiCredentialStore,
   type AiSecretDecryptor,
 } from "@/lib/ai/vault-credentials";
+
+export {
+  ProviderCircuitBreaker,
+  ProviderCircuitOpenError,
+  type ProviderCircuitSnapshot,
+  type ProviderCircuitState,
+} from "@/lib/ai/provider-circuit-breaker";
+export {
+  assertProviderTelemetrySafe,
+  redactProviderText,
+  redactProviderValue,
+} from "@/lib/ai/redaction";
