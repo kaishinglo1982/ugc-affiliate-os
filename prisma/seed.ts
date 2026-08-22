@@ -6,6 +6,7 @@ import { computeProductScore, type ScoreDimensions } from "../src/features/produ
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
+const SEED_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
 
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const ALLOW_DEMO_SEED = process.env.ALLOW_DEMO_SEED === "true";
@@ -14,16 +15,21 @@ function hasText(value: string | undefined): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-function assertProductionSeedConfig() {
-  if (!IS_PRODUCTION) return;
-
-  const missing = [];
+function assertSeedConfig() {
+  const missing: string[] = [];
   if (!hasText(process.env.ADMIN_EMAIL)) missing.push("ADMIN_EMAIL");
-  if (!hasText(process.env.ADMIN_PASSWORD_HASH)) missing.push("ADMIN_PASSWORD_HASH");
+  if (
+    IS_PRODUCTION
+      ? !hasText(process.env.ADMIN_PASSWORD_HASH)
+      : !hasText(process.env.ADMIN_PASSWORD_HASH) &&
+        !hasText(process.env.ADMIN_PASSWORD)
+  ) {
+    missing.push(IS_PRODUCTION ? "ADMIN_PASSWORD_HASH" : "ADMIN_PASSWORD_HASH or ADMIN_PASSWORD");
+  }
 
   if (missing.length > 0) {
     throw new Error(
-      `Production seed requires ${missing.join(" and ")}. Refusing to create a default admin user in production.`,
+      `Seed requires explicit ${missing.join(" and ")}. No default login is created.`,
     );
   }
 }
@@ -36,12 +42,10 @@ function daysAgo(n: number): Date {
 }
 
 async function seedAdminUser() {
-  const email = process.env.ADMIN_EMAIL || "owner@example.com";
-  const passwordHash = IS_PRODUCTION
-    ? process.env.ADMIN_PASSWORD_HASH!
-    : hasText(process.env.ADMIN_PASSWORD_HASH)
-      ? process.env.ADMIN_PASSWORD_HASH
-      : await bcrypt.hash(process.env.ADMIN_PASSWORD || "ChangeMe123!", 12);
+  const email = process.env.ADMIN_EMAIL!;
+  const passwordHash = hasText(process.env.ADMIN_PASSWORD_HASH)
+    ? process.env.ADMIN_PASSWORD_HASH
+    : await bcrypt.hash(process.env.ADMIN_PASSWORD!, 12);
 
   const user = await prisma.user.upsert({
     where: { email },
@@ -57,6 +61,7 @@ async function seedTaxSettings() {
   if (existing) return existing;
   return prisma.taxSetting.create({
     data: {
+        workspaceId: SEED_WORKSPACE_ID,
       reserveRatePercent: 30,
       vatRatePercent: 19,
       vatEnabled: false,
@@ -234,6 +239,7 @@ async function seedProducts() {
     });
     await prisma.productScore.create({
       data: {
+        workspaceId: SEED_WORKSPACE_ID,
         productId: product.id,
         demand: p.dims.demand,
         commission: p.dims.commission,
@@ -258,19 +264,24 @@ async function seedProducts() {
 async function seedAffiliatePrograms() {
   const programs = await Promise.all([
     prisma.affiliateProgram.create({
-      data: { provider: "AMAZON_ASSOCIATES", trackingId: "ugc-os-21", mode: "MOCK", status: "CONNECTED" },
+      data: {
+        workspaceId: SEED_WORKSPACE_ID, provider: "AMAZON_ASSOCIATES", trackingId: "ugc-os-21", mode: "MOCK", status: "CONNECTED" },
     }),
     prisma.affiliateProgram.create({
-      data: { provider: "DIGISTORE24", trackingId: "d24-ugcos", mode: "MOCK", status: "CONNECTED" },
+      data: {
+        workspaceId: SEED_WORKSPACE_ID, provider: "DIGISTORE24", trackingId: "d24-ugcos", mode: "MOCK", status: "CONNECTED" },
     }),
     prisma.affiliateProgram.create({
-      data: { provider: "AWIN", trackingId: "awin-ugcos", mode: "MOCK", status: "CONNECTED" },
+      data: {
+        workspaceId: SEED_WORKSPACE_ID, provider: "AWIN", trackingId: "awin-ugcos", mode: "MOCK", status: "CONNECTED" },
     }),
     prisma.affiliateProgram.create({
-      data: { provider: "CJ_AFFILIATE", trackingId: "cj-ugcos", mode: "MOCK", status: "DISCONNECTED" },
+      data: {
+        workspaceId: SEED_WORKSPACE_ID, provider: "CJ_AFFILIATE", trackingId: "cj-ugcos", mode: "MOCK", status: "DISCONNECTED" },
     }),
     prisma.affiliateProgram.create({
-      data: { provider: "SHAREASALE", trackingId: "sas-ugcos", mode: "MOCK", status: "CONNECTED" },
+      data: {
+        workspaceId: SEED_WORKSPACE_ID, provider: "SHAREASALE", trackingId: "sas-ugcos", mode: "MOCK", status: "CONNECTED" },
     }),
   ]);
   console.log(`Seeded ${programs.length} affiliate programs`);
@@ -288,6 +299,7 @@ async function seedAffiliateLinks(
     const program = programs[i % programs.length];
     const link = await prisma.affiliateLink.create({
       data: {
+        workspaceId: SEED_WORKSPACE_ID,
         programId: program.id,
         productId: product.id,
         label: `${product.name} – Haupt-Link`,
@@ -332,6 +344,7 @@ async function seedCampaigns(
     const link = links[i % links.length];
     const campaign = await prisma.campaign.create({
       data: {
+        workspaceId: SEED_WORKSPACE_ID,
         name: `${product.name} – Launch Welle ${i + 1}`,
         productId: product.id,
         affiliateLinkId: link.id,
@@ -358,6 +371,7 @@ async function seedScripts(
     const product = products.find((p) => p.id === campaign.productId) ?? products[0];
     const script = await prisma.script.create({
       data: {
+        workspaceId: SEED_WORKSPACE_ID,
         title: `${product.name} – Hook-Variante A`,
         productId: product.id,
         campaignId: campaign.id,
@@ -372,6 +386,7 @@ async function seedScripts(
     });
     await prisma.scriptVersion.create({
       data: {
+        workspaceId: SEED_WORKSPACE_ID,
         scriptId: script.id,
         versionNumber: 1,
         hook: `Niemand sagt dir, dass ${product.name} genau DAS Problem löst...`,
@@ -408,6 +423,7 @@ async function seedVideoJobsAndPosts(campaigns: Awaited<ReturnType<typeof seedCa
     const campaign = campaigns[i];
     const job = await prisma.videoJob.create({
       data: {
+        workspaceId: SEED_WORKSPACE_ID,
         campaignId: campaign.id,
         productId: campaign.productId,
         provider: "MOCK",
@@ -424,16 +440,20 @@ async function seedVideoJobsAndPosts(campaigns: Awaited<ReturnType<typeof seedCa
   }
 
   const account = await prisma.socialAccount.create({
-    data: { platform: "TIKTOK", handle: "@ugc.os.demo", mode: "MOCK", status: "CONNECTED" },
+    data: {
+        workspaceId: SEED_WORKSPACE_ID, platform: "TIKTOK", handle: "@ugc.os.demo", mode: "MOCK", status: "CONNECTED" },
   });
   const igAccount = await prisma.socialAccount.create({
-    data: { platform: "INSTAGRAM", handle: "ugc.os.demo", mode: "MOCK", status: "CONNECTED" },
+    data: {
+        workspaceId: SEED_WORKSPACE_ID, platform: "INSTAGRAM", handle: "ugc.os.demo", mode: "MOCK", status: "CONNECTED" },
   });
   const ytAccount = await prisma.socialAccount.create({
-    data: { platform: "YOUTUBE_SHORTS", handle: "@ugc.os.demo", mode: "MOCK", status: "CONNECTED" },
+    data: {
+        workspaceId: SEED_WORKSPACE_ID, platform: "YOUTUBE_SHORTS", handle: "@ugc.os.demo", mode: "MOCK", status: "CONNECTED" },
   });
   const pinAccount = await prisma.socialAccount.create({
-    data: { platform: "PINTEREST", handle: "ugc.os.demo", mode: "MOCK", status: "CONNECTED" },
+    data: {
+        workspaceId: SEED_WORKSPACE_ID, platform: "PINTEREST", handle: "ugc.os.demo", mode: "MOCK", status: "CONNECTED" },
   });
   const accounts = [account, igAccount, ytAccount, pinAccount];
 
@@ -468,6 +488,7 @@ async function seedVideoJobsAndPosts(campaigns: Awaited<ReturnType<typeof seedCa
     const metrics = isPublished ? generateMetrics(acc.platform) : {};
     await prisma.socialPost.create({
       data: {
+        workspaceId: SEED_WORKSPACE_ID,
         campaignId: campaigns[i].id,
         accountId: acc.id,
         caption: `Ehrliche Erfahrung mit ${campaigns[i].name.split("–")[0].trim()} 👀`,
@@ -499,6 +520,7 @@ async function seedVideoJobsAndPosts(campaigns: Awaited<ReturnType<typeof seedCa
     const metrics = generateMetrics(acc.platform);
     await prisma.socialPost.create({
       data: {
+        workspaceId: SEED_WORKSPACE_ID,
         campaignId: campaign.id,
         accountId: acc.id,
         caption: extraCaptions[i % extraCaptions.length],
@@ -532,6 +554,7 @@ async function seedFinance(
       const product = products.find((p) => p.id === campaign.productId) ?? products[0];
       await prisma.revenue.create({
         data: {
+        workspaceId: SEED_WORKSPACE_ID,
           date,
           programId: program.id,
           productId: product.id,
@@ -548,6 +571,7 @@ async function seedFinance(
     const campaign = campaigns[week % campaigns.length];
     await prisma.expense.create({
       data: {
+        workspaceId: SEED_WORKSPACE_ID,
         date,
         category: categories[week % categories.length],
         vendor: ["Meta Ads", "ElevenLabs", "Higgsfield", "CapCut Pro"][week % 4],
@@ -598,9 +622,10 @@ async function seedIntegrations() {
 
   for (const entry of catalog) {
     await prisma.integration.upsert({
-      where: { providerKey: entry.providerKey },
+      where: { workspaceId_providerKey: { workspaceId: SEED_WORKSPACE_ID, providerKey: entry.providerKey } },
       update: {},
       create: {
+        workspaceId: SEED_WORKSPACE_ID,
         providerKey: entry.providerKey,
         displayName: entry.displayName,
         category: entry.category as never,
@@ -630,9 +655,10 @@ const AGENT_CATALOG = [
 async function seedAgents() {
   for (const [i, a] of AGENT_CATALOG.entries()) {
     const agent = await prisma.agent.upsert({
-      where: { key: a.key },
+      where: { workspaceId_key: { workspaceId: SEED_WORKSPACE_ID, key: a.key } },
       update: {},
       create: {
+        workspaceId: SEED_WORKSPACE_ID,
         key: a.key,
         name: a.name,
         role: a.role,
@@ -648,6 +674,7 @@ async function seedAgents() {
     });
     await prisma.agentRun.create({
       data: {
+        workspaceId: SEED_WORKSPACE_ID,
         agentId: agent.id,
         status: "SUCCESS",
         startedAt: daysAgo(i + 1),
@@ -662,6 +689,7 @@ async function seedAgents() {
 async function seedAutomations() {
   const automation = await prisma.automation.create({
     data: {
+        workspaceId: SEED_WORKSPACE_ID,
       name: "Score-Alarm für neue Produkte",
       isActive: true,
       trigger: "PRODUCT_SCORE_ABOVE_THRESHOLD",
@@ -671,11 +699,13 @@ async function seedAutomations() {
     },
   });
   await prisma.automationRun.create({
-    data: { automationId: automation.id, status: "SUCCESS", runAt: daysAgo(2), message: "1 Produkt über Schwellenwert gefunden." },
+    data: {
+        workspaceId: SEED_WORKSPACE_ID, automationId: automation.id, status: "SUCCESS", runAt: daysAgo(2), message: "1 Produkt über Schwellenwert gefunden." },
   });
 
   const automation2 = await prisma.automation.create({
     data: {
+        workspaceId: SEED_WORKSPACE_ID,
       name: "Fehlgeschlagene Posts benachrichtigen",
       isActive: true,
       trigger: "POST_FAILED",
@@ -685,7 +715,8 @@ async function seedAutomations() {
     },
   });
   await prisma.automationRun.create({
-    data: { automationId: automation2.id, status: "SUCCESS", runAt: daysAgo(5), message: "Benachrichtigung erstellt." },
+    data: {
+        workspaceId: SEED_WORKSPACE_ID, automationId: automation2.id, status: "SUCCESS", runAt: daysAgo(5), message: "Benachrichtigung erstellt." },
   });
   console.log("Seeded 2 automations with run history");
 }
@@ -702,7 +733,7 @@ async function seedNotifications() {
 }
 
 async function main() {
-  assertProductionSeedConfig();
+  assertSeedConfig();
 
   await seedAdminUser();
   await seedTaxSettings();

@@ -8,13 +8,15 @@ interface AuditEntryInput {
   metadata?: Prisma.InputJsonValue;
   requestId?: string;
   actor?: string;
+  workspaceId?: string;
 }
 
-/** Writes one audit trail entry. Never throws — audit failures must not break the mutation. */
 export async function writeAuditLog(entry: AuditEntryInput): Promise<void> {
   try {
     await prisma.auditLog.create({
       data: {
+        workspaceId:
+          entry.workspaceId ?? "00000000-0000-0000-0000-000000000001",
         action: entry.action,
         entityType: entry.entityType,
         entityId: entry.entityId,

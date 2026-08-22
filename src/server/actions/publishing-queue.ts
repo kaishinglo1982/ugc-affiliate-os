@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { ok, fail, newRequestId, type Result } from "@/types/result";
 import { idSchema } from "@/lib/validation/publishing";
 import {
@@ -17,12 +18,12 @@ export async function approvePostAction(id: string): Promise<Result<{ id: string
   const requestId = newRequestId();
   const user = await getCurrentUser();
   if (!user) return fail("Nicht authentifiziert.", requestId);
-
   const parsed = idSchema.safeParse({ id });
   if (!parsed.success) return fail("Ungültige ID.", requestId);
 
   try {
-    const post = await approvePost(parsed.data.id, user.email);
+    const workspaceId = await resolveWorkspaceId();
+    const post = await approvePost(parsed.data.id, user.email, workspaceId);
     revalidatePath("/app/publishing");
     revalidatePath("/app/calendar");
     return ok({ id: post.id, status: post.status }, requestId);
@@ -35,12 +36,12 @@ export async function enqueuePublishAction(id: string): Promise<Result<{ id: str
   const requestId = newRequestId();
   const user = await getCurrentUser();
   if (!user) return fail("Nicht authentifiziert.", requestId);
-
   const parsed = idSchema.safeParse({ id });
   if (!parsed.success) return fail("Ungültige ID.", requestId);
 
   try {
-    const post = await enqueuePublish(parsed.data.id, user.email);
+    const workspaceId = await resolveWorkspaceId();
+    const post = await enqueuePublish(parsed.data.id, user.email, workspaceId);
     revalidatePath("/app/publishing");
     revalidatePath("/app/calendar");
     return ok({ id: post.id, status: post.status }, requestId);
@@ -55,7 +56,8 @@ export async function runPublishWorkerAction(): Promise<Result<PublishWorkerRepo
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
   try {
-    const report = await processPublishQueue();
+    const workspaceId = await resolveWorkspaceId();
+    const report = await processPublishQueue(workspaceId);
     revalidatePath("/app/publishing");
     revalidatePath("/app/calendar");
     return ok(report, requestId);
@@ -68,12 +70,12 @@ export async function retryDeadLetterAction(jobId: string): Promise<Result<{ id:
   const requestId = newRequestId();
   const user = await getCurrentUser();
   if (!user) return fail("Nicht authentifiziert.", requestId);
-
   const parsed = idSchema.safeParse({ id: jobId });
   if (!parsed.success) return fail("Ungültige ID.", requestId);
 
   try {
-    await retryDeadLetterJob(parsed.data.id, user.email);
+    const workspaceId = await resolveWorkspaceId();
+    await retryDeadLetterJob(parsed.data.id, user.email, workspaceId);
     revalidatePath("/app/publishing");
     revalidatePath("/app/calendar");
     return ok({ id: parsed.data.id }, requestId);

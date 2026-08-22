@@ -1,96 +1,77 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireApiPermission } from "@/lib/api/guard";
+import {
+  created,
+  ok,
+  parseBody,
+  validateValue,
+  withApiContext,
+} from "@/lib/api";
 import { Permission } from "@/lib/auth/rbac";
-import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
-import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
 import { writeAuditLog } from "@/lib/audit/log";
-import type { AgentMemoryType } from "@/generated/prisma/client";
+import {
+  createAgentMemoryEntry,
+  getAgentMemoryEntries,
+} from "@/server/services/agents";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
-  const guard = await requireApiPermission(Permission.VIEW_AGENT_MEMORY);
-  if (guard) return guard.response;
+const memoryTypeSchema = z.enum(["FACT", "PREFERENCE", "CONTEXT"]);
 
-  let workspaceId: string;
-  try {
-    workspaceId = await resolveWorkspaceId();
-  } catch (e) {
-    if (e instanceof InvalidTenantTokenError) {
-      return NextResponse.json({ error: "Ungültiges Tenant-Token." }, { status: 401 });
-    }
-    throw e;
-  }
-
-  const { searchParams } = new URL(request.url);
-  const agentKey = searchParams.get("agentKey");
-  const type = searchParams.get("type");
-
-  if (!agentKey) {
-    return NextResponse.json({ error: "agentKey ist erforderlich." }, { status: 400 });
-  }
-
-  const entries = await prisma.agentMemoryEntry.findMany({
-    where: {
-      workspaceId: workspaceId,
-      agentKey,
-      ...(type ? { type: type as AgentMemoryType } : {}),
-    },
-    orderBy: [{ importance: "desc" }, { createdAt: "desc" }],
-  });
-
-  return NextResponse.json({ entries });
-}
-
-const createSchema = z.object({
-  agentKey: z.string().min(1).max(100),
-  type: z.enum(["FACT", "PREFERENCE", "CONTEXT"]).optional(),
-  key: z.string().min(1).max(200),
-  value: z.unknown().optional(),
-  importance: z.number().int().min(1).max(10).optional(),
-  expiresAt: z.string().datetime().optional(),
+const listSchema = z.object({
+  agentKey: z.string().trim().min(1).max(100),
+  type: memoryTypeSchema.optional(),
 });
 
-export async function POST(request: Request) {
-  const guard = await requireApiPermission(Permission.MANAGE_AGENT_MEMORY);
-  if (guard) return guard.response;
+const createSchema = z.object({
+  agentKey: z.string().trim().min(1).max(100),
+  type: memoryTypeSchema.optional(),
+  key: z.string().trim().min(1).max(200),
+  value: z.unknown().optional(),
+  importance: z.number().int().min(1).max(10).optional(),
+  expiresAt: z.string().datetime().transform((value) => new Date(value)).optional(),
+});
 
-  let workspaceId: string;
-  try {
-    workspaceId = await resolveWorkspaceId();
-  } catch (e) {
-    if (e instanceof InvalidTenantTokenError) {
-      return NextResponse.json({ error: "Ungültiges Tenant-Token." }, { status: 401 });
-    }
-    throw e;
-  }
+export async function GET(request: Request) {
+  const auth = await withApiContext(Permission.VIEW_AGENT_MEMORY);
+  if ("response" in auth) return auth.response;
 
-  const parsed = createSchema.safeParse(await request.json());
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Ungültige Eingabe." }, { status: 400 });
-  }
-
-  const actor = (await getCurrentUser())?.id ?? "owner";
-  const entry = await prisma.agentMemoryEntry.create({
-    data: {
-      workspaceId: workspaceId,
-      agentKey: parsed.data.agentKey,
-      type: (parsed.data.type ?? "FACT") as AgentMemoryType,
-      key: parsed.data.key,
-      value: parsed.data.value as object | undefined,
-      importance: parsed.data.importance ?? 1,
-      expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,
+  const { searchParams } = new URL(request.url);
+  const validated = validateValue(
+    {
+      agentKey: searchParams.get("agentKey") ?? undefined,
+      type: searchParams.get("type") ?? undefined,
     },
+    listSchema,
+  );
+  if ("response" in validated) return validated.response;
+
+  const entries = await getAgentMemoryEntries(
+    auth.context.workspaceId,
+    validated.data.agentKey,
+    { type: validated.data.type },
+  );
+
+  return ok({ entries });
+}
+
+export async function POST(request: Request) {
+  const auth = await withApiContext(Permission.MANAGE_AGENT_MEMORY);
+  if ("response" in auth) return auth.response;
+
+  const validated = await parseBody(request, createSchema);
+  if ("response" in validated) return validated.response;
+
+  const entry = await createAgentMemoryEntry({
+    workspaceId: auth.context.workspaceId,
+    ...validated.data,
   });
 
   await writeAuditLog({
     action: "agent_memory.create",
     entityType: "AgentMemoryEntry",
     entityId: entry.id,
-    actor,
+    actor: auth.context.actor,
   });
 
-  return NextResponse.json({ entry }, { status: 201 });
+  return created({ entry });
 }

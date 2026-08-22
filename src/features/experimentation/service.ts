@@ -77,6 +77,7 @@ export async function createExperiment(input: CreateExperimentInput, actor: stri
       approvalStatus: "DRAFT",
       variants: {
         create: input.variants.map((v) => ({
+          workspaceId,
           name: v.name,
           isControl: v.isControl,
           trafficWeight: v.trafficWeight,
@@ -93,6 +94,7 @@ export async function createExperiment(input: CreateExperimentInput, actor: stri
     entityType: "ContentExperiment",
     entityId: experiment.id,
     actor,
+    workspaceId,
     metadata: { variantCount: experiment.variants.length },
   });
   return experiment;
@@ -110,7 +112,7 @@ async function transition(experimentId: string, to: ExperimentStatus, actor: str
 
 export async function requestExperimentApproval(experimentId: string, actor: string, workspaceId: string) {
   const updated = await transition(experimentId, "AWAITING_APPROVAL", actor, workspaceId, { approvalStatus: "PENDING" as ApprovalStatus });
-  await writeAuditLog({ action: "experiment.approval_requested", entityType: "ContentExperiment", entityId: experimentId, actor });
+  await writeAuditLog({ action: "experiment.approval_requested", entityType: "ContentExperiment", entityId: experimentId, actor, workspaceId });
   return updated;
 }
 
@@ -122,7 +124,7 @@ export async function approveExperiment(experimentId: string, actor: string, wor
     where: { id: experimentId },
     data: { approvalStatus: "APPROVED" as ApprovalStatus, status: "SCHEDULED" },
   });
-  await writeAuditLog({ action: "experiment.approved", entityType: "ContentExperiment", entityId: experimentId, actor });
+  await writeAuditLog({ action: "experiment.approved", entityType: "ContentExperiment", entityId: experimentId, actor, workspaceId });
   return updated;
 }
 
@@ -132,13 +134,13 @@ export async function startExperiment(experimentId: string, actor: string, works
   if (exp.approvalStatus !== "APPROVED") throw new ExperimentError("Experiment benötigt Freigabe vor dem Start.");
   const updated = await transition(experimentId, "RUNNING", actor, workspaceId, { startedAt: new Date() });
   incrementMetric(METRICS.experimentStartedTotal);
-  await writeAuditLog({ action: "experiment.started", entityType: "ContentExperiment", entityId: experimentId, actor });
+  await writeAuditLog({ action: "experiment.started", entityType: "ContentExperiment", entityId: experimentId, actor, workspaceId });
   return updated;
 }
 
 export async function pauseExperiment(experimentId: string, actor: string, workspaceId: string) {
   const updated = await transition(experimentId, "PAUSED", actor, workspaceId);
-  await writeAuditLog({ action: "experiment.paused", entityType: "ContentExperiment", entityId: experimentId, actor });
+  await writeAuditLog({ action: "experiment.paused", entityType: "ContentExperiment", entityId: experimentId, actor, workspaceId });
   return updated;
 }
 
@@ -151,6 +153,7 @@ export async function completeExperiment(experimentId: string, actor: string, wo
     entityType: "ContentExperiment",
     entityId: experimentId,
     actor,
+    workspaceId,
   });
   return updated;
 }
@@ -251,6 +254,7 @@ export async function analyzeExperimentById(experimentId: string, workspaceId: s
 
   const result = await prisma.experimentResult.create({
     data: {
+      workspaceId,
       experimentId,
       analyzedAt: new Date(),
       status: outcome.status,
@@ -273,6 +277,7 @@ export async function analyzeExperimentById(experimentId: string, workspaceId: s
     action: outcome.winningVariantId ? "experiment.winner_detected" : "experiment.analysis_completed",
     entityType: "ExperimentResult",
     entityId: result.id,
+    workspaceId,
     metadata: { status: outcome.status, winningVariantId: outcome.winningVariantId },
   });
   logStructured({ experimentId, status: outcome.status, message: "experiment analyzed" });

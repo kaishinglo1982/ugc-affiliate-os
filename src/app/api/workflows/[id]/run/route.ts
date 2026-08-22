@@ -1,56 +1,64 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireApiPermission } from "@/lib/api/guard";
+import {
+  created,
+  fail,
+  parseBody,
+  uuidSchema,
+  validateValue,
+  withApiContext,
+} from "@/lib/api";
 import { Permission } from "@/lib/auth/rbac";
-import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
-import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
 import { writeAuditLog } from "@/lib/audit/log";
+import { startWorkflowRun } from "@/server/services/workflows";
 
 export const dynamic = "force-dynamic";
 
-const bodySchema = z.object({ context: z.unknown().optional() }).optional();
+const bodySchema = z
+  .object({ context: z.unknown().optional() })
+  .nullable()
+  .transform((value) => value ?? {});
 
 export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const guard = await requireApiPermission(Permission.MANAGE_WORKFLOWS);
-  if (guard) return guard.response;
-
-  let workspaceId: string;
-  try {
-    workspaceId = await resolveWorkspaceId();
-  } catch (e) {
-    if (e instanceof InvalidTenantTokenError) {
-      return NextResponse.json({ error: "Ungültiges Tenant-Token." }, { status: 401 });
-    }
-    throw e;
-  }
+  const auth = await withApiContext(Permission.MANAGE_WORKFLOWS);
+  if ("response" in auth) return auth.response;
 
   const { id } = await context.params;
-  const parsed = bodySchema.safeParse(await request.json().catch(() => undefined));
-  const payload = parsed.success ? (parsed.data?.context as object | undefined) : undefined;
+  const params = validateValue(id, uuidSchema);
+  if ("response" in params) return params.response;
 
-  const workflow = await prisma.workflowDefinition.findFirst({
-    where: { id, workspaceId: workspaceId },
-  });
-  if (!workflow) {
-    return NextResponse.json({ error: "Workflow nicht gefunden." }, { status: 404 });
+  const validated = await parseBody(request, bodySchema);
+  if ("response" in validated) return validated.response;
+
+  try {
+    const run = await startWorkflowRun(
+      params.data,
+      auth.context.workspaceId,
+      {
+        actor: auth.context.actor,
+        context: validated.data.context,
+        idempotencyKey:
+          request.headers.get("idempotency-key")?.trim() || undefined,
+      },
+    );
+
+    await writeAuditLog({
+      action: "workflow.run",
+      entityType: "WorkflowRun",
+      entityId: run.id,
+      actor: auth.context.actor,
+      metadata: { workflowId: params.data },
+    });
+
+    return created({ run });
+  } catch (error) {
+    if (error instanceof Error && error.message === "WORKFLOW_NOT_RUNNABLE") {
+      return fail("Workflow ist nicht vorhanden oder nicht aktiv.", {
+        status: 409,
+      });
+    }
+    throw error;
   }
-
-  const actor = (await getCurrentUser())?.id ?? "owner";
-  const run = await prisma.workflowRun.create({
-    data: { workflowId: id, status: "RUNNING", context: payload },
-  });
-
-  await writeAuditLog({
-    action: "workflow.run",
-    entityType: "WorkflowRun",
-    entityId: run.id,
-    actor,
-    metadata: { workflowId: id },
-  });
-
-  return NextResponse.json({ run }, { status: 201 });
 }

@@ -1,10 +1,15 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireApiPermission } from "@/lib/api/guard";
+import {
+  notFound,
+  ok,
+  parseBody,
+  uuidSchema,
+  validateValue,
+  withApiContext,
+} from "@/lib/api";
 import { Permission } from "@/lib/auth/rbac";
-import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
 import { writeAuditLog } from "@/lib/audit/log";
+import { updateAgentToolEnabled } from "@/server/services/agents";
 
 export const dynamic = "force-dynamic";
 
@@ -14,28 +19,36 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const guard = await requireApiPermission(Permission.MANAGE_AGENT_TOOLS);
-  if (guard) return guard.response;
+  const auth = await withApiContext(Permission.MANAGE_AGENT_TOOLS);
+  if ("response" in auth) return auth.response;
 
   const { id } = await context.params;
-  const parsed = patchSchema.safeParse(await request.json());
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Ungültige Eingabe." }, { status: 400 });
+  const params = validateValue(id, uuidSchema);
+  if ("response" in params) return params.response;
+
+  const validated = await parseBody(request, patchSchema);
+  if ("response" in validated) return validated.response;
+
+  try {
+    const tool = await updateAgentToolEnabled(
+      params.data,
+      auth.context.workspaceId,
+      validated.data.enabled,
+    );
+
+    await writeAuditLog({
+      action: "agent_tool.update",
+      entityType: "AgentToolDefinition",
+      entityId: tool.id,
+      actor: auth.context.actor,
+      metadata: { enabled: tool.enabled },
+    });
+
+    return ok({ tool });
+  } catch (error) {
+    if (error instanceof Error && error.message === "AGENT_TOOL_NOT_FOUND") {
+      return notFound("Agent-Tool nicht gefunden.");
+    }
+    throw error;
   }
-
-  const actor = (await getCurrentUser())?.id ?? "owner";
-  const tool = await prisma.agentToolDefinition.update({
-    where: { id },
-    data: { enabled: parsed.data.enabled },
-  });
-
-  await writeAuditLog({
-    action: "agent_tool.update",
-    entityType: "AgentToolDefinition",
-    entityId: id,
-    actor,
-    metadata: { enabled: tool.enabled },
-  });
-
-  return NextResponse.json({ tool });
 }

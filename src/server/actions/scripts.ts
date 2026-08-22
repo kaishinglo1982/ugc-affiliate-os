@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/client";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { runMutation } from "@/server/actions/action-helpers";
 import { scriptGenerateSchema, idSchema, scriptStatusEnum } from "@/lib/validation/scripts";
 import { resolveScriptProvider } from "@/lib/providers/llm/registry";
@@ -24,9 +25,17 @@ export async function generateScriptAction(
   }
 
   const input = parsed.data;
-  const product = input.productId
-    ? await prisma.product.findUnique({ where: { id: input.productId } })
-    : null;
+  const workspaceId = await resolveWorkspaceId();
+  const [product, campaign] = await Promise.all([
+    input.productId
+      ? prisma.product.findFirst({ where: { id: input.productId, workspaceId } })
+      : null,
+    input.campaignId
+      ? prisma.campaign.findFirst({ where: { id: input.campaignId, workspaceId }, select: { id: true } })
+      : null,
+  ]);
+  if (input.productId && !product) return fail("Produkt nicht gefunden.", requestId);
+  if (input.campaignId && !campaign) return fail("Kampagne nicht gefunden.", requestId);
 
   const provider = resolveScriptProvider(input.provider);
   const generated = await provider.generate({
@@ -43,6 +52,7 @@ export async function generateScriptAction(
 
   const script = await prisma.script.create({
     data: {
+      workspaceId,
       title: input.title,
       productId: input.productId || null,
       campaignId: input.campaignId || null,
@@ -55,6 +65,7 @@ export async function generateScriptAction(
       status: "DRAFT",
       versions: {
         create: {
+          workspaceId,
           versionNumber: 1,
           ...generated,
           sceneList: generated.sceneList,
@@ -70,6 +81,7 @@ export async function generateScriptAction(
     entityId: script.id,
     requestId,
     actor: user.email,
+    workspaceId,
     metadata: { provider: provider.key },
   });
 
@@ -84,9 +96,13 @@ export async function regenerateScriptVersionAction(
   const user = await getCurrentUser();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
-  const script = await prisma.script.findUnique({
-    where: { id: scriptId },
-    include: { product: true, versions: { orderBy: { versionNumber: "desc" }, take: 1 } },
+  const workspaceId = await resolveWorkspaceId();
+  const script = await prisma.script.findFirst({
+    where: { id: scriptId, workspaceId },
+    include: {
+      product: true,
+      versions: { where: { workspaceId }, orderBy: { versionNumber: "desc" }, take: 1 },
+    },
   });
   if (!script) return fail("Skript nicht gefunden.", requestId);
 
@@ -107,6 +123,7 @@ export async function regenerateScriptVersionAction(
 
   await prisma.scriptVersion.create({
     data: {
+      workspaceId,
       scriptId: script.id,
       versionNumber: nextVersion,
       ...generated,
@@ -121,6 +138,7 @@ export async function regenerateScriptVersionAction(
     entityId: script.id,
     requestId,
     actor: user.email,
+    workspaceId,
     metadata: { versionNumber: nextVersion },
   });
 
@@ -133,15 +151,17 @@ export async function duplicateScriptAction(id: string): Promise<Result<{ id: st
   const user = await getCurrentUser();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
-  const original = await prisma.script.findUnique({
-    where: { id },
-    include: { versions: { orderBy: { versionNumber: "desc" }, take: 1 } },
+  const workspaceId = await resolveWorkspaceId();
+  const original = await prisma.script.findFirst({
+    where: { id, workspaceId },
+    include: { versions: { where: { workspaceId }, orderBy: { versionNumber: "desc" }, take: 1 } },
   });
   if (!original) return fail("Skript nicht gefunden.", requestId);
 
   const latest = original.versions[0];
   const copy = await prisma.script.create({
     data: {
+      workspaceId,
       title: `${original.title} (Kopie)`,
       productId: original.productId,
       campaignId: original.campaignId,
@@ -155,6 +175,7 @@ export async function duplicateScriptAction(id: string): Promise<Result<{ id: st
       versions: latest
         ? {
             create: {
+              workspaceId,
               versionNumber: 1,
               hook: latest.hook,
               problem: latest.problem,
@@ -182,7 +203,8 @@ export async function duplicateScriptAction(id: string): Promise<Result<{ id: st
     entityId: copy.id,
     requestId,
     actor: user.email,
-    metadata: { duplicatedFrom: id },
+    workspaceId,
+    metadata: { duplicatedFrom: original.id },
   });
 
   revalidatePath("/app/scripts");
@@ -197,7 +219,11 @@ export async function changeScriptStatusAction(id: string, status: string) {
     input: { id, status },
     auditAction: "script.status_change",
     entityType: "Script",
-    handler: async (input) => prisma.script.update({ where: { id: input.id }, data: { status: input.status } }),
+    handler: async (input, _user, workspaceId) => {
+      const script = await prisma.script.findFirst({ where: { id: input.id, workspaceId }, select: { id: true } });
+      if (!script) throw new Error("SCRIPT_NOT_FOUND");
+      return prisma.script.update({ where: { id: script.id }, data: { status: input.status } });
+    },
     entityId: (output) => output.id,
   });
   revalidatePath("/app/scripts");
@@ -210,8 +236,9 @@ export async function deleteScriptAction(id: string) {
     input: { id },
     auditAction: "script.delete",
     entityType: "Script",
-    handler: async (input) => {
-      await prisma.script.delete({ where: { id: input.id } });
+    handler: async (input, _user, workspaceId) => {
+      const deleted = await prisma.script.deleteMany({ where: { id: input.id, workspaceId } });
+      if (deleted.count !== 1) throw new Error("SCRIPT_NOT_FOUND");
       return { id: input.id };
     },
     entityId: (output) => output.id,

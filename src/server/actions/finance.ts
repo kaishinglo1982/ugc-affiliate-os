@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/client";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { runMutation } from "@/server/actions/action-helpers";
 import {
   revenueFormSchema,
@@ -12,6 +13,28 @@ import {
 import { ok, fail, newRequestId, type Result } from "@/types/result";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
+
+async function validateFinanceRelations(
+  workspaceId: string,
+  relations: { programId?: string | null; productId?: string | null; campaignId?: string | null },
+) {
+  const [program, product, campaign] = await Promise.all([
+    relations.programId
+      ? prisma.affiliateProgram.findFirst({ where: { id: relations.programId, workspaceId }, select: { id: true } })
+      : null,
+    relations.productId
+      ? prisma.product.findFirst({ where: { id: relations.productId, workspaceId }, select: { id: true } })
+      : null,
+    relations.campaignId
+      ? prisma.campaign.findFirst({ where: { id: relations.campaignId, workspaceId }, select: { id: true } })
+      : null,
+  ]);
+  return {
+    validProgram: !relations.programId || Boolean(program),
+    validProduct: !relations.productId || Boolean(product),
+    validCampaign: !relations.campaignId || Boolean(campaign),
+  };
+}
 
 export async function saveRevenueAction(
   revenueId: string | null,
@@ -27,6 +50,12 @@ export async function saveRevenueAction(
     return fail("Eingabe ungültig.", requestId, parsed.error.flatten().fieldErrors);
   }
 
+  const workspaceId = await resolveWorkspaceId();
+  const relations = await validateFinanceRelations(workspaceId, parsed.data);
+  if (!relations.validProgram) return fail("Affiliate-Programm nicht gefunden.", requestId);
+  if (!relations.validProduct) return fail("Produkt nicht gefunden.", requestId);
+  if (!relations.validCampaign) return fail("Kampagne nicht gefunden.", requestId);
+
   const data = {
     date: new Date(parsed.data.date),
     programId: parsed.data.programId || null,
@@ -39,9 +68,14 @@ export async function saveRevenueAction(
     notes: parsed.data.notes || null,
   };
 
-  const revenue = revenueId
-    ? await prisma.revenue.update({ where: { id: revenueId }, data })
-    : await prisma.revenue.create({ data });
+  let revenue;
+  if (revenueId) {
+    const existing = await prisma.revenue.findFirst({ where: { id: revenueId, workspaceId }, select: { id: true } });
+    if (!existing) return fail("Einnahme nicht gefunden.", requestId);
+    revenue = await prisma.revenue.update({ where: { id: existing.id }, data });
+  } else {
+    revenue = await prisma.revenue.create({ data: { workspaceId, ...data } });
+  }
 
   await writeAuditLog({
     action: revenueId ? "revenue.update" : "revenue.create",
@@ -49,6 +83,7 @@ export async function saveRevenueAction(
     entityId: revenue.id,
     requestId,
     actor: user.email,
+    workspaceId,
   });
 
   revalidatePath("/app/finance");
@@ -61,8 +96,9 @@ export async function deleteRevenueAction(id: string) {
     input: { id },
     auditAction: "revenue.delete",
     entityType: "Revenue",
-    handler: async (input) => {
-      await prisma.revenue.delete({ where: { id: input.id } });
+    handler: async (input, _user, workspaceId) => {
+      const deleted = await prisma.revenue.deleteMany({ where: { id: input.id, workspaceId } });
+      if (deleted.count !== 1) throw new Error("REVENUE_NOT_FOUND");
       return { id: input.id };
     },
     entityId: (output) => output.id,
@@ -85,6 +121,11 @@ export async function saveExpenseAction(
     return fail("Eingabe ungültig.", requestId, parsed.error.flatten().fieldErrors);
   }
 
+  const workspaceId = await resolveWorkspaceId();
+  const relations = await validateFinanceRelations(workspaceId, parsed.data);
+  if (!relations.validProduct) return fail("Produkt nicht gefunden.", requestId);
+  if (!relations.validCampaign) return fail("Kampagne nicht gefunden.", requestId);
+
   const data = {
     date: new Date(parsed.data.date),
     category: parsed.data.category,
@@ -97,9 +138,14 @@ export async function saveExpenseAction(
     notes: parsed.data.notes || null,
   };
 
-  const expense = expenseId
-    ? await prisma.expense.update({ where: { id: expenseId }, data })
-    : await prisma.expense.create({ data });
+  let expense;
+  if (expenseId) {
+    const existing = await prisma.expense.findFirst({ where: { id: expenseId, workspaceId }, select: { id: true } });
+    if (!existing) return fail("Ausgabe nicht gefunden.", requestId);
+    expense = await prisma.expense.update({ where: { id: existing.id }, data });
+  } else {
+    expense = await prisma.expense.create({ data: { workspaceId, ...data } });
+  }
 
   await writeAuditLog({
     action: expenseId ? "expense.update" : "expense.create",
@@ -107,6 +153,7 @@ export async function saveExpenseAction(
     entityId: expense.id,
     requestId,
     actor: user.email,
+    workspaceId,
   });
 
   revalidatePath("/app/finance");
@@ -119,8 +166,9 @@ export async function deleteExpenseAction(id: string) {
     input: { id },
     auditAction: "expense.delete",
     entityType: "Expense",
-    handler: async (input) => {
-      await prisma.expense.delete({ where: { id: input.id } });
+    handler: async (input, _user, workspaceId) => {
+      const deleted = await prisma.expense.deleteMany({ where: { id: input.id, workspaceId } });
+      if (deleted.count !== 1) throw new Error("EXPENSE_NOT_FOUND");
       return { id: input.id };
     },
     entityId: (output) => output.id,
@@ -142,7 +190,8 @@ export async function saveTaxSettingAction(
     return fail("Eingabe ungültig.", requestId, parsed.error.flatten().fieldErrors);
   }
 
-  const existing = await prisma.taxSetting.findFirst();
+  const workspaceId = await resolveWorkspaceId();
+  const existing = await prisma.taxSetting.findFirst({ where: { workspaceId } });
   const data = {
     reserveRatePercent: parsed.data.reserveRatePercent,
     vatRatePercent: parsed.data.vatRatePercent,
@@ -153,7 +202,7 @@ export async function saveTaxSettingAction(
 
   const setting = existing
     ? await prisma.taxSetting.update({ where: { id: existing.id }, data })
-    : await prisma.taxSetting.create({ data });
+    : await prisma.taxSetting.create({ data: { workspaceId, ...data } });
 
   await writeAuditLog({
     action: "tax_setting.update",
@@ -161,6 +210,7 @@ export async function saveTaxSettingAction(
     entityId: setting.id,
     requestId,
     actor: user.email,
+    workspaceId,
   });
 
   revalidatePath("/app/finance");

@@ -91,6 +91,10 @@ export const PERMISSIONS = [
   "approvals.read",
   "agents.read",
   "agents.manage",
+  // Phase 21 — BYOK Provider Gateway
+  "provider_gateway.read",
+  "provider_gateway.manage",
+  "provider_gateway.route",
   // Phase 8 — Campaign Factory
   "campaign_candidates.read",
   "campaign_candidates.create",
@@ -189,6 +193,9 @@ export const Permission = {
   VIEW_APPROVALS: "approvals.read",
   VIEW_AGENTS: "agents.read",
   MANAGE_AGENTS: "agents.manage",
+  VIEW_PROVIDER_GATEWAY: "provider_gateway.read",
+  MANAGE_PROVIDER_GATEWAY: "provider_gateway.manage",
+  ROUTE_PROVIDER_GATEWAY: "provider_gateway.route",
   // Phase 8 — Campaign Factory
   VIEW_CAMPAIGN_CANDIDATES: "campaign_candidates.read",
   MANAGE_CAMPAIGN_CANDIDATES: "campaign_candidates.create",
@@ -269,6 +276,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     "feature_flags.read",
     "content_briefs.read",
     "workflows.read",
+    "provider_gateway.read",
   ],
   analyst: [
     ...PHASE7_READ,

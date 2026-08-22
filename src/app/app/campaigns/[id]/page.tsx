@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getCampaignById } from "@/server/services/campaigns";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { listProductsForSelect, listAffiliateLinks } from "@/server/services/affiliate";
 import { CampaignForm, type CampaignFormInitial } from "@/components/campaigns/campaign-form";
 import { CampaignStatusControl } from "@/components/campaigns/campaign-status-control";
@@ -22,16 +23,18 @@ interface CampaignDetailPageProps {
 
 export async function generateMetadata({ params }: CampaignDetailPageProps): Promise<Metadata> {
   const { id } = await params;
-  const campaign = await getCampaignById(id);
+  const workspaceId = await resolveWorkspaceId();
+  const campaign = await getCampaignById(id, workspaceId);
   return { title: campaign?.name ?? "Kampagne" };
 }
 
 export default async function CampaignDetailPage({ params }: CampaignDetailPageProps) {
   const { id } = await params;
+  const workspaceId = await resolveWorkspaceId();
   const [campaign, products, links] = await Promise.all([
-    getCampaignById(id),
-    listProductsForSelect(),
-    listAffiliateLinks(),
+    getCampaignById(id, workspaceId),
+    listProductsForSelect(workspaceId),
+    listAffiliateLinks(workspaceId),
   ]);
 
   if (!campaign) notFound();

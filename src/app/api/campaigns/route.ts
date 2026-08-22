@@ -1,26 +1,44 @@
-import { NextResponse } from "next/server";
-import { requireApiPermission } from "@/lib/api/guard";
+import { z } from "zod";
+import { ok, validateValue, withApiContext } from "@/lib/api";
 import { Permission } from "@/lib/auth/rbac";
-import { prisma } from "@/lib/db/client";
-import type { CampaignStatus } from "@/generated/prisma/client";
+import { listCampaigns } from "@/server/services/campaigns";
 
 export const dynamic = "force-dynamic";
 
+const listSchema = z.object({
+  status: z.enum([
+    "DRAFT",
+    "RESEARCH",
+    "SCRIPTING",
+    "PRODUCTION",
+    "REVIEW",
+    "SCHEDULED",
+    "ACTIVE",
+    "PAUSED",
+    "COMPLETED",
+    "ARCHIVED",
+  ]).optional(),
+  productId: z.string().uuid().optional(),
+});
+
 export async function GET(request: Request) {
-  const guard = await requireApiPermission(Permission.VIEW_CAMPAIGNS);
-  if (guard) return guard.response;
+  const auth = await withApiContext(Permission.VIEW_CAMPAIGNS);
+  if ("response" in auth) return auth.response;
 
   const { searchParams } = new URL(request.url);
-  const status = searchParams.get("status");
-  const productId = searchParams.get("productId");
-
-  const campaigns = await prisma.campaign.findMany({
-    where: {
-      ...(status ? { status: status as CampaignStatus } : {}),
-      ...(productId ? { productId } : {}),
+  const validated = validateValue(
+    {
+      status: searchParams.get("status") ?? undefined,
+      productId: searchParams.get("productId") ?? undefined,
     },
-    orderBy: { createdAt: "desc" },
-  });
+    listSchema,
+  );
+  if ("response" in validated) return validated.response;
 
-  return NextResponse.json({ campaigns });
+  const campaigns = await listCampaigns(
+    auth.context.workspaceId,
+    validated.data,
+  );
+
+  return ok({ campaigns });
 }

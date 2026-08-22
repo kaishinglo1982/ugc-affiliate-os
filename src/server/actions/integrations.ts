@@ -1,6 +1,7 @@
 "use server";
 
 import { prisma } from "@/lib/db/client";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import {
   saveHuggingFaceSettingsSchema,
   disconnectIntegrationSchema,
@@ -22,26 +23,38 @@ export async function saveHuggingFaceSettingsAction(
     };
   }
 
+  const workspaceId = await resolveWorkspaceId();
   const { apiKey, model, temperature, maxTokens, autoSuggestHooks } = parsed.data;
 
-  const integration = await prisma.integration.upsert({
-    where: { providerKey: "huggingface" },
-    update: {},
-    create: {
-      providerKey: "huggingface",
-      displayName: "HuggingFace",
-      category: "AI",
-      mode: "MOCK",
-      status: "DISCONNECTED",
-    },
+  let integration = await prisma.integration.findFirst({
+    where: { providerKey: "huggingface", workspaceId },
   });
+  if (!integration) {
+    integration = await prisma.integration.create({
+      data: {
+        workspaceId,
+        providerKey: "huggingface",
+        displayName: "HuggingFace",
+        category: "AI",
+        mode: "MOCK",
+        status: "DISCONNECTED",
+      },
+    });
+  }
 
   let credentialId: string | undefined = integration.credentialId ?? undefined;
   if (apiKey) {
     const encrypted = encryptSecret(apiKey);
-    if (credentialId) {
+    const existingCredential = credentialId
+      ? await prisma.encryptedCredential.findFirst({
+          where: { id: credentialId, workspaceId },
+          select: { id: true },
+        })
+      : null;
+
+    if (existingCredential) {
       await prisma.encryptedCredential.update({
-        where: { id: credentialId },
+        where: { id: existingCredential.id },
         data: {
           cipherText: encrypted.cipherText,
           iv: encrypted.iv,
@@ -51,6 +64,7 @@ export async function saveHuggingFaceSettingsAction(
     } else {
       const credential = await prisma.encryptedCredential.create({
         data: {
+          workspaceId,
           label: "HuggingFace API Key",
           cipherText: encrypted.cipherText,
           iv: encrypted.iv,
@@ -64,7 +78,7 @@ export async function saveHuggingFaceSettingsAction(
   await prisma.integration.update({
     where: { id: integration.id },
     data: {
-      credentialId: credentialId,
+      credentialId,
       status: credentialId ? "CONNECTED" : integration.status,
       config: { model, temperature, maxTokens, autoSuggestHooks },
     },
@@ -80,14 +94,18 @@ export async function disconnectIntegrationAction(providerKey: string) {
     input: { providerKey },
     auditAction: "integration.disconnect",
     entityType: "Integration",
-    handler: async ({ providerKey: key }) => {
-      const integration = await prisma.integration.findUnique({ where: { providerKey: key } });
+    handler: async ({ providerKey: key }, _user, workspaceId) => {
+      const integration = await prisma.integration.findFirst({
+        where: { providerKey: key, workspaceId },
+      });
       if (!integration) return { providerKey: key };
       if (integration.credentialId) {
-        await prisma.encryptedCredential.delete({ where: { id: integration.credentialId } });
+        await prisma.encryptedCredential.deleteMany({
+          where: { id: integration.credentialId, workspaceId },
+        });
       }
       await prisma.integration.update({
-        where: { providerKey: key },
+        where: { id: integration.id },
         data: { credentialId: null, status: "DISCONNECTED" },
       });
       return { providerKey: key };

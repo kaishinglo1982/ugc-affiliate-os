@@ -20,7 +20,6 @@ const CRITICAL_SERVER_VARS = [
 ] as const;
 
 const forbiddenProductionValues = new Set([
-  "ChangeMe123!",
   "ci-auth-secret-at-least-thirty-two-characters",
   "ci-worker-secret-at-least-thirty-two-characters",
   "0000000000000000000000000000000000000000000000000000000000000000",

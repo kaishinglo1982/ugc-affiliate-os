@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { listAgents } from "@/server/services/agents";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { AgentsView, type AgentRow } from "@/components/agents/agents-view";
 
 export const metadata: Metadata = { title: "Agenten-Registry" };
 
 export default async function AgentsPage() {
-  const agents = await listAgents();
+  const workspaceId = await resolveWorkspaceId();
+  const agents = await listAgents(workspaceId);
 
   const rows: AgentRow[] = agents.map((a) => ({
     id: a.id,
