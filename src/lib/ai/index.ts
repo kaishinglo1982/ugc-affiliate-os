@@ -9,4 +9,20 @@ export {
   type AiResponse,
 } from "@/lib/ai/contracts";
 export { OfflineAiProvider } from "@/lib/ai/offline-provider";
+export {
+  AiRoutePolicySchema,
+  OmniRoute,
+  type AiProviderProfile,
+  type AiRouteAttempt,
+  type AiRoutePolicy,
+  type AiRouteResult,
+} from "@/lib/ai/omni-route";
 export { AiRouter, AiRoutingError, type AiRouterOptions } from "@/lib/ai/router";
+export {
+  AiCredentialIsolationError,
+  AiCredentialRecordSchema,
+  WorkspaceAiSecretResolver,
+  type AiCredentialRecord,
+  type AiCredentialStore,
+  type AiSecretDecryptor,
+} from "@/lib/ai/vault-credentials";
