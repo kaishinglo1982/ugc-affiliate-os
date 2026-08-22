@@ -1,0 +1,93 @@
+# Woodpecker CI pipeline — self-hosted alternative to the `validate` job in
+# `.github/workflows/ci.yml`, for when GitHub Actions' quota/spending limit
+# blocks CI here (see deploy/woodpecker/README.md for the "why" and how to
+# run the server this connects to). Mirrors ci.yml's steps and CI-only
+# constants exactly, so results should match. Does not (yet) cover the `e2e`
+# job — see deploy/woodpecker/README.md.
+#
+# Deliberately written without YAML anchors/aliases: this file has not been
+# run against a live Woodpecker instance (none exists in the environment
+# that authored it — see deploy/woodpecker/README.md), so it stays as
+# plain, literal, easy-to-verify-by-reading YAML rather than relying on
+# anchor/alias behavior nobody has confirmed against Woodpecker's actual
+# parser. Each step is its own container — `node_modules` persists via the
+# shared workspace after `install`, but the `pnpm` shim itself does not, so
+# every step that runs `pnpm` re-activates it first.
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ugc_affiliate_ci
+
+steps:
+  install:
+    image: node:22
+    commands:
+      - corepack enable
+      - corepack prepare pnpm@11.13.0 --activate
+      - pnpm install --frozen-lockfile
+
+  architecture-check:
+    image: node:22
+    commands:
+      - corepack enable
+      - corepack prepare pnpm@11.13.0 --activate
+      - pnpm run architecture:check
+
+  generate-and-migrate:
+    image: node:22
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ugc_affiliate_ci?schema=public
+    commands:
+      - corepack enable
+      - corepack prepare pnpm@11.13.0 --activate
+      - pnpm run db:generate
+      - pnpm run db:migrate:deploy
+
+  typecheck:
+    image: node:22
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ugc_affiliate_ci?schema=public
+    commands:
+      - corepack enable
+      - corepack prepare pnpm@11.13.0 --activate
+      - pnpm run typecheck
+
+  lint:
+    image: node:22
+    commands:
+      - corepack enable
+      - corepack prepare pnpm@11.13.0 --activate
+      - pnpm run lint
+    # Known pre-existing, unrelated failure as of this writing (see
+    # deploy/woodpecker/README.md). Not marked `failure: ignore` on purpose:
+    # this should turn red until the repo-wide TS7/eslint issue is actually
+    # fixed, not be silently masked here.
+
+  test:
+    image: node:22
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ugc_affiliate_ci?schema=public
+      DATABASE_URL_TEST: postgresql://postgres:postgres@postgres:5432/ugc_affiliate_ci?schema=public
+      AUTH_SECRET: ci-auth-secret-at-least-thirty-two-characters
+      CREDENTIAL_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      WORKER_SECRET: ci-worker-secret-at-least-thirty-two-characters
+      APP_URL: http://127.0.0.1:3000
+      ADMIN_EMAIL: owner@example.com
+      ADMIN_PASSWORD: ChangeMe123!
+    commands:
+      - corepack enable
+      - corepack prepare pnpm@11.13.0 --activate
+      - pnpm run test
+
+  build:
+    image: node:22
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/ugc_affiliate_ci?schema=public
+    commands:
+      - corepack enable
+      - corepack prepare pnpm@11.13.0 --activate
+      - pnpm run build
