@@ -13,8 +13,10 @@ export const architecture = Object.freeze({
     "components",
     "generated",
     "hooks",
+    "instrumentation.ts",
     "lib",
     "styles",
+    "test",
     "types",
   ],
   platformDomains: [
