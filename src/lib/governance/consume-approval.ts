@@ -1,11 +1,14 @@
 import "server-only";
 import { prisma } from "@/lib/db/client";
+import type { Prisma } from "@/generated/prisma/client";
 import {
   generateApprovalToken,
   hashApprovalToken,
   getApprovalTokenSecret,
 } from "./approval-token";
 import { evaluateCostAgainstEnvelope } from "./cost-envelope";
+
+type Tx = Prisma.TransactionClient;
 
 /**
  * Single-use consumption of an approved, enveloped action (Phase 80.1).
@@ -77,7 +80,7 @@ export async function consumeApprovalWithToken(input: {
     return { ok: false, code: "TOKEN_MISMATCH" };
   }
 
-  return prisma.$transaction(async (tx) => {
+  return prisma.$transaction(async (tx: Tx) => {
     const locked = await tx.approval.findFirst({
       where: { id: input.approvalId, workspaceId: input.workspaceId },
       include: { envelopes: { orderBy: { createdAt: "asc" } } },
@@ -106,7 +109,11 @@ export async function consumeApprovalWithToken(input: {
       }
     }
 
-    return { ok: true, approvalId: locked.id, envelopeId: consumedEnvelopeId };
+    return {
+      ok: true,
+      approvalId: locked.id,
+      envelopeId: consumedEnvelopeId,
+    } as ConsumeResult;
   });
 }
 
