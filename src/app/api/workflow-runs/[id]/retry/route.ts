@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { Prisma } from "@/generated/prisma/client";
 import { requireApiPermission } from "@/lib/api/guard";
@@ -36,7 +37,14 @@ export async function POST(
 
   const actor = (await getCurrentUser())?.id ?? "owner";
   const run = await prisma.workflowRun.create({
-    data: { workflowId: previous.workflowId, status: "RUNNING", context: previous.context as Prisma.InputJsonValue },
+    data: {
+      workflowId: previous.workflowId,
+      workflowVersion: previous.workflowVersion,
+      definitionSnapshot: previous.definitionSnapshot as Prisma.InputJsonValue,
+      correlationId: previous.correlationId ?? randomUUID(),
+      status: "RUNNING",
+      context: previous.context as Prisma.InputJsonValue,
+    },
   });
 
   await writeAuditLog({

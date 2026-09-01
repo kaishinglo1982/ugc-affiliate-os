@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireApiPermission } from "@/lib/api/guard";
@@ -57,6 +58,14 @@ const createSchema = z.object({
   steps: z.array(stepSchema).optional(),
 });
 
+function slugify(name: string): string {
+  const base = name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return `${base || "workflow"}-${randomUUID().slice(0, 8)}`;
+}
+
 export async function POST(request: Request) {
   const guard = await requireApiPermission(Permission.MANAGE_WORKFLOWS);
   if (guard) return guard.response;
@@ -82,11 +91,13 @@ export async function POST(request: Request) {
   const workflow = await prisma.workflowDefinition.create({
     data: {
       workspaceId: workspaceId,
+      key: slugify(rest.name),
       ...rest,
       config: rest.config as Prisma.InputJsonValue | undefined,
       steps: steps
         ? {
             create: steps.map((s, index) => ({
+              key: `step-${index}`,
               stepOrder: index,
               type: s.type as WorkflowStepType,
               name: s.name,

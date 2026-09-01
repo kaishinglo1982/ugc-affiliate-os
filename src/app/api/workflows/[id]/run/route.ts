@@ -1,5 +1,7 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import type { Prisma } from "@/generated/prisma/client";
 import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
 import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
@@ -34,6 +36,7 @@ export async function POST(
 
   const workflow = await prisma.workflowDefinition.findFirst({
     where: { id, workspaceId: workspaceId },
+    include: { steps: { orderBy: { stepOrder: "asc" } } },
   });
   if (!workflow) {
     return NextResponse.json({ error: "Workflow nicht gefunden." }, { status: 404 });
@@ -41,7 +44,14 @@ export async function POST(
 
   const actor = (await getCurrentUser())?.id ?? "owner";
   const run = await prisma.workflowRun.create({
-    data: { workflowId: id, status: "RUNNING", context: payload },
+    data: {
+      workflowId: id,
+      workflowVersion: workflow.version,
+      definitionSnapshot: workflow as unknown as Prisma.InputJsonValue,
+      correlationId: randomUUID(),
+      status: "RUNNING",
+      context: payload as Prisma.InputJsonValue | undefined,
+    },
   });
 
   await writeAuditLog({
