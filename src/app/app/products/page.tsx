@@ -50,7 +50,7 @@ export default async function ProductsPage({ searchParams }: ProductsPageProps) 
           </p>
         </div>
         <Button asChild>
-          <Link href="/app/products/new">
+          <Link href="/app/products/create">
             <Plus className="h-4 w-4" /> Produkt hinzufügen
           </Link>
         </Button>
