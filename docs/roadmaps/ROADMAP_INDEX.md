@@ -7,6 +7,14 @@ Aktueller Masterprompt: 10.0 (vollständig)
 Aktueller Teil: dokumentiert
 Status: COMPLETED (Doku), IN_PROGRESS (Implementierung)
 
+## Aktuelle Architekturentscheidung — 27.08.2026
+
+UGC Affiliate OS wird als **CarryOS-Fachplugin** weiterentwickelt. Das Plugin besitzt eigene UGC-/Commerce-Agenten, Domain-Services, Commerce Core, Attribution und Profitability, nutzt aber CarryOS für Auth/Tenant/RBAC, Agent Runtime, AI Gateway, Shared Memory/RAG, Audit/FinOps, Queue/Worker und gemeinsame Connector-/Approval-Infrastruktur.
+
+- [UGC Affiliate OS — CarryOS Plugin Runtime](./UGC_AFFILIATE_PLUGIN_RUNTIME_2026-08-27.md)
+
+Diese Architekturentscheidung hat für neue Implementierungen Vorrang vor älteren Annahmen, die UGC Affiliate OS als vollständig paralleles AI-/Auth-/Runtime-System behandeln.
+
 ## Globale Roadmap
 
 - [Band 10–16](./BANDS_10_16_ROADMAP.md)
