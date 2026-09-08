@@ -1,3 +1,5 @@
+import { UGC_AFFILIATE_WORKFLOW_KEYS } from "./workflow-manifests";
+
 export type UgcAutomationRisk = "low" | "medium" | "high" | "critical";
 
 export interface UgcProcessTemplateStep {
@@ -40,6 +42,7 @@ export const UGC_AFFILIATE_PROCESS_TEMPLATES: readonly UgcProcessTemplate[] = [
         name: "Collect approved product and offer signals",
         capabilityRefs: ["ugc.research.product", "ugc.research.offer"],
         connectorRefs: [],
+        workflowRef: UGC_AFFILIATE_WORKFLOW_KEYS.productOfferResearch,
         agentRefs: ["ugc.product-researcher"],
         humanApprovalRequired: false,
         externalSideEffect: false,
@@ -50,6 +53,7 @@ export const UGC_AFFILIATE_PROCESS_TEMPLATES: readonly UgcProcessTemplate[] = [
         name: "Verify sources, terms and claims",
         capabilityRefs: ["ugc.research.verify", "ugc.affiliate.policy-check"],
         connectorRefs: [],
+        workflowRef: UGC_AFFILIATE_WORKFLOW_KEYS.productOfferResearch,
         agentRefs: ["ugc.opportunity-analyst"],
         humanApprovalRequired: false,
         externalSideEffect: false,
@@ -72,6 +76,7 @@ export const UGC_AFFILIATE_PROCESS_TEMPLATES: readonly UgcProcessTemplate[] = [
         name: "Generate campaign briefing",
         capabilityRefs: ["ugc.content.briefing"],
         connectorRefs: [],
+        workflowRef: UGC_AFFILIATE_WORKFLOW_KEYS.campaignToScript,
         agentRefs: ["ugc.content-planner"],
         humanApprovalRequired: false,
         externalSideEffect: false,
@@ -82,6 +87,7 @@ export const UGC_AFFILIATE_PROCESS_TEMPLATES: readonly UgcProcessTemplate[] = [
         name: "Generate script variants",
         capabilityRefs: ["ugc.content.script"],
         connectorRefs: [],
+        workflowRef: UGC_AFFILIATE_WORKFLOW_KEYS.campaignToScript,
         agentRefs: ["ugc.script-writer"],
         humanApprovalRequired: false,
         externalSideEffect: false,
@@ -92,6 +98,7 @@ export const UGC_AFFILIATE_PROCESS_TEMPLATES: readonly UgcProcessTemplate[] = [
         name: "Review brand, merchant and legal claims",
         capabilityRefs: ["ugc.content.claim-review"],
         connectorRefs: [],
+        workflowRef: UGC_AFFILIATE_WORKFLOW_KEYS.campaignToScript,
         agentRefs: ["ugc.compliance-reviewer"],
         humanApprovalRequired: true,
         externalSideEffect: false,
@@ -114,6 +121,7 @@ export const UGC_AFFILIATE_PROCESS_TEMPLATES: readonly UgcProcessTemplate[] = [
         name: "Validate asset and metadata",
         capabilityRefs: ["ugc.asset.validate"],
         connectorRefs: [],
+        workflowRef: UGC_AFFILIATE_WORKFLOW_KEYS.assetToPublishing,
         agentRefs: ["ugc.asset-reviewer"],
         humanApprovalRequired: false,
         externalSideEffect: false,
@@ -124,6 +132,7 @@ export const UGC_AFFILIATE_PROCESS_TEMPLATES: readonly UgcProcessTemplate[] = [
         name: "Repurpose for channel requirements",
         capabilityRefs: ["ugc.asset.repurpose"],
         connectorRefs: [],
+        workflowRef: UGC_AFFILIATE_WORKFLOW_KEYS.assetToPublishing,
         agentRefs: ["ugc.repurpose-agent"],
         humanApprovalRequired: false,
         externalSideEffect: false,
@@ -134,6 +143,7 @@ export const UGC_AFFILIATE_PROCESS_TEMPLATES: readonly UgcProcessTemplate[] = [
         name: "Publish approved content",
         capabilityRefs: ["ugc.social.publish"],
         connectorRefs: ["social-channel"],
+        workflowRef: UGC_AFFILIATE_WORKFLOW_KEYS.assetToPublishing,
         agentRefs: ["ugc.publisher"],
         humanApprovalRequired: true,
         externalSideEffect: true,
@@ -156,6 +166,7 @@ export const UGC_AFFILIATE_PROCESS_TEMPLATES: readonly UgcProcessTemplate[] = [
         name: "Collect verified performance evidence",
         capabilityRefs: ["ugc.analytics.collect"],
         connectorRefs: ["affiliate-network"],
+        workflowRef: UGC_AFFILIATE_WORKFLOW_KEYS.attributionAnalytics,
         agentRefs: ["ugc.analytics-agent"],
         humanApprovalRequired: false,
         externalSideEffect: false,
@@ -166,6 +177,7 @@ export const UGC_AFFILIATE_PROCESS_TEMPLATES: readonly UgcProcessTemplate[] = [
         name: "Attribute clicks, conversions and commissions",
         capabilityRefs: ["ugc.analytics.attribute"],
         connectorRefs: [],
+        workflowRef: UGC_AFFILIATE_WORKFLOW_KEYS.attributionAnalytics,
         agentRefs: ["ugc.attribution-agent"],
         humanApprovalRequired: false,
         externalSideEffect: false,
@@ -188,6 +200,7 @@ export const UGC_AFFILIATE_PROCESS_TEMPLATES: readonly UgcProcessTemplate[] = [
         name: "Evaluate measured outcomes",
         capabilityRefs: ["ugc.analytics.evaluate"],
         connectorRefs: [],
+        workflowRef: UGC_AFFILIATE_WORKFLOW_KEYS.performanceOptimization,
         agentRefs: ["ugc.performance-analyst"],
         humanApprovalRequired: false,
         externalSideEffect: false,
@@ -198,6 +211,7 @@ export const UGC_AFFILIATE_PROCESS_TEMPLATES: readonly UgcProcessTemplate[] = [
         name: "Recommend next content or offer",
         capabilityRefs: ["ugc.optimization.recommend"],
         connectorRefs: [],
+        workflowRef: UGC_AFFILIATE_WORKFLOW_KEYS.performanceOptimization,
         agentRefs: ["ugc.optimization-agent"],
         humanApprovalRequired: false,
         externalSideEffect: false,
@@ -220,6 +234,7 @@ export const UGC_AFFILIATE_PROCESS_TEMPLATES: readonly UgcProcessTemplate[] = [
         name: "Check links, offers and tracking",
         capabilityRefs: ["ugc.affiliate.integrity"],
         connectorRefs: ["affiliate-network"],
+        workflowRef: UGC_AFFILIATE_WORKFLOW_KEYS.affiliateIntegrity,
         agentRefs: ["ugc.affiliate-integrity-agent"],
         humanApprovalRequired: false,
         externalSideEffect: false,
@@ -230,6 +245,7 @@ export const UGC_AFFILIATE_PROCESS_TEMPLATES: readonly UgcProcessTemplate[] = [
         name: "Escalate changed program terms or legal uncertainty",
         capabilityRefs: ["ugc.affiliate.policy-check"],
         connectorRefs: [],
+        workflowRef: UGC_AFFILIATE_WORKFLOW_KEYS.affiliateIntegrity,
         agentRefs: ["ugc.compliance-reviewer"],
         humanApprovalRequired: true,
         externalSideEffect: false,
@@ -252,6 +268,7 @@ export const UGC_AFFILIATE_PROCESS_TEMPLATES: readonly UgcProcessTemplate[] = [
         name: "Resolve tenant, brand and account context",
         capabilityRefs: ["ugc.context.resolve"],
         connectorRefs: [],
+        workflowRef: UGC_AFFILIATE_WORKFLOW_KEYS.multiAccountOperations,
         agentRefs: ["ugc.operations-router"],
         humanApprovalRequired: false,
         externalSideEffect: false,
@@ -262,6 +279,7 @@ export const UGC_AFFILIATE_PROCESS_TEMPLATES: readonly UgcProcessTemplate[] = [
         name: "Execute versioned workflow in isolated context",
         capabilityRefs: ["ugc.workflow.execute"],
         connectorRefs: [],
+        workflowRef: UGC_AFFILIATE_WORKFLOW_KEYS.multiAccountOperations,
         agentRefs: ["ugc.operations-router"],
         humanApprovalRequired: false,
         externalSideEffect: false,
@@ -282,6 +300,7 @@ export function validateUgcAffiliateProcessTemplates(): void {
     ids.add(template.processId);
     if (template.steps.length === 0) throw new Error(`EMPTY_PROCESS_TEMPLATE:${template.processId}`);
     for (const step of template.steps) {
+      if (!step.workflowRef) throw new Error(`WORKFLOW_REF_MISSING:${template.processId}:${step.stepId}`);
       if ((step.risk === "high" || step.risk === "critical") && !step.humanApprovalRequired) {
         throw new Error(`UNSAFE_HIGH_RISK_AUTOMATION:${template.processId}:${step.stepId}`);
       }
