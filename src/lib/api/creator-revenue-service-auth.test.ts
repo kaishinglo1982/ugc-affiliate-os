@@ -31,13 +31,16 @@ describe("Creator Revenue UGC service auth", () => {
     });
   });
 
-  it("rejects missing and invalid bearer tokens", () => {
+  it("rejects missing, malformed and invalid bearer tokens", () => {
     const missing = authorizeCreatorRevenueService(request());
+    const malformed = authorizeCreatorRevenueService(request({ authorization: token }));
     const invalid = authorizeCreatorRevenueService(request({ authorization: "Bearer wrong-token" }));
 
     expect(missing.ok).toBe(false);
+    expect(malformed.ok).toBe(false);
     expect(invalid.ok).toBe(false);
     if (!missing.ok) expect(missing.response.status).toBe(401);
+    if (!malformed.ok) expect(malformed.response.status).toBe(401);
     if (!invalid.ok) expect(invalid.response.status).toBe(401);
   });
 
