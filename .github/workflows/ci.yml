@@ -76,8 +76,15 @@ jobs:
       - name: Apply migrations
         run: pnpm run db:migrate:deploy
 
-      - name: Typecheck
+      - name: Typecheck with repository compiler
         run: pnpm run typecheck
+
+      # typescript-eslint currently supports TypeScript <6.1. The repository's
+      # TS 7 package exposes no compatible compiler API and crashes the parser.
+      # Keep the repository compiler check above, then use the supported TS 6
+      # runtime for ESLint and the production build without changing the lockfile.
+      - name: Install ESLint-compatible TypeScript runtime
+        run: pnpm add --save-dev typescript@6.0.3 --lockfile=false
 
       - name: Lint
         run: pnpm run lint
@@ -149,6 +156,9 @@ jobs:
 
       - name: Seed database
         run: pnpm run db:seed
+
+      - name: Install supported TypeScript runtime for production build
+        run: pnpm add --save-dev typescript@6.0.3 --lockfile=false
 
       - name: Install Chromium
         run: pnpm exec playwright install --with-deps chromium
