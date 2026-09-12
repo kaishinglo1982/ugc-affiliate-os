@@ -57,9 +57,13 @@ export class TenantWorkspaceBindingError extends Error {}
 
 /**
  * Test/dev helper for the current shared-secret contract. Production CarryOS
- * should mint the assertion; callers cannot provide tenant identity directly.
+ * must mint the assertion; the UGC application is verification-only in prod.
  */
 export async function signTenantToken(tenantId: string): Promise<string> {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("UGC must not mint CarryOS tenant assertions in production");
+  }
+
   const parsedTenantId = coreTenantIdSchema.safeParse(tenantId);
   if (!parsedTenantId.success) throw new Error("CarryOS tenantId must be a UUID");
 
