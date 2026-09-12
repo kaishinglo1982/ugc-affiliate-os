@@ -10,7 +10,7 @@ test.describe("Workflows", () => {
     await page.goto("/app/workflows");
     await page.getByRole("button", { name: /workflow erstellen/i }).click();
     await expect(page.getByRole("heading", { name: /neuer workflow/i })).toBeVisible();
-    await page.getByLabel(/name/i).fill("E2E Workflow");
+    await page.getByLabel(/name/i).fill(`E2E Workflow ${Date.now()}`);
     await page.getByRole("button", { name: /speichern/i }).click();
     await expect(page.getByText("Workflow erstellt")).toBeVisible();
   });
