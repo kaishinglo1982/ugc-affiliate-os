@@ -10,9 +10,9 @@ test.describe("Agents", () => {
     await page.goto("/app/agents");
     await page.getByRole("button", { name: /agent anlegen/i }).click();
     await expect(page.getByText("Neuer Agent", { exact: true })).toBeVisible();
-    await page.getByLabel("Key", { exact: true }).fill(`e2e-agent-${Date.now()}`);
-    await page.getByLabel("Name", { exact: true }).fill("E2E Agent");
-    await page.getByLabel("Rolle", { exact: true }).fill("Tester");
+    await page.getByRole("textbox", { name: /^Key/i }).fill(`e2e-agent-${Date.now()}`);
+    await page.getByRole("textbox", { name: /^Name/i }).fill("E2E Agent");
+    await page.getByRole("textbox", { name: /^Rolle/i }).fill("Tester");
     await page.getByRole("button", { name: /speichern/i }).click();
     await expect(page.getByText("Agent erstellt")).toBeVisible();
   });
