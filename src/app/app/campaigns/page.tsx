@@ -32,7 +32,7 @@ export default async function CampaignsPage() {
           </p>
         </div>
         <Button asChild>
-          <Link href="/app/campaigns/new">
+          <Link href="/app/campaigns/create">
             <Plus className="h-4 w-4" /> Kampagne erstellen
           </Link>
         </Button>

@@ -33,7 +33,7 @@ export default async function VideosPage() {
           </p>
         </div>
         <Button asChild>
-          <Link href="/app/videos/new">
+          <Link href="/app/videos/create">
             <Plus className="h-4 w-4" /> Videoauftrag starten
           </Link>
         </Button>
