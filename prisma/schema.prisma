@@ -2422,23 +2422,30 @@ enum WorkflowStatus {
 }
 
 model WorkflowDefinition {
-  id           String         @id @default(uuid())
-  workspaceId  String         @default("00000000-0000-0000-0000-000000000001")
-  name         String
-  description  String?
-  trigger      String         @default("manual")
-  scheduleCron String?
-  status       WorkflowStatus @default(DRAFT)
-  enabled      Boolean        @default(false)
-  ownerId      String?
-  config       Json?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id             String         @id @default(uuid())
+  workspaceId    String         @default("00000000-0000-0000-0000-000000000001")
+  key            String
+  version        Int            @default(1)
+  name           String
+  description    String?
+  trigger        String         @default("manual")
+  scheduleCron   String?
+  status         WorkflowStatus @default(DRAFT)
+  enabled        Boolean        @default(false)
+  ownerId        String?
+  config         Json?
+  definitionHash String?
+  activatedAt    DateTime?
+  supersededAt   DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   steps WorkflowStepDefinition[]
   runs  WorkflowRun[]
 
+  @@unique([workspaceId, key, version])
   @@index([workspaceId, status])
+  @@index([workspaceId, key, status])
 }
 
 enum WorkflowStepType {
@@ -2453,13 +2460,17 @@ model WorkflowStepDefinition {
   workspaceId String             @default("00000000-0000-0000-0000-000000000001")
   workflowId  String
   workflow    WorkflowDefinition @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  key         String
   stepOrder   Int
   type        WorkflowStepType
   name        String
+  dependsOn   String[]           @default([])
   config      Json?
 
   runs WorkflowStepRun[]
 
+  @@unique([workflowId, key])
+  @@unique([workflowId, stepOrder])
   @@index([workspaceId, workflowId])
 }
 
@@ -2468,22 +2479,34 @@ enum WorkflowRunStatus {
   COMPLETED
   FAILED
   CANCELLED
+  QUEUED
+  WAITING_FOR_APPROVAL
+  PAUSED
+  RETRYING
+  COMPENSATING
 }
 
 model WorkflowRun {
-  id          String            @id @default(uuid())
-  workspaceId String            @default("00000000-0000-0000-0000-000000000001")
-  workflowId  String
-  workflow    WorkflowDefinition @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  triggeredBy String?
-  status      WorkflowRunStatus @default(RUNNING)
-  context     Json?
-  startedAt   DateTime          @default(now())
-  finishedAt  DateTime?
+  id                 String            @id @default(uuid())
+  workspaceId        String            @default("00000000-0000-0000-0000-000000000001")
+  workflowId         String
+  workflow           WorkflowDefinition @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflowVersion    Int               @default(1)
+  definitionSnapshot Json
+  definitionHash     String?
+  correlationId      String
+  idempotencyKey     String?
+  triggeredBy        String?
+  status             WorkflowRunStatus @default(RUNNING)
+  context            Json?
+  startedAt          DateTime          @default(now())
+  finishedAt         DateTime?
 
   steps WorkflowStepRun[]
 
+  @@unique([workspaceId, idempotencyKey])
   @@index([workspaceId, workflowId, status])
+  @@index([workspaceId, correlationId])
 }
 
 model WorkflowStepRun {
