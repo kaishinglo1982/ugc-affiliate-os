@@ -35,14 +35,22 @@ export async function PATCH(
     return NextResponse.json({ error: "Ungültige Eingabe." }, { status: 400 });
   }
 
-  const actor = (await getCurrentUser())?.id ?? "owner";
-  const existing = await prisma.workflowDefinition.findFirst({ where: { id, workspaceId } });
-  if (!existing) return NextResponse.json({ error: "Workflow nicht gefunden." }, { status: 404 });
-  const workflow = await prisma.workflowDefinition.update({
-    where: { id },
+  const result = await prisma.workflowDefinition.updateMany({
+    where: { id, workspaceId },
     data: { status: parsed.data.status as WorkflowStatus },
   });
+  if (result.count !== 1) {
+    return NextResponse.json({ error: "Workflow nicht gefunden." }, { status: 404 });
+  }
 
+  const workflow = await prisma.workflowDefinition.findFirst({
+    where: { id, workspaceId },
+  });
+  if (!workflow) {
+    return NextResponse.json({ error: "Workflow nicht gefunden." }, { status: 404 });
+  }
+
+  const actor = (await getCurrentUser())?.id ?? "owner";
   await writeAuditLog({
     action: "workflow.update",
     entityType: "WorkflowDefinition",
