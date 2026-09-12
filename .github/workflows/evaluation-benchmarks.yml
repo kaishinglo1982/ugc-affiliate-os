@@ -1,0 +1,42 @@
+name: CarryOS Evaluation Benchmarks
+
+on:
+  push:
+    branches:
+      - feat/carryos-eval-benchmarks
+    paths:
+      - "evaluation/**"
+      - "scripts/validate-eval-suites.mjs"
+      - "prisma/seed.ts"
+      - ".github/workflows/evaluation-benchmarks.yml"
+  pull_request:
+    paths:
+      - "evaluation/**"
+      - "scripts/validate-eval-suites.mjs"
+      - "prisma/seed.ts"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  evaluation-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.13.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Install frozen dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Generate Prisma client
+        run: pnpm run db:generate
+      - name: Validate CarryOS EvalSuite manifests
+        run: node scripts/validate-eval-suites.mjs
+      - name: Typecheck
+        run: pnpm run typecheck
