@@ -3,6 +3,7 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../src/generated/prisma/client";
 import bcrypt from "bcryptjs";
 import { computeProductScore, type ScoreDimensions } from "../src/features/products/scoring";
+import { DEFAULT_WORKSPACE_ID } from "../src/lib/config/workspace";
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
@@ -701,9 +702,25 @@ async function seedNotifications() {
   console.log("Seeded notifications");
 }
 
+async function seedTenant() {
+  const tenant = await prisma.tenant.upsert({
+    where: { id: DEFAULT_WORKSPACE_ID },
+    update: {},
+    create: {
+      id: DEFAULT_WORKSPACE_ID,
+      name: "Single Owner",
+      slug: "single-owner",
+      mode: "SINGLE_OWNER",
+    },
+  });
+  console.log(`Seeded tenant: ${tenant.name} (${tenant.mode})`);
+  return tenant;
+}
+
 async function main() {
   assertProductionSeedConfig();
 
+  await seedTenant();
   await seedAdminUser();
   await seedTaxSettings();
 

@@ -44,6 +44,27 @@ model Session {
 }
 
 // ---------------------------------------------------------------------------
+// Tenancy (Phase 70 consolidation: single_owner + multi_tenant modes)
+// ---------------------------------------------------------------------------
+
+enum TenantMode {
+  SINGLE_OWNER
+  MULTI_TENANT
+}
+
+model Tenant {
+  id        String     @id
+  name      String
+  slug      String?    @unique
+  mode      TenantMode @default(SINGLE_OWNER)
+  settings  Json?
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  @@index([mode])
+}
+
+// ---------------------------------------------------------------------------
 // Product Radar
 // ---------------------------------------------------------------------------
 
@@ -367,6 +388,13 @@ enum VideoProviderKey {
   ELEVENLABS
   CUSTOM
   MOCK
+  // Phase 80.2 consolidation: governed pipeline providers. Adapters are
+  // contract-only until officially documented APIs exist (see FEATURE_MATRIX).
+  PEXELS
+  OMNIROUTE
+  INTERNAL_COMPOSER
+  CREATOR_MANUAL
+  TEST_DOUBLE
 }
 
 model VideoJob {
@@ -658,6 +686,13 @@ model Integration {
   @@index([category])
 }
 
+enum CredentialHealth {
+  UNKNOWN
+  HEALTHY
+  UNHEALTHY
+  ROTATION_REQUIRED
+}
+
 model EncryptedCredential {
   id            String   @id @default(uuid())
   label         String
@@ -666,11 +701,16 @@ model EncryptedCredential {
   authTag       String
   keyVersion    Int      @default(1)
   lastRotatedAt DateTime @default(now())
+  // Phase 80.2 consolidation: health/last-use tracking for rotation policies.
+  lastUsedAt    DateTime?
+  healthStatus  CredentialHealth @default(UNKNOWN)
   createdAt     DateTime @default(now())
 
   affiliatePrograms AffiliateProgram[]
   socialAccounts    SocialAccount[]
   integrations      Integration[]
+
+  @@index([healthStatus])
 }
 
 // ---------------------------------------------------------------------------
@@ -1024,11 +1064,50 @@ model Approval {
   currency   String?
   expiresAt  DateTime?
   payload    Json?
+  // Phase 80.1 consolidation: single-use approval token (HMAC hash, unique)
+  // and consumption timestamp — an approved action may be applied at most once.
+  approvalTokenHash String?   @unique
+  consumedAt        DateTime?
   createdAt    DateTime             @default(now())
   updatedAt    DateTime             @updatedAt
 
+  envelopes   CostEnvelope[]
+
   @@index([workspaceId, resourceType, resourceId])
   @@index([resourceType, resourceId])
+}
+
+// ---------------------------------------------------------------------------
+// Governance gates (Phase 80.1 consolidation)
+// ---------------------------------------------------------------------------
+
+enum CostEnvelopeStatus {
+  ACTIVE
+  CONSUMED
+  EXPIRED
+  CANCELLED
+}
+
+/// Phase 80.1: cost envelope bound to an approval. No paid action may run
+/// outside an approved envelope; consumption is single-use (see ApprovalToken).
+model CostEnvelope {
+  id                      String             @id @default(uuid())
+  workspaceId             String             @default("00000000-0000-0000-0000-000000000001")
+  approvalId              String?
+  approval                Approval?          @relation(fields: [approvalId], references: [id], onDelete: SetNull)
+  category                String
+  currency                String             @default("EUR")
+  minimum                 Decimal            @db.Decimal(12, 2)
+  maximum                 Decimal            @db.Decimal(12, 2)
+  freeAlternativeAvailable Boolean           @default(false)
+  status                  CostEnvelopeStatus @default(ACTIVE)
+  expiresAt               DateTime?
+  consumedAt              DateTime?
+  createdAt               DateTime           @default(now())
+  updatedAt               DateTime           @updatedAt
+
+  @@index([workspaceId, status])
+  @@index([approvalId])
 }
 
 enum ExperimentStatus {
@@ -2422,23 +2501,30 @@ enum WorkflowStatus {
 }
 
 model WorkflowDefinition {
-  id           String         @id @default(uuid())
-  workspaceId  String         @default("00000000-0000-0000-0000-000000000001")
-  name         String
-  description  String?
-  trigger      String         @default("manual")
-  scheduleCron String?
-  status       WorkflowStatus @default(DRAFT)
-  enabled      Boolean        @default(false)
-  ownerId      String?
-  config       Json?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id             String         @id @default(uuid())
+  workspaceId    String         @default("00000000-0000-0000-0000-000000000001")
+  key            String
+  version        Int            @default(1)
+  name           String
+  description    String?
+  trigger        String         @default("manual")
+  scheduleCron   String?
+  status         WorkflowStatus @default(DRAFT)
+  enabled        Boolean        @default(false)
+  ownerId        String?
+  config         Json?
+  definitionHash String?
+  activatedAt    DateTime?
+  supersededAt   DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   steps WorkflowStepDefinition[]
   runs  WorkflowRun[]
 
+  @@unique([workspaceId, key, version])
   @@index([workspaceId, status])
+  @@index([workspaceId, key, status])
 }
 
 enum WorkflowStepType {
@@ -2453,13 +2539,17 @@ model WorkflowStepDefinition {
   workspaceId String             @default("00000000-0000-0000-0000-000000000001")
   workflowId  String
   workflow    WorkflowDefinition @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  key         String
   stepOrder   Int
   type        WorkflowStepType
   name        String
+  dependsOn   String[]           @default([])
   config      Json?
 
   runs WorkflowStepRun[]
 
+  @@unique([workflowId, key])
+  @@unique([workflowId, stepOrder])
   @@index([workspaceId, workflowId])
 }
 
@@ -2468,22 +2558,34 @@ enum WorkflowRunStatus {
   COMPLETED
   FAILED
   CANCELLED
+  QUEUED
+  WAITING_FOR_APPROVAL
+  PAUSED
+  RETRYING
+  COMPENSATING
 }
 
 model WorkflowRun {
-  id          String            @id @default(uuid())
-  workspaceId String            @default("00000000-0000-0000-0000-000000000001")
-  workflowId  String
-  workflow    WorkflowDefinition @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  triggeredBy String?
-  status      WorkflowRunStatus @default(RUNNING)
-  context     Json?
-  startedAt   DateTime          @default(now())
-  finishedAt  DateTime?
+  id                 String            @id @default(uuid())
+  workspaceId        String            @default("00000000-0000-0000-0000-000000000001")
+  workflowId         String
+  workflow           WorkflowDefinition @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflowVersion    Int               @default(1)
+  definitionSnapshot Json
+  definitionHash     String?
+  correlationId      String
+  idempotencyKey     String?
+  triggeredBy        String?
+  status             WorkflowRunStatus @default(RUNNING)
+  context            Json?
+  startedAt          DateTime          @default(now())
+  finishedAt         DateTime?
 
   steps WorkflowStepRun[]
 
+  @@unique([workspaceId, idempotencyKey])
   @@index([workspaceId, workflowId, status])
+  @@index([workspaceId, correlationId])
 }
 
 model WorkflowStepRun {

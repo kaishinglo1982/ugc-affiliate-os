@@ -34,6 +34,7 @@ export async function POST(
   const step = await prisma.workflowStepDefinition.create({
     data: {
       workflowId: id,
+      key: `step-${existing + 1}`,
       name: parsed.data.name,
       type: parsed.data.type as WorkflowStepType,
       config: (parsed.data.config ?? {}) as Prisma.InputJsonValue,
