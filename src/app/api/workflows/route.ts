@@ -30,7 +30,7 @@ export async function GET(request: Request) {
 
   const workflows = await prisma.workflowDefinition.findMany({
     where: {
-      workspaceId: workspaceId,
+      workspaceId,
       ...(status ? { status: status as WorkflowStatus } : {}),
     },
     orderBy: { createdAt: "desc" },
@@ -48,8 +48,10 @@ const workflowKeySchema = z
   .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
 
 const stepSchema = z.object({
+  key: workflowKeySchema.optional(),
   type: z.enum(["AGENT", "TOOL", "APPROVAL", "CONDITION"]),
   name: z.string().min(1).max(200),
+  dependsOn: z.array(workflowKeySchema).optional(),
   config: z.unknown().optional(),
 });
 
@@ -104,7 +106,7 @@ export async function POST(request: Request) {
 
   const workflow = await prisma.workflowDefinition.create({
     data: {
-      workspaceId: workspaceId,
+      workspaceId,
       key,
       version: version ?? 1,
       ...rest,
@@ -112,9 +114,12 @@ export async function POST(request: Request) {
       steps: steps
         ? {
             create: steps.map((s, index) => ({
+              workspaceId,
+              key: s.key ?? `step-${index}`,
               stepOrder: index,
               type: s.type as WorkflowStepType,
               name: s.name,
+              dependsOn: s.dependsOn ?? [],
               config: s.config as Prisma.InputJsonValue | undefined,
             })),
           }
