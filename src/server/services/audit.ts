@@ -9,8 +9,9 @@ export interface AuditEntry {
   createdAt: Date;
 }
 
-export async function listAudit(): Promise<AuditEntry[]> {
+export async function listAudit(workspaceId: string): Promise<AuditEntry[]> {
   const entries = await prisma.auditLog.findMany({
+    where: { workspaceId },
     orderBy: { createdAt: "desc" },
     take: 100,
   });

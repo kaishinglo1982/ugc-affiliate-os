@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import { listAffiliatePrograms } from "@/server/services/affiliate";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { ProgramsTable, type ProgramRow } from "@/components/affiliate/programs-table";
 import { ProgramDialog } from "@/components/affiliate/program-dialog";
 
 export const metadata: Metadata = { title: "Affiliate-Programme" };
 
 export default async function AffiliateProgramsPage() {
-  const programs = await listAffiliatePrograms();
+  const workspaceId = await resolveWorkspaceId();
+  const programs = await listAffiliatePrograms(workspaceId);
 
   const rows: ProgramRow[] = programs.map((p) => ({
     id: p.id,

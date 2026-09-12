@@ -1,8 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db/client";
 import { Decimal } from "@/lib/shared/decimal";
-import { DEFAULT_WORKSPACE_ID } from "@/lib/config/workspace";
-import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
 import { computeDataQualityScores, detectDataQualityIssues, type DataQualityInput } from "@/lib/data-quality/engine";
 import type { DataQualityScope } from "@/generated/prisma/client";
@@ -19,8 +17,7 @@ function big(v: { toString(): string } | null | undefined): bigint {
  * DataQualityReport (+ issues). Scores are conservative: missing data lowers
  * the score rather than being assumed good. Never blocks anything directly.
  */
-export async function runDataQualityScan(actor: string) {
-  const workspaceId = DEFAULT_WORKSPACE_ID;
+export async function runDataQualityScan(actor: string, workspaceId: string) {
 
   const snapshots = await prisma.contentPerformanceSnapshot.findMany({
     where: { workspaceId },
@@ -92,6 +89,7 @@ export async function runDataQualityScan(actor: string) {
       issueCount: issues.length,
       issues: {
         create: issues.map((i) => ({
+          workspaceId,
           issueType: i.issueType,
           severity: i.severity,
           detail: i.detail,
@@ -100,6 +98,6 @@ export async function runDataQualityScan(actor: string) {
     },
   });
 
-  await writeAuditLog({ action: "data_quality.scan", entityType: "DataQualityReport", entityId: report.id, actor, metadata: { overall: scores.overall, issues: issues.length } });
+  await writeAuditLog({ action: "data_quality.scan", entityType: "DataQualityReport", entityId: report.id, actor, workspaceId, metadata: { overall: scores.overall, issues: issues.length } });
   return { reportId: report.id, overall: scores.overall, issues: issues.length };
 }

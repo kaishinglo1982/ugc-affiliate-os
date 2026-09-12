@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
 import { listAudit } from "@/server/services/audit";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { Badge } from "@/components/ui/badge";
 
 export const metadata: Metadata = { title: "Audit-Log" };
 
 export default async function AuditPage() {
-  const entries = await listAudit();
+  const workspaceId = await resolveWorkspaceId();
+  const entries = await listAudit(workspaceId);
 
   return (
     <div className="space-y-6">

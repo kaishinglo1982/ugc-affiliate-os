@@ -1,6 +1,26 @@
 import "server-only";
 import { prisma } from "@/lib/db/client";
 
+export type CreateBudgetPolicyInput = {
+  name: string;
+  scope?: string;
+  limitAmount: number;
+  currency?: string;
+  period?: string;
+  alertThresholdPct?: number;
+  action?: "alert" | "block";
+  enabled?: boolean;
+};
+
+export async function createBudgetPolicy(
+  workspaceId: string,
+  input: CreateBudgetPolicyInput,
+) {
+  return prisma.budgetPolicy.create({
+    data: { workspaceId, ...input },
+  });
+}
+
 export async function listBudgets(workspaceId: string) {
   return prisma.budgetPolicy.findMany({
     where: { workspaceId },

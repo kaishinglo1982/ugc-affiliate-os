@@ -8,7 +8,7 @@ export const metadata: Metadata = { title: "Content Briefs" };
 
 export default async function ContentBriefsPage() {
   const workspaceId = await resolveWorkspaceId();
-  const [briefs, campaigns] = await Promise.all([listContentBriefs(workspaceId), listCampaigns()]);
+  const [briefs, campaigns] = await Promise.all([listContentBriefs(workspaceId), listCampaigns(workspaceId)]);
 
   const rows: BriefRow[] = briefs.map((b) => ({
     id: b.id,

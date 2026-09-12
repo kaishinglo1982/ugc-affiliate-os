@@ -1,11 +1,14 @@
-import { NextResponse } from "next/server";
-import { Prisma } from "@/generated/prisma/client";
-import { requireApiPermission } from "@/lib/api/guard";
+import {
+  created,
+  fail,
+  notFound,
+  uuidSchema,
+  validateValue,
+  withApiContext,
+} from "@/lib/api";
 import { Permission } from "@/lib/auth/rbac";
-import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
-import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
 import { writeAuditLog } from "@/lib/audit/log";
+import { retryWorkflowRun } from "@/server/services/workflows";
 
 export const dynamic = "force-dynamic";
 
@@ -13,39 +16,41 @@ export async function POST(
   _request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const guard = await requireApiPermission(Permission.MANAGE_WORKFLOWS);
-  if (guard) return guard.response;
-
-  let workspaceId: string;
-  try {
-    workspaceId = await resolveWorkspaceId();
-  } catch (e) {
-    if (e instanceof InvalidTenantTokenError) {
-      return NextResponse.json({ error: "Ungültiges Tenant-Token." }, { status: 401 });
-    }
-    throw e;
-  }
+  const auth = await withApiContext(Permission.MANAGE_WORKFLOWS);
+  if ("response" in auth) return auth.response;
 
   const { id } = await context.params;
-  const previous = await prisma.workflowRun.findFirst({
-    where: { id, workspaceId: workspaceId },
-  });
-  if (!previous) {
-    return NextResponse.json({ error: "Run nicht gefunden." }, { status: 404 });
+  const params = validateValue(id, uuidSchema);
+  if ("response" in params) return params.response;
+
+  try {
+    const run = await retryWorkflowRun(
+      params.data,
+      auth.context.workspaceId,
+      auth.context.actor,
+    );
+
+    await writeAuditLog({
+      action: "workflow_run.retry",
+      entityType: "WorkflowRun",
+      entityId: run.id,
+      actor: auth.context.actor,
+      metadata: { previousRunId: params.data },
+    });
+
+    return created({ run });
+  } catch (error) {
+    if (error instanceof Error && error.message === "WORKFLOW_RUN_NOT_FOUND") {
+      return notFound("Run nicht gefunden.");
+    }
+    if (
+      error instanceof Error &&
+      error.message === "WORKFLOW_RUN_NOT_RETRYABLE"
+    ) {
+      return fail("Nur fehlgeschlagene Runs können erneut gestartet werden.", {
+        status: 409,
+      });
+    }
+    throw error;
   }
-
-  const actor = (await getCurrentUser())?.id ?? "owner";
-  const run = await prisma.workflowRun.create({
-    data: { workflowId: previous.workflowId, status: "RUNNING", context: previous.context as Prisma.InputJsonValue },
-  });
-
-  await writeAuditLog({
-    action: "workflow_run.retry",
-    entityType: "WorkflowRun",
-    entityId: run.id,
-    actor,
-    metadata: { previousRunId: id },
-  });
-
-  return NextResponse.json({ run }, { status: 201 });
 }

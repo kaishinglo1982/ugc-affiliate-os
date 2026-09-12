@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/client";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { runMutation } from "@/server/actions/action-helpers";
 import { affiliateLinkSchema, idSchema } from "@/lib/validation/affiliate";
 import { buildTrackedUrl, generateShortSlug } from "@/features/affiliate/link-builder";
@@ -18,10 +19,34 @@ export async function saveAffiliateLinkAction(
   const user = await getCurrentUser();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = affiliateLinkSchema.safeParse(raw);
+  const parsed = affiliateLinkSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
     return fail("Eingabe ungültig.", requestId, parsed.error.flatten().fieldErrors);
+  }
+
+  const workspaceId = await resolveWorkspaceId();
+  const program = await prisma.affiliateProgram.findFirst({
+    where: { id: parsed.data.programId, workspaceId },
+    select: { id: true },
+  });
+  if (!program) return fail("Affiliate-Programm nicht gefunden.", requestId);
+
+  if (parsed.data.productId) {
+    const product = await prisma.product.findFirst({
+      where: { id: parsed.data.productId, workspaceId },
+      select: { id: true },
+    });
+    if (!product) return fail("Produkt nicht gefunden.", requestId);
+  }
+
+  let existingId: string | null = null;
+  if (linkId) {
+    const existing = await prisma.affiliateLink.findFirst({
+      where: { id: linkId, workspaceId },
+      select: { id: true },
+    });
+    if (!existing) return fail("Affiliate-Link nicht gefunden.", requestId);
+    existingId = existing.id;
   }
 
   let deepLink = parsed.data.deepLink || undefined;
@@ -38,7 +63,7 @@ export async function saveAffiliateLinkAction(
   }
 
   const data = {
-    programId: parsed.data.programId,
+    programId: program.id,
     productId: parsed.data.productId || null,
     label: parsed.data.label,
     destinationUrl: parsed.data.destinationUrl,
@@ -51,10 +76,10 @@ export async function saveAffiliateLinkAction(
     utmTerm: parsed.data.utmTerm || null,
   };
 
-  const link = linkId
-    ? await prisma.affiliateLink.update({ where: { id: linkId }, data })
+  const link = existingId
+    ? await prisma.affiliateLink.update({ where: { id: existingId }, data })
     : await prisma.affiliateLink.create({
-        data: { ...data, shortSlug: generateShortSlug() },
+        data: { workspaceId, ...data, shortSlug: generateShortSlug() },
       });
 
   await writeAuditLog({
@@ -63,6 +88,7 @@ export async function saveAffiliateLinkAction(
     entityId: link.id,
     requestId,
     actor: user.email,
+    workspaceId,
   });
 
   revalidatePath("/app/affiliate-links");
@@ -75,8 +101,11 @@ export async function deleteAffiliateLinkAction(id: string) {
     input: { id },
     auditAction: "affiliate_link.delete",
     entityType: "AffiliateLink",
-    handler: async (input) => {
-      await prisma.affiliateLink.delete({ where: { id: input.id } });
+    handler: async (input, _user, workspaceId) => {
+      const deleted = await prisma.affiliateLink.deleteMany({
+        where: { id: input.id, workspaceId },
+      });
+      if (deleted.count !== 1) throw new Error("AFFILIATE_LINK_NOT_FOUND");
       return { id: input.id };
     },
     entityId: (output) => output.id,
@@ -93,14 +122,17 @@ export async function testAffiliateLinkAction(id: string) {
     input: { id },
     auditAction: "affiliate_link.test",
     entityType: "AffiliateLink",
-    handler: async (input) => {
-      const link = await prisma.affiliateLink.findUniqueOrThrow({ where: { id: input.id } });
+    handler: async (input, _user, workspaceId) => {
+      const link = await prisma.affiliateLink.findFirst({
+        where: { id: input.id, workspaceId },
+      });
+      if (!link) throw new Error("AFFILIATE_LINK_NOT_FOUND");
       const target = link.deepLink || link.destinationUrl;
       const url = new URL(target);
 
       if (PRIVATE_HOST_PATTERN.test(url.hostname)) {
         return prisma.affiliateLink.update({
-          where: { id: input.id },
+          where: { id: link.id },
           data: { lastCheckedAt: new Date(), lastCheckStatus: "BLOCKED" },
         });
       }
@@ -122,7 +154,7 @@ export async function testAffiliateLinkAction(id: string) {
       }
 
       return prisma.affiliateLink.update({
-        where: { id: input.id },
+        where: { id: link.id },
         data: { lastCheckedAt: new Date(), lastCheckStatus: status },
       });
     },

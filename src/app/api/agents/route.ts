@@ -1,67 +1,64 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
+import { created, ok, parseBody, validateValue } from "@/lib/api";
 import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/log";
-import type { AgentStatus } from "@/generated/prisma/client";
+import { createAgent, listAgents } from "@/server/services/agents";
 
 export const dynamic = "force-dynamic";
+
+const agentStatusSchema = z.enum(["IDLE", "RUNNING", "PAUSED", "ERROR"]);
+
+const listSchema = z.object({
+  status: agentStatusSchema.optional(),
+});
+
+const createSchema = z.object({
+  key: z.string().trim().min(1).max(100),
+  name: z.string().trim().min(1).max(200),
+  role: z.string().trim().min(1).max(100),
+  description: z.string().max(2000).optional(),
+  capabilities: z.array(z.string().trim().min(1).max(200)).max(100).optional(),
+  allowedActions: z.array(z.string().trim().min(1).max(200)).max(100).optional(),
+  status: agentStatusSchema.optional(),
+});
 
 export async function GET(request: Request) {
   const guard = await requireApiPermission(Permission.VIEW_AGENTS);
   if (guard) return guard.response;
 
   const { searchParams } = new URL(request.url);
-  const status = searchParams.get("status");
+  const validated = validateValue(
+    { status: searchParams.get("status") ?? undefined },
+    listSchema,
+  );
+  if ("response" in validated) return validated.response;
 
-  const agents = await prisma.agent.findMany({
-    where: { ...(status ? { status: status as AgentStatus } : {}) },
-    orderBy: { createdAt: "desc" },
-  });
-
-  return NextResponse.json({ agents });
+  const workspaceId = await resolveWorkspaceId();
+  const agents = await listAgents(workspaceId, validated.data);
+  return ok({ agents });
 }
-
-const createSchema = z.object({
-  key: z.string().min(1).max(100),
-  name: z.string().min(1).max(200),
-  role: z.string().min(1).max(100),
-  description: z.string().max(2000).optional(),
-  capabilities: z.array(z.string()).optional(),
-  allowedActions: z.array(z.string()).optional(),
-  status: z.enum(["IDLE", "RUNNING", "PAUSED", "ERROR"]).optional(),
-});
 
 export async function POST(request: Request) {
   const guard = await requireApiPermission(Permission.MANAGE_AGENTS);
   if (guard) return guard.response;
 
-  const parsed = createSchema.safeParse(await request.json());
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Ungültige Eingabe." }, { status: 400 });
-  }
+  const validated = await parseBody(request, createSchema);
+  if ("response" in validated) return validated.response;
 
   const actor = (await getCurrentUser())?.id ?? "owner";
-  const agent = await prisma.agent.create({
-    data: {
-      key: parsed.data.key,
-      name: parsed.data.name,
-      role: parsed.data.role,
-      description: parsed.data.description ?? "",
-      capabilities: parsed.data.capabilities ?? [],
-      allowedActions: parsed.data.allowedActions ?? [],
-      status: (parsed.data.status ?? "IDLE") as AgentStatus,
-    },
-  });
+  const workspaceId = await resolveWorkspaceId();
+  const agent = await createAgent(workspaceId, validated.data);
 
   await writeAuditLog({
     action: "agent.create",
     entityType: "Agent",
     entityId: agent.id,
     actor,
+    workspaceId,
   });
 
-  return NextResponse.json({ agent }, { status: 201 });
+  return created({ agent });
 }

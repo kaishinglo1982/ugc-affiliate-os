@@ -138,6 +138,7 @@ model Product {
 }
 
 model ProductScore {
+  workspaceId String
   id                    String   @id @default(uuid())
   productId             String
   product               Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
@@ -156,6 +157,8 @@ model ProductScore {
   createdAt             DateTime @default(now())
 
   @@index([productId])
+
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -182,6 +185,7 @@ enum IntegrationMode {
 }
 
 model AffiliateProgram {
+  workspaceId String
   id             String               @id @default(uuid())
   provider       AffiliateProviderKey
   customName     String?
@@ -199,9 +203,12 @@ model AffiliateProgram {
   offers   AffiliateOffer[]
 
   @@index([provider])
+
+  @@index([workspaceId])
 }
 
 model AffiliateLink {
+  workspaceId String
   id               String            @id @default(uuid())
   programId        String
   program          AffiliateProgram  @relation(fields: [programId], references: [id], onDelete: Cascade)
@@ -228,9 +235,12 @@ model AffiliateLink {
 
   @@index([programId])
   @@index([productId])
+
+  @@index([workspaceId])
 }
 
 model LinkClick {
+  workspaceId String
   id        String        @id @default(uuid())
   linkId    String
   link      AffiliateLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
@@ -238,6 +248,8 @@ model LinkClick {
   source    String?
 
   @@index([linkId])
+
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -258,6 +270,7 @@ enum CampaignStatus {
 }
 
 model Campaign {
+  workspaceId String
   id             String         @id @default(uuid())
   name           String
   productId      String?
@@ -283,8 +296,11 @@ model Campaign {
   expenses    Expense[]
   mediaAssets MediaAsset[]
   briefs      ContentBrief[]
+  creatorEngagements CreatorEngagement[]
 
   @@index([status])
+
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -298,6 +314,7 @@ enum ScriptStatus {
 }
 
 model Script {
+  workspaceId String
   id          String       @id @default(uuid())
   title       String
   productId   String?
@@ -319,9 +336,12 @@ model Script {
 
   @@index([status])
   @@index([campaignId])
+
+  @@index([workspaceId])
 }
 
 model ScriptVersion {
+  workspaceId String
   id             String   @id @default(uuid())
   scriptId       String
   script         Script   @relation(fields: [scriptId], references: [id], onDelete: Cascade)
@@ -343,6 +363,8 @@ model ScriptVersion {
   createdAt      DateTime @default(now())
 
   @@unique([scriptId, versionNumber])
+
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -370,6 +392,7 @@ enum VideoProviderKey {
 }
 
 model VideoJob {
+  workspaceId String
   id           String         @id @default(uuid())
   scriptId     String?
   script       Script?        @relation(fields: [scriptId], references: [id])
@@ -400,6 +423,8 @@ model VideoJob {
 
   @@index([status])
   @@index([campaignId])
+
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -414,6 +439,7 @@ enum MediaKind {
 }
 
 model MediaAsset {
+  workspaceId String
   id          String    @id @default(uuid())
   kind        MediaKind
   fileName    String
@@ -437,9 +463,12 @@ model MediaAsset {
   socialPosts SocialPost[]
 
   primaryImageProducts Product[] @relation("ProductPrimaryImage")
+  creatorDeliverables CreatorDeliverable[]
 
   @@index([kind])
   @@index([campaignId])
+
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -458,6 +487,7 @@ enum SocialPlatform {
 }
 
 model SocialAccount {
+  workspaceId String
   id           String          @id @default(uuid())
   platform     SocialPlatform
   handle       String
@@ -471,6 +501,8 @@ model SocialAccount {
   posts SocialPost[]
 
   @@index([platform])
+
+  @@index([workspaceId])
 }
 
 enum SocialPostStatus {
@@ -485,6 +517,7 @@ enum SocialPostStatus {
 }
 
 model SocialPost {
+  workspaceId String
   id              String            @id @default(uuid())
   campaignId      String?
   campaign        Campaign?         @relation(fields: [campaignId], references: [id])
@@ -514,6 +547,8 @@ model SocialPost {
 
   @@index([status])
   @@index([scheduledAt])
+
+  @@index([workspaceId])
 }
 
 enum PublishJobStatus {
@@ -533,6 +568,7 @@ enum PublishJobStatus {
  * indefinitely without an owner's intervention.
  */
 model PublishJob {
+  workspaceId String
   id              String           @id @default(uuid())
   postId          String
   post            SocialPost       @relation(fields: [postId], references: [id], onDelete: Cascade)
@@ -545,6 +581,8 @@ model PublishJob {
   updatedAt       DateTime         @updatedAt
 
   @@index([status, nextAttemptAt])
+
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -559,6 +597,7 @@ enum RevenueStatus {
 }
 
 model Revenue {
+  workspaceId String
   id            String        @id @default(uuid())
   date          DateTime
   programId     String?
@@ -578,6 +617,8 @@ model Revenue {
 
   @@index([date])
   @@index([campaignId])
+
+  @@index([workspaceId])
 }
 
 enum ExpenseCategory {
@@ -595,6 +636,7 @@ enum ExpenseCategory {
 }
 
 model Expense {
+  workspaceId String
   id           String          @id @default(uuid())
   date         DateTime
   category     ExpenseCategory
@@ -614,9 +656,12 @@ model Expense {
 
   @@index([date])
   @@index([campaignId])
+
+  @@index([workspaceId])
 }
 
 model TaxSetting {
+  workspaceId String
   id                    String   @id @default(uuid())
   reserveRatePercent    Decimal  @db.Decimal(5, 2) @default(30)
   vatRatePercent        Decimal  @db.Decimal(5, 2) @default(19)
@@ -624,6 +669,8 @@ model TaxSetting {
   tradeTaxReservePercent Decimal @db.Decimal(5, 2) @default(15)
   incomeTaxReservePercent Decimal @db.Decimal(5, 2) @default(25)
   updatedAt             DateTime @updatedAt
+
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -641,8 +688,9 @@ enum IntegrationCategory {
 }
 
 model Integration {
+  workspaceId String
   id            String              @id @default(uuid())
-  providerKey   String              @unique
+  providerKey   String
   displayName   String
   category      IntegrationCategory
   mode          IntegrationMode     @default(MOCK)
@@ -656,9 +704,13 @@ model Integration {
   updatedAt     DateTime            @updatedAt
 
   @@index([category])
+
+  @@unique([workspaceId, providerKey])
+  @@index([workspaceId])
 }
 
 model EncryptedCredential {
+  workspaceId String
   id            String   @id @default(uuid())
   label         String
   cipherText    String
@@ -671,6 +723,8 @@ model EncryptedCredential {
   affiliatePrograms AffiliateProgram[]
   socialAccounts    SocialAccount[]
   integrations      Integration[]
+
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -685,8 +739,9 @@ enum AgentStatus {
 }
 
 model Agent {
+  workspaceId String
   id             String      @id @default(uuid())
-  key            String      @unique
+  key            String
   name           String
   role           String
   description    String
@@ -702,6 +757,9 @@ model Agent {
   updatedAt      DateTime    @updatedAt
 
   runs AgentRun[]
+
+  @@unique([workspaceId, key])
+  @@index([workspaceId])
 }
 
 enum AgentRunStatus {
@@ -711,6 +769,7 @@ enum AgentRunStatus {
 }
 
 model AgentRun {
+  workspaceId String
   id         String         @id @default(uuid())
   agentId    String
   agent      Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
@@ -722,6 +781,8 @@ model AgentRun {
   toolCalls  AgentToolCall[]
 
   @@index([agentId])
+
+  @@index([workspaceId])
 }
 
 enum AutomationTrigger {
@@ -747,6 +808,7 @@ enum AutomationActionType {
 }
 
 model Automation {
+  workspaceId String
   id           String            @id @default(uuid())
   name         String
   isActive     Boolean           @default(true)
@@ -759,6 +821,8 @@ model Automation {
   updatedAt    DateTime          @updatedAt
 
   runs AutomationRun[]
+
+  @@index([workspaceId])
 }
 
 enum AutomationRunStatus {
@@ -768,6 +832,7 @@ enum AutomationRunStatus {
 }
 
 model AutomationRun {
+  workspaceId String
   id           String               @id @default(uuid())
   automationId String
   automation   Automation           @relation(fields: [automationId], references: [id], onDelete: Cascade)
@@ -776,6 +841,8 @@ model AutomationRun {
   message      String?
 
   @@index([automationId])
+
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -790,6 +857,7 @@ enum NotificationLevel {
 }
 
 model Notification {
+  workspaceId String
   id        String             @id @default(uuid())
   level     NotificationLevel  @default(INFO)
   title     String
@@ -799,6 +867,8 @@ model Notification {
   createdAt DateTime           @default(now())
 
   @@index([readAt])
+
+  @@index([workspaceId])
 }
 
 model ContactRequest {
@@ -812,6 +882,7 @@ model ContactRequest {
 }
 
 model AuditLog {
+  workspaceId String
   id         String   @id @default(uuid())
   actor      String   @default("owner")
   action     String
@@ -823,6 +894,8 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@index([createdAt])
+
+  @@index([workspaceId])
 }
 
 // ===========================================================================
@@ -1551,6 +1624,7 @@ model ContentExperiment {
 }
 
 model ExperimentVariant {
+  workspaceId String
   id                      String                  @id @default(uuid())
   experimentId            String
   contentVariantId        String?
@@ -1566,6 +1640,8 @@ model ExperimentVariant {
   assignments             ExperimentAssignment[]
 
   @@index([experimentId])
+
+  @@index([workspaceId])
 }
 
 model ExperimentAssignment {
@@ -1587,6 +1663,7 @@ model ExperimentAssignment {
 }
 
 model ExperimentResult {
+  workspaceId String
   id                    String                @id @default(uuid())
   experimentId          String
   analyzedAt            DateTime              @default(now())
@@ -1607,6 +1684,8 @@ model ExperimentResult {
   experiment            ContentExperiment      @relation(fields: [experimentId], references: [id], onDelete: Cascade)
 
   @@index([experimentId])
+
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -1702,6 +1781,7 @@ model DataQualityReport {
 }
 
 model DataQualityIssue {
+  workspaceId String
   id                String               @id @default(uuid())
   reportId          String
   issueType         DataQualityIssueType
@@ -1711,6 +1791,8 @@ model DataQualityIssue {
 
   report            DataQualityReport    @relation(fields: [reportId], references: [id], onDelete: Cascade)
   @@index([reportId])
+
+  @@index([workspaceId])
 }
 
 model AnalyticsAnomaly {
@@ -4090,4 +4172,560 @@ model MediaLicenseReference {
   updatedAt         DateTime @updatedAt
 
   @@index([workspaceId, status])
+}
+
+
+// ---------------------------------------------------------------------------
+// Phase 21: BYOK Provider Gateway
+// ---------------------------------------------------------------------------
+
+enum ProviderCapability {
+  LLM_TEXT
+  IMAGE
+  VIDEO
+  VOICE
+  AVATAR
+  SEARCH
+  AUTOMATION
+}
+
+enum ProviderRoutingStrategy {
+  FREE_FIRST
+  COST_FIRST
+  QUALITY_FIRST
+  MANUAL
+}
+
+enum ProviderHealthStatus {
+  HEALTHY
+  DEGRADED
+  UNAVAILABLE
+  DISABLED
+}
+
+model ProviderRoutingPolicy {
+  id                       String                  @id @default(uuid())
+  workspaceId              String
+  name                     String
+  capability               ProviderCapability
+  strategy                 ProviderRoutingStrategy @default(FREE_FIRST)
+  enabled                  Boolean                 @default(true)
+  allowedProviderKeys      String[]                @default([])
+  deniedProviderKeys       String[]                @default([])
+  fallbackProviderKeys     String[]                @default([])
+  premiumRequiresApproval  Boolean                 @default(true)
+  maxCostPerCall           Decimal?                @db.Decimal(12, 6)
+  dailyBudget              Decimal?                @db.Decimal(12, 2)
+  regionAllowList          String[]                @default([])
+  createdAt                DateTime                @default(now())
+  updatedAt                DateTime                @updatedAt
+
+  @@unique([workspaceId, capability, name])
+  @@index([workspaceId, capability, enabled])
+}
+
+model ProviderUsageRecord {
+  id             String             @id @default(uuid())
+  workspaceId    String
+  providerKey    String
+  capability     ProviderCapability
+  modelKey       String?
+  requestId      String?
+  inputUnits     Int                @default(0)
+  outputUnits    Int                @default(0)
+  estimatedCost  Decimal            @db.Decimal(12, 6) @default(0)
+  currency       String             @default("EUR")
+  success        Boolean
+  latencyMs      Int?
+  errorCode      String?
+  createdAt      DateTime           @default(now())
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, providerKey, capability])
+  @@index([requestId])
+}
+
+model ProviderHealthCheck {
+  id           String               @id @default(uuid())
+  workspaceId  String
+  providerKey  String
+  status       ProviderHealthStatus
+  latencyMs    Int?
+  errorCode    String?
+  checkedAt    DateTime             @default(now())
+
+  @@index([workspaceId, providerKey, checkedAt])
+}
+
+
+// ---------------------------------------------------------------------------
+// Bulk Phase 23-30: CRM, Creator Marketplace, Compliance and Go-Live Control
+// ---------------------------------------------------------------------------
+
+enum ContactLawfulBasis {
+  CONSENT
+  CONTRACT
+  LEGITIMATE_INTEREST
+}
+
+enum CreatorProfileStatus {
+  DRAFT
+  VERIFIED
+  ACTIVE
+  PAUSED
+  ARCHIVED
+}
+
+enum CreatorEngagementStatus {
+  DRAFT
+  OFFERED
+  ACCEPTED
+  IN_PRODUCTION
+  IN_REVIEW
+  COMPLETED
+  CANCELLED
+}
+
+enum CreatorDeliverableStatus {
+  REQUESTED
+  SUBMITTED
+  CHANGES_REQUESTED
+  APPROVED
+  REJECTED
+}
+
+enum ExecutiveObjectiveStatus {
+  DRAFT
+  ACTIVE
+  AT_RISK
+  ACHIEVED
+  PAUSED
+  CANCELLED
+}
+
+enum GoLiveGateStatus {
+  PENDING
+  PASS
+  FAIL
+  WAIVED
+}
+
+model AudienceContact {
+  id                    String             @id @default(uuid())
+  workspaceId           String
+  pseudonymousKey       String
+  displayName           String?
+  email                 String?
+  phone                 String?
+  lawfulBasis           ContactLawfulBasis
+  marketingConsent      Boolean            @default(false)
+  consentEvidenceRef    String?
+  consentedAt           DateTime?
+  optedOutAt            DateTime?
+  retentionUntil        DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@unique([workspaceId, pseudonymousKey])
+  @@index([workspaceId, marketingConsent, optedOutAt])
+}
+
+model CreatorProfile {
+  id                    String               @id @default(uuid())
+  workspaceId           String
+  displayName           String
+  status                CreatorProfileStatus @default(DRAFT)
+  countryCode           String?
+  languageCodes         String[]             @default([])
+  platformHandles       Json?
+  capabilityTags        String[]             @default([])
+  rateCard              Json?
+  identityVerifiedAt    DateTime?
+  rightsVerifiedAt      DateTime?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  engagements CreatorEngagement[]
+
+  @@index([workspaceId, status])
+}
+
+model CreatorEngagement {
+  id                    String                  @id @default(uuid())
+  workspaceId           String
+  creatorId             String
+  creator               CreatorProfile          @relation(fields: [creatorId], references: [id], onDelete: Restrict)
+  campaignId            String?
+  campaign              Campaign?               @relation(fields: [campaignId], references: [id])
+  status                CreatorEngagementStatus @default(DRAFT)
+  brief                  Json
+  agreedAmount          Decimal?                @db.Decimal(12, 2)
+  currency              String                  @default("EUR")
+  dueAt                 DateTime?
+  acceptedAt            DateTime?
+  completedAt           DateTime?
+  createdAt             DateTime                @default(now())
+  updatedAt             DateTime                @updatedAt
+
+  deliverables CreatorDeliverable[]
+
+  @@index([workspaceId, status, dueAt])
+  @@index([workspaceId, creatorId])
+}
+
+model CreatorDeliverable {
+  id                    String                   @id @default(uuid())
+  workspaceId           String
+  engagementId          String
+  engagement            CreatorEngagement        @relation(fields: [engagementId], references: [id], onDelete: Cascade)
+  mediaAssetId          String?
+  mediaAsset            MediaAsset?               @relation(fields: [mediaAssetId], references: [id])
+  status                CreatorDeliverableStatus @default(REQUESTED)
+  version               Int                      @default(1)
+  notes                 String?
+  rightsApproved        Boolean                  @default(false)
+  submittedAt           DateTime?
+  reviewedAt            DateTime?
+  createdAt             DateTime                 @default(now())
+
+  @@unique([engagementId, version])
+  @@index([workspaceId, status])
+}
+
+model ComplianceEvidence {
+  id                    String   @id @default(uuid())
+  workspaceId           String
+  entityType            String
+  entityId              String
+  evidenceKind          String
+  reference             String
+  checksum              String?
+  verifiedBy            String?
+  verifiedAt            DateTime?
+  expiresAt             DateTime?
+  createdAt             DateTime @default(now())
+
+  @@index([workspaceId, entityType, entityId])
+  @@index([workspaceId, expiresAt])
+}
+
+model ExecutiveObjective {
+  id                    String                   @id @default(uuid())
+  workspaceId           String
+  title                 String
+  metricKey             String
+  targetValue           Decimal                  @db.Decimal(14, 4)
+  currentValue          Decimal?                 @db.Decimal(14, 4)
+  status                ExecutiveObjectiveStatus @default(DRAFT)
+  riskTolerance         String                   @default("conservative")
+  startsAt              DateTime?
+  endsAt                DateTime?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+
+  @@index([workspaceId, status])
+}
+
+model OperationalKillSwitch {
+  id                    String   @id @default(uuid())
+  workspaceId           String
+  scopeType             String
+  scopeId               String?
+  reason                String
+  active                Boolean  @default(true)
+  activatedBy           String
+  activatedAt           DateTime @default(now())
+  releasedBy            String?
+  releasedAt            DateTime?
+
+  @@index([workspaceId, active, scopeType])
+}
+
+model GoLiveGate {
+  id                    String           @id @default(uuid())
+  workspaceId           String
+  gateKey               String
+  status                GoLiveGateStatus @default(PENDING)
+  required              Boolean          @default(true)
+  evidenceReference     String?
+  notes                 String?
+  checkedAt             DateTime?
+  checkedBy             String?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  @@unique([workspaceId, gateKey])
+  @@index([workspaceId, status, required])
+}
+
+
+// ---------------------------------------------------------------------------
+// Bulk Phase 31-40: Growth, Global Scale, Data and Reliability
+// ---------------------------------------------------------------------------
+
+enum GrowthExperimentStatus {
+  DRAFT
+  PENDING_APPROVAL
+  ACTIVE
+  PAUSED
+  COMPLETED
+  STOPPED
+}
+
+enum LocalizationStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  PUBLISHED
+  REJECTED
+}
+
+enum DistributionStatus {
+  QUEUED
+  DELIVERING
+  DELIVERED
+  FAILED
+  REVOKED
+}
+
+enum ForecastScenario {
+  DOWNSIDE
+  BASE
+  UPSIDE
+  STRESS
+}
+
+enum BrandAssetStatus {
+  DRAFT
+  APPROVED
+  BLOCKED
+  EXPIRED
+  ARCHIVED
+}
+
+enum PartnerConnectionStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  REVOKED
+}
+
+enum DataExportStatus {
+  REQUESTED
+  APPROVED
+  PROCESSING
+  COMPLETED
+  FAILED
+  EXPIRED
+}
+
+enum ReliabilitySeverity {
+  SEV1
+  SEV2
+  SEV3
+  SEV4
+}
+
+enum ReliabilityIncidentStatus {
+  OPEN
+  MITIGATING
+  MONITORING
+  RESOLVED
+  CLOSED
+}
+
+enum ScaleGateStatus {
+  PENDING
+  PASS
+  FAIL
+  WAIVED
+}
+
+model GrowthExperimentPlan {
+  id               String                 @id @default(uuid())
+  workspaceId      String
+  name             String
+  hypothesis       String
+  primaryMetric    String
+  budgetLimit      Decimal                @db.Decimal(12, 2)
+  currency         String                 @default("EUR")
+  stopRule         String
+  status           GrowthExperimentStatus @default(DRAFT)
+  approvalId       String?
+  ownerId          String?
+  startsAt         DateTime?
+  endsAt           DateTime?
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+
+  @@index([workspaceId, status])
+}
+
+model LocalizationProject {
+  id                 String             @id @default(uuid())
+  workspaceId        String
+  sourceEntityType   String
+  sourceEntityId     String
+  marketCode         String
+  languageCode       String
+  status             LocalizationStatus @default(DRAFT)
+  content            Json
+  disclosureSnapshot Json?
+  culturalQaNotes    String?
+  reviewedBy         String?
+  reviewedAt         DateTime?
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  @@unique([workspaceId, sourceEntityType, sourceEntityId, marketCode, languageCode])
+  @@index([workspaceId, status])
+}
+
+model DistributionSyndication {
+  id                    String             @id @default(uuid())
+  workspaceId           String
+  sourceEntityType      String
+  sourceEntityId        String
+  destinationType       String
+  destinationId         String
+  idempotencyKey        String
+  rightsEvidenceRef     String
+  status                DistributionStatus @default(QUEUED)
+  attemptCount          Int                @default(0)
+  lastErrorCode         String?
+  deliveredAt           DateTime?
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+
+  @@unique([workspaceId, idempotencyKey])
+  @@index([workspaceId, status])
+}
+
+model AttributionTouchpoint {
+  id                String   @id @default(uuid())
+  workspaceId       String
+  pseudonymousKey   String
+  source            String
+  channel           String
+  campaignId        String?
+  eventType         String
+  eventValue        Decimal? @db.Decimal(14, 4)
+  currency          String?
+  confidence        Decimal  @db.Decimal(4, 3)
+  observedAt        DateTime
+  metadata          Json?
+  createdAt         DateTime @default(now())
+
+  @@index([workspaceId, pseudonymousKey, observedAt])
+  @@index([workspaceId, campaignId])
+}
+
+model FinancialForecast {
+  id                String           @id @default(uuid())
+  workspaceId       String
+  name              String
+  scenario          ForecastScenario
+  horizonDays       Int
+  modelVersion      String
+  assumptions       Json
+  projectedRevenue Decimal          @db.Decimal(14, 2)
+  projectedCost    Decimal          @db.Decimal(14, 2)
+  confidence       Decimal          @db.Decimal(4, 3)
+  approvedBy       String?
+  approvedAt       DateTime?
+  createdAt        DateTime         @default(now())
+
+  @@index([workspaceId, scenario, createdAt])
+}
+
+model BrandAssetRegistry {
+  id                 String           @id @default(uuid())
+  workspaceId        String
+  name               String
+  assetType          String
+  reference          String
+  checksum           String?
+  provenance         String
+  licenseEvidenceRef String
+  usageConstraints   Json?
+  status             BrandAssetStatus @default(DRAFT)
+  validFrom          DateTime?
+  validUntil         DateTime?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  @@index([workspaceId, status, validUntil])
+}
+
+model PartnerConnection {
+  id             String                  @id @default(uuid())
+  workspaceId    String
+  partnerKey     String
+  displayName    String
+  scopes         String[]                @default([])
+  status         PartnerConnectionStatus @default(PENDING)
+  credentialRef  String?
+  expiresAt      DateTime?
+  revokedAt      DateTime?
+  createdAt      DateTime                @default(now())
+  updatedAt      DateTime                @updatedAt
+
+  @@unique([workspaceId, partnerKey])
+  @@index([workspaceId, status])
+}
+
+model GovernedDataExport {
+  id                String           @id @default(uuid())
+  workspaceId       String
+  purpose           String
+  lawfulBasis       String
+  dataClasses       String[]         @default([])
+  retentionDays     Int
+  status            DataExportStatus @default(REQUESTED)
+  requestedBy       String
+  approvedBy        String?
+  outputReference   String?
+  expiresAt         DateTime?
+  completedAt       DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([workspaceId, status])
+}
+
+model ReliabilityIncident {
+  id                String                    @id @default(uuid())
+  workspaceId       String
+  title             String
+  severity          ReliabilitySeverity
+  status            ReliabilityIncidentStatus @default(OPEN)
+  scopeType         String
+  scopeId           String?
+  runbookReference  String
+  summary           String
+  evidenceReference String?
+  openedAt          DateTime                  @default(now())
+  resolvedAt        DateTime?
+  createdAt         DateTime                  @default(now())
+  updatedAt         DateTime                  @updatedAt
+
+  @@index([workspaceId, status, severity])
+}
+
+model ScaleCertificationGate {
+  id                String          @id @default(uuid())
+  workspaceId       String
+  gateKey           String
+  regionCode        String
+  status            ScaleGateStatus @default(PENDING)
+  required          Boolean         @default(true)
+  evidenceReference String?
+  notes             String?
+  checkedBy         String?
+  checkedAt         DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@unique([workspaceId, gateKey, regionCode])
+  @@index([workspaceId, regionCode, status, required])
 }

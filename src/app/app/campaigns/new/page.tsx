@@ -2,11 +2,16 @@ import type { Metadata } from "next";
 import { CampaignForm } from "@/components/campaigns/campaign-form";
 import { saveCampaignAction } from "@/server/actions/campaigns";
 import { listProductsForSelect, listAffiliateLinks } from "@/server/services/affiliate";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export const metadata: Metadata = { title: "Neue Kampagne" };
 
 export default async function NewCampaignPage() {
-  const [products, links] = await Promise.all([listProductsForSelect(), listAffiliateLinks()]);
+  const workspaceId = await resolveWorkspaceId();
+  const [products, links] = await Promise.all([
+    listProductsForSelect(workspaceId),
+    listAffiliateLinks(workspaceId),
+  ]);
   const boundAction = saveCampaignAction.bind(null, null);
 
   return (

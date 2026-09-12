@@ -2,6 +2,56 @@ import "server-only";
 import { prisma } from "@/lib/db/client";
 import type { ContentBriefStatus, ContentHookStatus } from "@/generated/prisma/client";
 
+export type CreateContentBriefInput = {
+  campaignId?: string;
+  objective: string;
+  targetAudience?: string;
+  platform?: string;
+  hookAngle?: string;
+  notes?: string;
+  createdBy: string;
+};
+
+export async function createContentBrief(
+  workspaceId: string,
+  input: CreateContentBriefInput,
+) {
+  if (input.campaignId) {
+    const campaign = await prisma.campaign.findFirst({
+      where: { id: input.campaignId, workspaceId },
+      select: { id: true },
+    });
+    if (!campaign) throw new Error("CAMPAIGN_NOT_FOUND");
+  }
+
+  return prisma.contentBrief.create({
+    data: { workspaceId, ...input },
+  });
+}
+
+export type CreateContentHookInput = {
+  briefId: string;
+  angle: string;
+  body?: string;
+  score?: number;
+  status?: ContentHookStatus;
+};
+
+export async function createContentHook(
+  workspaceId: string,
+  input: CreateContentHookInput,
+) {
+  const brief = await prisma.contentBrief.findFirst({
+    where: { id: input.briefId, workspaceId },
+    select: { id: true },
+  });
+  if (!brief) throw new Error("CONTENT_BRIEF_NOT_FOUND");
+
+  return prisma.contentHook.create({
+    data: { workspaceId, ...input },
+  });
+}
+
 export async function listContentBriefs(workspaceId: string, filters?: { status?: string; campaignId?: string }) {
   return prisma.contentBrief.findMany({
     where: {
@@ -37,8 +87,8 @@ export async function contentOverview(workspaceId: string) {
   const [briefs, hooks, scripts, assets] = await Promise.all([
     prisma.contentBrief.count({ where: { workspaceId } }),
     prisma.contentHook.count({ where: { workspaceId } }),
-    prisma.script.count(),
-    prisma.mediaAsset.count(),
+    prisma.script.count({ where: { workspaceId } }),
+    prisma.mediaAsset.count({ where: { workspaceId } }),
   ]);
   const recent = await prisma.contentBrief.findMany({
     where: { workspaceId },

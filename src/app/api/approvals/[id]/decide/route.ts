@@ -1,67 +1,70 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireApiPermission } from "@/lib/api/guard";
+import {
+  fail,
+  notFound,
+  ok,
+  parseBody,
+  uuidSchema,
+  validateValue,
+  withApiContext,
+} from "@/lib/api";
 import { Permission } from "@/lib/auth/rbac";
-import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
-import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
 import { writeAuditLog } from "@/lib/audit/log";
+import { decideApproval } from "@/server/services/approvals";
 
 export const dynamic = "force-dynamic";
 
 const decideSchema = z.object({
   decision: z.enum(["APPROVED", "REJECTED"]),
-  decisionReason: z.string().max(2000).optional(),
+  decisionReason: z.string().trim().min(1).max(2000).optional(),
 });
 
 export async function POST(
   request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const guard = await requireApiPermission(Permission.DECIDE_APPROVALS);
-  if (guard) return guard.response;
-
-  let workspaceId: string;
-  try {
-    workspaceId = await resolveWorkspaceId();
-  } catch (e) {
-    if (e instanceof InvalidTenantTokenError) {
-      return NextResponse.json({ error: "Ungültiges Tenant-Token." }, { status: 401 });
-    }
-    throw e;
-  }
+  const auth = await withApiContext(Permission.DECIDE_APPROVALS);
+  if ("response" in auth) return auth.response;
 
   const { id } = await context.params;
-  const parsed = decideSchema.safeParse(await request.json());
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Ungültige Eingabe." }, { status: 400 });
+  const params = validateValue(id, uuidSchema);
+  if ("response" in params) return params.response;
+
+  const validated = await parseBody(request, decideSchema);
+  if ("response" in validated) return validated.response;
+
+  try {
+    const approval = await decideApproval(
+      params.data,
+      auth.context.workspaceId,
+      {
+        ...validated.data,
+        decidedBy: auth.context.actor,
+      },
+    );
+
+    await writeAuditLog({
+      action: "approval.decide",
+      entityType: "Approval",
+      entityId: approval.id,
+      actor: auth.context.actor,
+      metadata: { decision: validated.data.decision },
+    });
+
+    return ok({ approval });
+  } catch (error) {
+    if (error instanceof Error && error.message === "APPROVAL_NOT_FOUND") {
+      return notFound("Freigabe nicht gefunden.");
+    }
+    if (error instanceof Error && error.message === "APPROVAL_EXPIRED") {
+      return fail("Freigabe ist abgelaufen.", { status: 410 });
+    }
+    if (
+      error instanceof Error &&
+      error.message === "APPROVAL_ALREADY_DECIDED"
+    ) {
+      return fail("Freigabe wurde bereits entschieden.", { status: 409 });
+    }
+    throw error;
   }
-
-  const actor = (await getCurrentUser())?.id ?? "owner";
-  const existing = await prisma.approval.findFirst({
-    where: { id, workspaceId: workspaceId },
-  });
-  if (!existing) {
-    return NextResponse.json({ error: "Freigabe nicht gefunden." }, { status: 404 });
-  }
-
-  const approval = await prisma.approval.update({
-    where: { id },
-    data: {
-      status: parsed.data.decision,
-      decidedBy: actor,
-      decisionReason: parsed.data.decisionReason,
-      decidedAt: new Date(),
-    },
-  });
-
-  await writeAuditLog({
-    action: "approval.decide",
-    entityType: "Approval",
-    entityId: approval.id,
-    actor,
-    metadata: { decision: parsed.data.decision },
-  });
-
-  return NextResponse.json({ approval });
 }

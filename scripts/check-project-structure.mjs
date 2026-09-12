@@ -36,7 +36,13 @@ function walk(directory) {
     const repositoryPath = relative(repositoryRoot, absolutePath).split(sep).join("/");
 
     if (entry.isDirectory()) {
-      if (architecture.forbiddenSourceDirectoryNames.includes(entry.name.toLowerCase())) {
+      // Next.js App Router route segments (src/app/**) are URL path
+      // segments, not internal module/folder names — "new" as in
+      // "/campaigns/new" is a standard, unambiguous routing convention
+      // there, unlike "new"/"temp"/"old" as an internal src/lib folder
+      // name, which is what this rule exists to catch.
+      const isAppRouteSegment = repositoryPath.startsWith("src/app/");
+      if (!isAppRouteSegment && architecture.forbiddenSourceDirectoryNames.includes(entry.name.toLowerCase())) {
         fail(`Ambiguous directory name is forbidden: ${repositoryPath}`);
       }
       const depth = repositoryPath.split("/").length;

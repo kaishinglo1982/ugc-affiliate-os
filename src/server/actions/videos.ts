@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/db/client";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { videoJobFormSchema, idSchema } from "@/lib/validation/videos";
 import { resolveVideoProvider } from "@/lib/providers/video/registry";
 import { ok, fail, newRequestId, type Result } from "@/types/result";
@@ -23,9 +24,20 @@ export async function createVideoJobAction(
   }
 
   const input = parsed.data;
+  const workspaceId = await resolveWorkspaceId();
+
+  const [script, product, campaign] = await Promise.all([
+    input.scriptId ? prisma.script.findFirst({ where: { id: input.scriptId, workspaceId }, select: { id: true } }) : null,
+    input.productId ? prisma.product.findFirst({ where: { id: input.productId, workspaceId }, select: { id: true } }) : null,
+    input.campaignId ? prisma.campaign.findFirst({ where: { id: input.campaignId, workspaceId }, select: { id: true } }) : null,
+  ]);
+  if (input.scriptId && !script) return fail("Skript nicht gefunden.", requestId);
+  if (input.productId && !product) return fail("Produkt nicht gefunden.", requestId);
+  if (input.campaignId && !campaign) return fail("Kampagne nicht gefunden.", requestId);
 
   const job = await prisma.videoJob.create({
     data: {
+      workspaceId,
       scriptId: input.scriptId || null,
       productId: input.productId || null,
       campaignId: input.campaignId || null,
@@ -60,6 +72,7 @@ export async function createVideoJobAction(
     entityId: job.id,
     requestId,
     actor: user.email,
+    workspaceId,
     metadata: { provider: input.provider },
   });
 
@@ -72,7 +85,8 @@ export async function pollVideoJobAction(id: string): Promise<Result<VideoJob>> 
   const user = await getCurrentUser();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
-  const job = await prisma.videoJob.findUnique({ where: { id } });
+  const workspaceId = await resolveWorkspaceId();
+  const job = await prisma.videoJob.findFirst({ where: { id, workspaceId } });
   if (!job) return fail("Video-Job nicht gefunden.", requestId);
 
   if (job.status === "COMPLETED" || job.status === "FAILED" || job.status === "CANCELLED") {
@@ -80,10 +94,10 @@ export async function pollVideoJobAction(id: string): Promise<Result<VideoJob>> 
   }
 
   const provider = resolveVideoProvider(job.provider);
-  const state = await provider.poll(id);
+  const state = await provider.poll(job.id);
 
   const updated = await prisma.videoJob.update({
-    where: { id },
+    where: { id: job.id },
     data: {
       status: state.status as VideoJobStatus,
       progress: state.progress,
@@ -94,18 +108,19 @@ export async function pollVideoJobAction(id: string): Promise<Result<VideoJob>> 
   });
 
   if (state.status === "COMPLETED" && state.resultUrl) {
-    const existingAsset = await prisma.mediaAsset.findFirst({ where: { videoJobId: id } });
+    const existingAsset = await prisma.mediaAsset.findFirst({ where: { videoJobId: job.id, workspaceId } });
     if (!existingAsset) {
       await prisma.mediaAsset.create({
         data: {
+          workspaceId,
           kind: "VIDEO",
-          fileName: `video-job-${id}.svg`,
-          storageKey: `mock/${id}`,
+          fileName: `video-job-${job.id}.svg`,
+          storageKey: `mock/${job.id}`,
           url: state.resultUrl,
           mimeType: "image/svg+xml",
           sizeBytes: 0,
           durationSec: job.durationSec,
-          videoJobId: id,
+          videoJobId: job.id,
           campaignId: job.campaignId,
           productId: job.productId,
           tags: ["mock-result", "video-job"],
@@ -114,9 +129,10 @@ export async function pollVideoJobAction(id: string): Promise<Result<VideoJob>> 
       await writeAuditLog({
         action: "video_job.retry",
         entityType: "VideoJob",
-        entityId: id,
+        entityId: job.id,
         requestId,
         actor: user.email,
+        workspaceId,
         metadata: { event: "completed", createdMediaAsset: true },
       });
     }
@@ -132,12 +148,13 @@ export async function retryVideoJobAction(id: string): Promise<Result<VideoJob>>
   const user = await getCurrentUser();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
-  const job = await prisma.videoJob.findUnique({ where: { id } });
+  const workspaceId = await resolveWorkspaceId();
+  const job = await prisma.videoJob.findFirst({ where: { id, workspaceId } });
   if (!job) return fail("Video-Job nicht gefunden.", requestId);
 
   const provider = resolveVideoProvider(job.provider);
   await provider.submit({
-    jobId: id,
+    jobId: job.id,
     format: job.format,
     aspectRatio: job.aspectRatio,
     durationSec: job.durationSec,
@@ -146,7 +163,7 @@ export async function retryVideoJobAction(id: string): Promise<Result<VideoJob>>
   });
 
   const updated = await prisma.videoJob.update({
-    where: { id },
+    where: { id: job.id },
     data: {
       status: "QUEUED",
       progress: 0,
@@ -161,6 +178,7 @@ export async function retryVideoJobAction(id: string): Promise<Result<VideoJob>>
     entityId: id,
     requestId,
     actor: user.email,
+    workspaceId,
   });
 
   revalidatePath("/app/videos");
@@ -173,13 +191,14 @@ export async function cancelVideoJobAction(id: string): Promise<Result<VideoJob>
   const user = await getCurrentUser();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
-  const job = await prisma.videoJob.findUnique({ where: { id } });
+  const workspaceId = await resolveWorkspaceId();
+  const job = await prisma.videoJob.findFirst({ where: { id, workspaceId } });
   if (!job) return fail("Video-Job nicht gefunden.", requestId);
 
   const provider = resolveVideoProvider(job.provider);
-  await provider.cancel(id);
+  await provider.cancel(job.id);
 
-  const updated = await prisma.videoJob.update({ where: { id }, data: { status: "CANCELLED" } });
+  const updated = await prisma.videoJob.update({ where: { id: job.id }, data: { status: "CANCELLED" } });
 
   await writeAuditLog({
     action: "video_job.cancel",
@@ -187,6 +206,7 @@ export async function cancelVideoJobAction(id: string): Promise<Result<VideoJob>
     entityId: id,
     requestId,
     actor: user.email,
+    workspaceId,
   });
 
   revalidatePath("/app/videos");
@@ -201,7 +221,10 @@ export async function deleteVideoJobAction(id: string) {
   if (!user) return fail("Nicht authentifiziert.", requestId);
   if (!parsed.success) return fail("Ungültige ID.", requestId);
 
-  await prisma.videoJob.delete({ where: { id } });
+  const workspaceId = await resolveWorkspaceId();
+  const job = await prisma.videoJob.findFirst({ where: { id, workspaceId }, select: { id: true } });
+  if (!job) return fail("Video-Job nicht gefunden.", requestId);
+  await prisma.videoJob.delete({ where: { id: job.id } });
 
   await writeAuditLog({
     action: "video_job.cancel",
@@ -209,6 +232,7 @@ export async function deleteVideoJobAction(id: string) {
     entityId: id,
     requestId,
     actor: user.email,
+    workspaceId,
     metadata: { event: "deleted" },
   });
 

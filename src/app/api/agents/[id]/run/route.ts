@@ -1,39 +1,43 @@
-import { NextResponse } from "next/server";
-import { requireApiPermission } from "@/lib/api/guard";
+import { created, notFound, validateValue, withApiContext, uuidSchema } from "@/lib/api";
 import { Permission } from "@/lib/auth/rbac";
-import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
 import { writeAuditLog } from "@/lib/audit/log";
+import { startAgentRun } from "@/server/services/agents";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(
-  _request: Request,
+  request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const guard = await requireApiPermission(Permission.MANAGE_AGENTS);
-  if (guard) return guard.response;
+  const auth = await withApiContext(Permission.MANAGE_AGENTS);
+  if ("response" in auth) return auth.response;
 
   const { id } = await context.params;
-  const agent = await prisma.agent.findUnique({ where: { id } });
-  if (!agent) {
-    return NextResponse.json({ error: "Agent nicht gefunden." }, { status: 404 });
+  const params = validateValue(id, uuidSchema);
+  if ("response" in params) return params.response;
+
+  const executionKey = request.headers.get("idempotency-key")?.trim() || undefined;
+
+  try {
+    const run = await startAgentRun(
+      { agentId: params.data, executionKey },
+      { workspaceId: auth.context.workspaceId },
+    );
+
+    await writeAuditLog({
+      action: "agent.run",
+      entityType: "AgentRun",
+      entityId: run.id,
+      actor: auth.context.actor,
+      workspaceId: auth.context.workspaceId,
+      metadata: { agentId: params.data },
+    });
+
+    return created({ run });
+  } catch (error) {
+    if (error instanceof Error && error.message === "AGENT_NOT_FOUND") {
+      return notFound("Agent nicht gefunden.");
+    }
+    throw error;
   }
-
-  const actor = (await getCurrentUser())?.id ?? "owner";
-  const run = await prisma.agentRun.create({
-    data: { agentId: id, status: "RUNNING" },
-  });
-
-  await prisma.agent.update({ where: { id }, data: { status: "RUNNING", lastRunAt: new Date() } });
-
-  await writeAuditLog({
-    action: "agent.run",
-    entityType: "AgentRun",
-    entityId: run.id,
-    actor,
-    metadata: { agentId: id },
-  });
-
-  return NextResponse.json({ run }, { status: 201 });
 }

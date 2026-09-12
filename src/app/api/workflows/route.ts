@@ -1,109 +1,80 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireApiPermission } from "@/lib/api/guard";
+import {
+  created,
+  ok,
+  parseBody,
+  validateValue,
+  withApiContext,
+} from "@/lib/api";
 import { Permission } from "@/lib/auth/rbac";
-import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
-import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
 import { writeAuditLog } from "@/lib/audit/log";
-import type { WorkflowStatus, WorkflowStepType } from "@/generated/prisma/client";
-import type { Prisma } from "@/generated/prisma/client";
+import {
+  createWorkflow,
+  listWorkflows,
+} from "@/server/services/workflows";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
-  const guard = await requireApiPermission(Permission.VIEW_WORKFLOWS);
-  if (guard) return guard.response;
+const workflowStatusSchema = z.enum(["DRAFT", "ACTIVE", "PAUSED", "ARCHIVED"]);
 
-  let workspaceId: string;
-  try {
-    workspaceId = await resolveWorkspaceId();
-  } catch (e) {
-    if (e instanceof InvalidTenantTokenError) {
-      return NextResponse.json({ error: "Ungültiges Tenant-Token." }, { status: 401 });
-    }
-    throw e;
-  }
-
-  const { searchParams } = new URL(request.url);
-  const status = searchParams.get("status");
-
-  const workflows = await prisma.workflowDefinition.findMany({
-    where: {
-      workspaceId: workspaceId,
-      ...(status ? { status: status as WorkflowStatus } : {}),
-    },
-    orderBy: { createdAt: "desc" },
-    include: { steps: { orderBy: { stepOrder: "asc" } } },
-  });
-
-  return NextResponse.json({ workflows });
-}
+const listSchema = z.object({
+  status: workflowStatusSchema.optional(),
+});
 
 const stepSchema = z.object({
   type: z.enum(["AGENT", "TOOL", "APPROVAL", "CONDITION"]),
-  name: z.string().min(1).max(200),
+  name: z.string().trim().min(1).max(200),
   config: z.unknown().optional(),
 });
 
 const createSchema = z.object({
-  name: z.string().min(1).max(200),
+  name: z.string().trim().min(1).max(200),
   description: z.string().max(2000).optional(),
-  trigger: z.string().max(50).optional(),
-  scheduleCron: z.string().max(100).optional(),
+  trigger: z.string().trim().min(1).max(50).optional(),
+  scheduleCron: z.string().trim().min(1).max(100).optional(),
   enabled: z.boolean().optional(),
-  ownerId: z.string().optional(),
+  ownerId: z.string().trim().min(1).max(200).optional(),
   config: z.unknown().optional(),
-  steps: z.array(stepSchema).optional(),
+  steps: z.array(stepSchema).max(100).optional(),
 });
 
+export async function GET(request: Request) {
+  const auth = await withApiContext(Permission.VIEW_WORKFLOWS);
+  if ("response" in auth) return auth.response;
+
+  const { searchParams } = new URL(request.url);
+  const validated = validateValue(
+    { status: searchParams.get("status") ?? undefined },
+    listSchema,
+  );
+  if ("response" in validated) return validated.response;
+
+  const workflows = await listWorkflows(
+    auth.context.workspaceId,
+    validated.data,
+  );
+
+  return ok({ workflows });
+}
+
 export async function POST(request: Request) {
-  const guard = await requireApiPermission(Permission.MANAGE_WORKFLOWS);
-  if (guard) return guard.response;
+  const auth = await withApiContext(Permission.MANAGE_WORKFLOWS);
+  if ("response" in auth) return auth.response;
 
-  let workspaceId: string;
-  try {
-    workspaceId = await resolveWorkspaceId();
-  } catch (e) {
-    if (e instanceof InvalidTenantTokenError) {
-      return NextResponse.json({ error: "Ungültiges Tenant-Token." }, { status: 401 });
-    }
-    throw e;
-  }
+  const validated = await parseBody(request, createSchema);
+  if ("response" in validated) return validated.response;
 
-  const parsed = createSchema.safeParse(await request.json());
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Ungültige Eingabe." }, { status: 400 });
-  }
-
-  const actor = (await getCurrentUser())?.id ?? "owner";
-  const { steps, ...rest } = parsed.data;
-
-  const workflow = await prisma.workflowDefinition.create({
-    data: {
-      workspaceId: workspaceId,
-      ...rest,
-      config: rest.config as Prisma.InputJsonValue | undefined,
-      steps: steps
-        ? {
-            create: steps.map((s, index) => ({
-              stepOrder: index,
-              type: s.type as WorkflowStepType,
-              name: s.name,
-              config: s.config as Prisma.InputJsonValue | undefined,
-            })),
-          }
-        : undefined,
-    },
-    include: { steps: { orderBy: { stepOrder: "asc" } } },
-  });
+  const workflow = await createWorkflow(
+    auth.context.workspaceId,
+    validated.data,
+  );
 
   await writeAuditLog({
     action: "workflow.create",
     entityType: "WorkflowDefinition",
     entityId: workflow.id,
-    actor,
+    actor: auth.context.actor,
   });
 
-  return NextResponse.json({ workflow }, { status: 201 });
+  return created({ workflow });
 }

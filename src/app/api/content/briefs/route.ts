@@ -1,84 +1,91 @@
-import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireApiPermission } from "@/lib/api/guard";
+import {
+  created,
+  notFound,
+  ok,
+  parseBody,
+  validateValue,
+  withApiContext,
+} from "@/lib/api";
 import { Permission } from "@/lib/auth/rbac";
-import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
-import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
 import { writeAuditLog } from "@/lib/audit/log";
-import type { ContentBriefStatus } from "@/generated/prisma/client";
+import {
+  createContentBrief,
+  listContentBriefs,
+} from "@/server/services/content";
 
 export const dynamic = "force-dynamic";
 
-export async function GET(request: Request) {
-  const guard = await requireApiPermission(Permission.VIEW_CONTENT_BRIEFS);
-  if (guard) return guard.response;
+const briefStatusSchema = z.enum([
+  "DRAFT",
+  "UNDER_REVIEW",
+  "APPROVED",
+  "REJECTED",
+  "SUPERSEDED",
+  "ARCHIVED",
+]);
 
-  let workspaceId: string;
-  try {
-    workspaceId = await resolveWorkspaceId();
-  } catch (e) {
-    if (e instanceof InvalidTenantTokenError) {
-      return NextResponse.json({ error: "Ungültiges Tenant-Token." }, { status: 401 });
-    }
-    throw e;
-  }
-
-  const { searchParams } = new URL(request.url);
-  const campaignId = searchParams.get("campaignId");
-  const status = searchParams.get("status");
-
-  const briefs = await prisma.contentBrief.findMany({
-    where: {
-      workspaceId: workspaceId,
-      ...(campaignId ? { campaignId } : {}),
-      ...(status ? { status: status as ContentBriefStatus } : {}),
-    },
-    orderBy: { createdAt: "desc" },
-  });
-
-  return NextResponse.json({ briefs });
-}
+const listSchema = z.object({
+  campaignId: z.string().uuid().optional(),
+  status: briefStatusSchema.optional(),
+});
 
 const createSchema = z.object({
-  campaignId: z.string().optional(),
-  objective: z.string().min(1).max(500),
+  campaignId: z.string().uuid().optional(),
+  objective: z.string().trim().min(1).max(500),
   targetAudience: z.string().max(500).optional(),
-  platform: z.string().max(100).optional(),
+  platform: z.string().trim().min(1).max(100).optional(),
   hookAngle: z.string().max(500).optional(),
   notes: z.string().max(5000).optional(),
 });
 
+export async function GET(request: Request) {
+  const auth = await withApiContext(Permission.VIEW_CONTENT_BRIEFS);
+  if ("response" in auth) return auth.response;
+
+  const { searchParams } = new URL(request.url);
+  const validated = validateValue(
+    {
+      campaignId: searchParams.get("campaignId") ?? undefined,
+      status: searchParams.get("status") ?? undefined,
+    },
+    listSchema,
+  );
+  if ("response" in validated) return validated.response;
+
+  const briefs = await listContentBriefs(
+    auth.context.workspaceId,
+    validated.data,
+  );
+
+  return ok({ briefs });
+}
+
 export async function POST(request: Request) {
-  const guard = await requireApiPermission(Permission.MANAGE_CONTENT_BRIEFS);
-  if (guard) return guard.response;
+  const auth = await withApiContext(Permission.MANAGE_CONTENT_BRIEFS);
+  if ("response" in auth) return auth.response;
 
-  let workspaceId: string;
+  const validated = await parseBody(request, createSchema);
+  if ("response" in validated) return validated.response;
+
   try {
-    workspaceId = await resolveWorkspaceId();
-  } catch (e) {
-    if (e instanceof InvalidTenantTokenError) {
-      return NextResponse.json({ error: "Ungültiges Tenant-Token." }, { status: 401 });
+    const brief = await createContentBrief(auth.context.workspaceId, {
+      ...validated.data,
+      createdBy: auth.context.actor,
+    });
+
+    await writeAuditLog({
+      action: "content_brief.create",
+      entityType: "ContentBrief",
+      entityId: brief.id,
+      actor: auth.context.actor,
+    });
+
+    return created({ brief });
+  } catch (error) {
+    if (error instanceof Error && error.message === "CAMPAIGN_NOT_FOUND") {
+      return notFound("Kampagne nicht gefunden.");
     }
-    throw e;
+    throw error;
   }
-
-  const parsed = createSchema.safeParse(await request.json());
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Ungültige Eingabe." }, { status: 400 });
-  }
-
-  const actor = (await getCurrentUser())?.id ?? "owner";
-  const brief = await prisma.contentBrief.create({
-    data: { workspaceId: workspaceId, createdBy: actor, ...parsed.data },
-  });
-
-  await writeAuditLog({
-    action: "content_brief.create",
-    entityType: "ContentBrief",
-    entityId: brief.id,
-    actor,
-  });
-
-  return NextResponse.json({ brief }, { status: 201 });
 }

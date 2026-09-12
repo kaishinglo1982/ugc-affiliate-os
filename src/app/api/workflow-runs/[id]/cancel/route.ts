@@ -1,10 +1,14 @@
-import { NextResponse } from "next/server";
-import { requireApiPermission } from "@/lib/api/guard";
+import {
+  fail,
+  notFound,
+  ok,
+  uuidSchema,
+  validateValue,
+  withApiContext,
+} from "@/lib/api";
 import { Permission } from "@/lib/auth/rbac";
-import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
-import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
 import { writeAuditLog } from "@/lib/audit/log";
+import { cancelWorkflowRun } from "@/server/services/workflows";
 
 export const dynamic = "force-dynamic";
 
@@ -12,42 +16,39 @@ export async function POST(
   _request: Request,
   context: { params: Promise<{ id: string }> },
 ) {
-  const guard = await requireApiPermission(Permission.MANAGE_WORKFLOWS);
-  if (guard) return guard.response;
-
-  let workspaceId: string;
-  try {
-    workspaceId = await resolveWorkspaceId();
-  } catch (e) {
-    if (e instanceof InvalidTenantTokenError) {
-      return NextResponse.json({ error: "Ungültiges Tenant-Token." }, { status: 401 });
-    }
-    throw e;
-  }
+  const auth = await withApiContext(Permission.MANAGE_WORKFLOWS);
+  if ("response" in auth) return auth.response;
 
   const { id } = await context.params;
-  const run = await prisma.workflowRun.findFirst({
-    where: { id, workspaceId: workspaceId },
-  });
-  if (!run) {
-    return NextResponse.json({ error: "Run nicht gefunden." }, { status: 404 });
+  const params = validateValue(id, uuidSchema);
+  if ("response" in params) return params.response;
+
+  try {
+    const run = await cancelWorkflowRun(
+      params.data,
+      auth.context.workspaceId,
+    );
+
+    await writeAuditLog({
+      action: "workflow_run.cancel",
+      entityType: "WorkflowRun",
+      entityId: run.id,
+      actor: auth.context.actor,
+    });
+
+    return ok({ run });
+  } catch (error) {
+    if (error instanceof Error && error.message === "WORKFLOW_RUN_NOT_FOUND") {
+      return notFound("Run nicht gefunden.");
+    }
+    if (
+      error instanceof Error &&
+      error.message === "WORKFLOW_RUN_NOT_CANCELLABLE"
+    ) {
+      return fail("Nur aktive Runs können abgebrochen werden.", {
+        status: 409,
+      });
+    }
+    throw error;
   }
-  if (run.status !== "RUNNING") {
-    return NextResponse.json({ error: "Nur aktive Runs können abgebrochen werden." }, { status: 409 });
-  }
-
-  const actor = (await getCurrentUser())?.id ?? "owner";
-  const updated = await prisma.workflowRun.update({
-    where: { id },
-    data: { status: "CANCELLED", finishedAt: new Date() },
-  });
-
-  await writeAuditLog({
-    action: "workflow_run.cancel",
-    entityType: "WorkflowRun",
-    entityId: id,
-    actor,
-  });
-
-  return NextResponse.json({ run: updated });
 }

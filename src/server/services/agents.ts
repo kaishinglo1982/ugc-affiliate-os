@@ -1,7 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db/client";
 import { incrementMetric } from "@/lib/observability/metrics";
-import type { AgentStatus, AgentRunStatus, AgentMemoryType } from "@/generated/prisma/client";
+import type { AgentStatus, AgentRunStatus, AgentMemoryType, AgentToolRiskLevel } from "@/generated/prisma/client";
 import { Prisma } from "@/generated/prisma/client";
 
 /**
@@ -176,11 +176,12 @@ function agentRunLogs(input: AgentRunStartInput): Prisma.InputJsonValue | typeof
  */
 export async function startAgentRun(
   input: AgentRunStartInput,
-  options: { workspaceId?: string; incrementObservability?: boolean } = {},
+  options: { workspaceId: string; incrementObservability?: boolean },
 ): Promise<{ id: string; status: AgentRunStatus; startedAt: Date }> {
   if (input.executionKey) {
     const existing = await prisma.agentRun.findFirst({
       where: {
+        workspaceId: options.workspaceId,
         agentId: input.agentId,
         status: "RUNNING",
         logs: { path: ["executionKey"], equals: input.executionKey },
@@ -195,7 +196,7 @@ export async function startAgentRun(
   const agent = await prisma.agent.findFirst({
     where: {
       id: input.agentId,
-      ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}),
+      workspaceId: options.workspaceId,
     },
     select: { id: true },
   });
@@ -205,6 +206,7 @@ export async function startAgentRun(
 
   const run = await prisma.agentRun.create({
     data: {
+      workspaceId: options.workspaceId,
       agentId: input.agentId,
       status: "RUNNING",
       summary: input.summary ?? null,
@@ -234,10 +236,10 @@ export async function startAgentRun(
 export async function finishAgentRun(
   runId: string,
   input: AgentRunFinishInput,
-  options: { incrementObservability?: boolean } = {},
+  options: { workspaceId: string; incrementObservability?: boolean },
 ): Promise<{ id: string; status: AgentRunStatus; finishedAt: Date | null }> {
-  const run = await prisma.agentRun.findUnique({
-    where: { id: runId },
+  const run = await prisma.agentRun.findFirst({
+    where: { id: runId, workspaceId: options.workspaceId },
     select: { id: true, status: true, agentId: true },
   });
   if (!run) {
@@ -354,8 +356,13 @@ export async function updateAgentMemoryEntry(
     expiresAt?: Date | null;
   },
 ) {
+  const existing = await prisma.agentMemoryEntry.findFirst({
+    where: { id, workspaceId },
+    select: { id: true },
+  });
+  if (!existing) throw new Error("AGENT_MEMORY_NOT_FOUND");
   return prisma.agentMemoryEntry.update({
-    where: { id },
+    where: { id: existing.id },
     data: {
       ...(patch.type ? { type: patch.type } : {}),
       ...(patch.key ? { key: patch.key } : {}),
@@ -375,27 +382,103 @@ export async function deleteAgentMemoryEntry(id: string, workspaceId: string) {
   });
 }
 
-export async function listAgents(filters?: { status?: string }) {
+export type UpdateAgentInput = {
+  name?: string;
+  description?: string;
+  status?: AgentStatus;
+};
+
+/**
+ * Update an agent through the canonical service while enforcing workspace
+ * ownership and the lifecycle transition matrix.
+ */
+export async function updateAgent(
+  id: string,
+  workspaceId: string,
+  input: UpdateAgentInput,
+) {
+  const existing = await prisma.agent.findFirst({
+    where: { id, workspaceId },
+    select: { id: true, status: true },
+  });
+  if (!existing) {
+    throw new Error("AGENT_NOT_FOUND");
+  }
+
+  if (
+    input.status !== undefined &&
+    input.status !== existing.status &&
+    !canTransitionAgentStatus(existing.status, input.status)
+  ) {
+    throw new Error(
+      `ILLEGAL_AGENT_TRANSITION: ${existing.status} -> ${input.status}`,
+    );
+  }
+
+  return prisma.agent.update({
+    where: { id: existing.id },
+    data: {
+      ...(input.name !== undefined ? { name: input.name } : {}),
+      ...(input.description !== undefined
+        ? { description: input.description }
+        : {}),
+      ...(input.status !== undefined ? { status: input.status } : {}),
+    },
+  });
+}
+
+export type CreateAgentInput = {
+  key: string;
+  name: string;
+  role: string;
+  description?: string;
+  capabilities?: string[];
+  allowedActions?: string[];
+  status?: AgentStatus;
+};
+
+/**
+ * Register one agent through the canonical agent service. Route handlers must
+ * not write agent rows directly.
+ */
+export async function createAgent(workspaceId: string, input: CreateAgentInput) {
+  return prisma.agent.create({
+    data: {
+      workspaceId,
+      key: input.key,
+      name: input.name,
+      role: input.role,
+      description: input.description ?? "",
+      capabilities: input.capabilities ?? [],
+      allowedActions: input.allowedActions ?? [],
+      status: input.status ?? "IDLE",
+    },
+  });
+}
+
+export async function listAgents(workspaceId: string, filters?: { status?: string }) {
   return prisma.agent.findMany({
     where: {
+      workspaceId,
       ...(filters?.status ? { status: filters.status as AgentStatus } : {}),
     },
     orderBy: { createdAt: "desc" },
   });
 }
 
-export async function getAgent(id: string) {
+export async function getAgent(id: string, workspaceId: string) {
   return prisma.agent.findFirst({
-    where: { id },
+    where: { id, workspaceId },
     include: {
-      runs: { orderBy: { startedAt: "desc" }, take: 10 },
+      runs: { where: { workspaceId }, orderBy: { startedAt: "desc" }, take: 10 },
     },
   });
 }
 
-export async function listAgentRuns(filters?: { agentId?: string; status?: string }) {
+export async function listAgentRuns(workspaceId: string, filters?: { agentId?: string; status?: string }) {
   return prisma.agentRun.findMany({
     where: {
+      workspaceId,
       ...(filters?.agentId ? { agentId: filters.agentId } : {}),
       ...(filters?.status ? { status: filters.status as AgentRunStatus } : {}),
     },
@@ -404,13 +487,76 @@ export async function listAgentRuns(filters?: { agentId?: string; status?: strin
   });
 }
 
-export async function getAgentRun(id: string) {
+export async function getAgentRun(id: string, workspaceId: string) {
   return prisma.agentRun.findFirst({
-    where: { id },
+    where: { id, workspaceId },
     include: {
       agent: { select: { id: true, name: true, key: true } },
       toolCalls: { orderBy: { createdAt: "desc" } },
     },
+  });
+}
+
+export type CreateAgentToolInput = {
+  name: string;
+  description?: string;
+  provider?: string;
+  riskLevel?: AgentToolRiskLevel;
+  enabled?: boolean;
+  schema?: unknown;
+  policy?: {
+    requiresApproval?: boolean;
+    maxCostPerCall?: number;
+    rateLimitPerMin?: number;
+    allowedAgentKeys?: string[];
+  };
+};
+
+export async function createAgentTool(
+  workspaceId: string,
+  input: CreateAgentToolInput,
+) {
+  const { policy, ...tool } = input;
+  return prisma.agentToolDefinition.create({
+    data: {
+      workspaceId,
+      ...tool,
+      schema:
+        tool.schema === undefined ? undefined : nullableJson(tool.schema),
+      riskLevel: tool.riskLevel ?? "LOW",
+      enabled: tool.enabled ?? true,
+      policies: policy
+        ? {
+            create: {
+              requiresApproval: policy.requiresApproval ?? false,
+              maxCostPerCall: policy.maxCostPerCall,
+              rateLimitPerMin: policy.rateLimitPerMin,
+              allowedAgentKeys: policy.allowedAgentKeys ?? [],
+            },
+          }
+        : undefined,
+    },
+    include: { policies: true },
+  });
+}
+
+export async function updateAgentToolEnabled(
+  id: string,
+  workspaceId: string,
+  enabled: boolean,
+) {
+  const existing = await prisma.agentToolDefinition.findFirst({
+    where: { id, workspaceId },
+    select: { id: true },
+  });
+  if (!existing) {
+    throw new Error("AGENT_TOOL_NOT_FOUND");
+  }
+
+  return prisma.agentToolDefinition.update({
+    where: { id: existing.id },
+    data: { enabled },
+    include: { policies: true },
   });
 }
 
