@@ -14,7 +14,7 @@ const TOKEN_ISSUER = "carryos-core";
 const TOKEN_AUDIENCE = "ugc-affiliate-os";
 const coreTenantIdSchema = z.string().uuid();
 const workspaceIdSchema = z.string().uuid();
-const bindingSchema = z.record(workspaceIdSchema);
+const bindingSchema = z.record(coreTenantIdSchema, workspaceIdSchema);
 
 type CarryOsIntegrationMode = "STANDALONE" | "CORE_BOUND";
 
@@ -44,11 +44,6 @@ function workspaceBindings(): Readonly<Record<string, string>> {
     throw new TenantWorkspaceBindingError("CARRYOS_TENANT_WORKSPACE_BINDINGS_INVALID");
   }
 
-  for (const tenantId of Object.keys(parsed.data)) {
-    if (!coreTenantIdSchema.safeParse(tenantId).success) {
-      throw new TenantWorkspaceBindingError("CARRYOS_TENANT_WORKSPACE_BINDINGS_INVALID");
-    }
-  }
   return parsed.data;
 }
 
