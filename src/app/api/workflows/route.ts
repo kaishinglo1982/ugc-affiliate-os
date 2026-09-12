@@ -40,6 +40,13 @@ export async function GET(request: Request) {
   return NextResponse.json({ workflows });
 }
 
+const workflowKeySchema = z
+  .string()
+  .trim()
+  .min(1)
+  .max(120)
+  .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+
 const stepSchema = z.object({
   type: z.enum(["AGENT", "TOOL", "APPROVAL", "CONDITION"]),
   name: z.string().min(1).max(200),
@@ -47,6 +54,8 @@ const stepSchema = z.object({
 });
 
 const createSchema = z.object({
+  key: workflowKeySchema.optional(),
+  version: z.number().int().positive().optional(),
   name: z.string().min(1).max(200),
   description: z.string().max(2000).optional(),
   trigger: z.string().max(50).optional(),
@@ -56,6 +65,19 @@ const createSchema = z.object({
   config: z.unknown().optional(),
   steps: z.array(stepSchema).optional(),
 });
+
+function workflowKeyFromName(name: string): string {
+  const normalized = name
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 120)
+    .replace(/-+$/g, "");
+
+  return normalized || "workflow";
+}
 
 export async function POST(request: Request) {
   const guard = await requireApiPermission(Permission.MANAGE_WORKFLOWS);
@@ -77,11 +99,14 @@ export async function POST(request: Request) {
   }
 
   const actor = (await getCurrentUser())?.id ?? "owner";
-  const { steps, ...rest } = parsed.data;
+  const { steps, key: requestedKey, version, ...rest } = parsed.data;
+  const key = requestedKey ?? workflowKeyFromName(rest.name);
 
   const workflow = await prisma.workflowDefinition.create({
     data: {
       workspaceId: workspaceId,
+      key,
+      version: version ?? 1,
       ...rest,
       config: rest.config as Prisma.InputJsonValue | undefined,
       steps: steps
