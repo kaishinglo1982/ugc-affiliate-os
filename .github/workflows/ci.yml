@@ -8,8 +8,6 @@ on:
       - master
       - main
       - phase-10-agentic-automation
-      # Temporary while PR #51 validates this workflow repair.
-      - chore/vercel-env-scope-cleanup-2026-09-13
 
 permissions:
   contents: read
