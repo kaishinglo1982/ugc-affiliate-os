@@ -19,7 +19,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  PNPM_VERSION: 11.13.0
+  PNPM_VERSION: 11.13.1
   AUTH_SECRET: ci-auth-secret-at-least-thirty-two-characters
   CREDENTIAL_ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
   WORKER_SECRET: ci-worker-secret-at-least-thirty-two-characters
