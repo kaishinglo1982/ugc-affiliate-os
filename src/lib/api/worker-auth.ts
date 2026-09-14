@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { env } from "@/lib/config/env";
 
 export async function authorizeWorkerRequest(
   request: Request,
@@ -16,7 +17,10 @@ export async function authorizeWorkerRequest(
     return { actor: "worker" };
   }
 
-  if (!options.allowUserFallback) {
+  // Never fall back to session auth in production: this endpoint is meant to be
+  // secret-gated for schedulers, and any signed-in user could otherwise trigger
+  // it if WORKER_SECRET/CRON_SECRET was simply forgotten at deploy time.
+  if (!options.allowUserFallback || env.isProduction) {
     return { response: NextResponse.json({ error: "Worker-Secret nicht konfiguriert." }, { status: 401 }) };
   }
 
