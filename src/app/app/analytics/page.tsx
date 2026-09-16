@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Eye, Users, MousePointerClick, Percent, TrendingUp, Coins, Target, Heart } from "lucide-react";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 import { getAnalyticsData } from "@/server/services/analytics";
 import type { DashboardPeriod } from "@/lib/dashboard-period";
 import { AnalyticsFilters } from "@/components/analytics/analytics-filters";
@@ -33,7 +33,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
     ? (params.period as DashboardPeriod)
     : "30d";
 
-  const [data, products, campaigns, programs] = await Promise.all([
+  const [data, [products, campaigns, programs]] = await Promise.all([
     getAnalyticsData({
       period,
       platform: params.platform,
@@ -42,9 +42,23 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       programId: params.programId,
       contentStatus: params.contentStatus,
     }),
-    prisma.product.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
-    prisma.campaign.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
-    prisma.affiliateProgram.findMany({ select: { id: true, provider: true, customName: true }, orderBy: { provider: "asc" } }),
+    withWorkspaceDb((tx, workspaceId) =>
+      Promise.all([
+        tx.product.findMany({
+          where: { workspaceId },
+          select: { id: true, name: true },
+          orderBy: { name: "asc" },
+        }),
+        tx.campaign.findMany({
+          select: { id: true, name: true },
+          orderBy: { name: "asc" },
+        }),
+        tx.affiliateProgram.findMany({
+          select: { id: true, provider: true, customName: true },
+          orderBy: { provider: "asc" },
+        }),
+      ]),
+    ),
   ]);
 
   return (
@@ -58,9 +72,12 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
         </div>
         <AnalyticsFilters
           period={period}
-          products={products.map((p) => ({ id: p.id, label: p.name }))}
-          campaigns={campaigns.map((c) => ({ id: c.id, label: c.name }))}
-          programs={programs.map((p) => ({ id: p.id, label: p.customName ?? p.provider }))}
+          products={products.map((product) => ({ id: product.id, label: product.name }))}
+          campaigns={campaigns.map((campaign) => ({ id: campaign.id, label: campaign.name }))}
+          programs={programs.map((program) => ({
+            id: program.id,
+            label: program.customName ?? program.provider,
+          }))}
         />
       </div>
 
@@ -101,9 +118,9 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
           <CardHeader><CardTitle className="text-base">Content-Status</CardTitle></CardHeader>
           <CardContent>
             <BarList
-              items={data.contentStatusBreakdown.map((s) => ({
-                label: SOCIAL_POST_STATUS_LABELS[s.status] ?? s.status,
-                value: s.count,
+              items={data.contentStatusBreakdown.map((status) => ({
+                label: SOCIAL_POST_STATUS_LABELS[status.status] ?? status.status,
+                value: status.count,
               }))}
               emptyLabel="Keine Posts im gewählten Filter."
             />
