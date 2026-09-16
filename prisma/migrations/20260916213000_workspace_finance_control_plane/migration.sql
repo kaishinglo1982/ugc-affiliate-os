@@ -36,6 +36,9 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='AuditLog' AND column_name='workspaceId') THEN
     ALTER TABLE "AuditLog" ADD COLUMN "workspaceId" TEXT;
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='EncryptedCredential' AND column_name='workspaceId') THEN
+    ALTER TABLE "EncryptedCredential" ADD COLUMN "workspaceId" TEXT;
+  END IF;
 END $$;
 
 -- An affiliate program cannot become tenant-owned safely when product-bound
@@ -103,6 +106,46 @@ UPDATE "Integration" SET "workspaceId" = '00000000-0000-0000-0000-000000000001' 
 UPDATE "Agent" SET "workspaceId" = '00000000-0000-0000-0000-000000000001' WHERE "workspaceId" IS NULL;
 UPDATE "AuditLog" SET "workspaceId" = '00000000-0000-0000-0000-000000000001' WHERE "workspaceId" IS NULL;
 
+-- A credential is secret tenant data. Derive its workspace from every parent
+-- that references it and abort if the same credential has ever crossed a
+-- workspace boundary.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT credential_id
+    FROM (
+      SELECT ap."credentialId" AS credential_id, ap."workspaceId" AS workspace_id
+      FROM "AffiliateProgram" ap WHERE ap."credentialId" IS NOT NULL
+      UNION ALL
+      SELECT sa."credentialId", sa."workspaceId"
+      FROM "SocialAccount" sa WHERE sa."credentialId" IS NOT NULL
+      UNION ALL
+      SELECT i."credentialId", i."workspaceId"
+      FROM "Integration" i WHERE i."credentialId" IS NOT NULL
+    ) refs
+    GROUP BY credential_id
+    HAVING COUNT(DISTINCT workspace_id) > 1
+  ) THEN
+    RAISE EXCEPTION 'ENCRYPTED_CREDENTIAL_CROSS_WORKSPACE_HISTORY_DETECTED';
+  END IF;
+END $$;
+
+UPDATE "EncryptedCredential" ec
+SET "workspaceId" = COALESCE(
+  (
+    SELECT MIN(workspace_id)
+    FROM (
+      SELECT ap."workspaceId" AS workspace_id FROM "AffiliateProgram" ap WHERE ap."credentialId" = ec.id
+      UNION ALL
+      SELECT sa."workspaceId" FROM "SocialAccount" sa WHERE sa."credentialId" = ec.id
+      UNION ALL
+      SELECT i."workspaceId" FROM "Integration" i WHERE i."credentialId" = ec.id
+    ) refs
+  ),
+  '00000000-0000-0000-0000-000000000001'
+)
+WHERE ec."workspaceId" IS NULL;
+
 -- Parent consistency is a hard migration gate. No record may carry a tenant
 -- different from any non-null tenant-owned parent it references.
 DO $$
@@ -149,6 +192,19 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'EXPENSE_PARENT_WORKSPACE_MISMATCH';
   END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM "AffiliateProgram" ap JOIN "EncryptedCredential" ec ON ec.id = ap."credentialId"
+    WHERE ap."workspaceId" <> ec."workspaceId"
+  ) OR EXISTS (
+    SELECT 1 FROM "SocialAccount" sa JOIN "EncryptedCredential" ec ON ec.id = sa."credentialId"
+    WHERE sa."workspaceId" <> ec."workspaceId"
+  ) OR EXISTS (
+    SELECT 1 FROM "Integration" i JOIN "EncryptedCredential" ec ON ec.id = i."credentialId"
+    WHERE i."workspaceId" <> ec."workspaceId"
+  ) THEN
+    RAISE EXCEPTION 'ENCRYPTED_CREDENTIAL_PARENT_WORKSPACE_MISMATCH';
+  END IF;
 END $$;
 
 -- Prevent duplicate singleton tax settings after moving from global to tenant scope.
@@ -172,6 +228,7 @@ ALTER TABLE "TaxSetting" ALTER COLUMN "workspaceId" SET DEFAULT COALESCE(NULLIF(
 ALTER TABLE "Integration" ALTER COLUMN "workspaceId" SET DEFAULT COALESCE(NULLIF(current_setting('app.workspace_id', true), ''), '00000000-0000-0000-0000-000000000001'), ALTER COLUMN "workspaceId" SET NOT NULL;
 ALTER TABLE "Agent" ALTER COLUMN "workspaceId" SET DEFAULT COALESCE(NULLIF(current_setting('app.workspace_id', true), ''), '00000000-0000-0000-0000-000000000001'), ALTER COLUMN "workspaceId" SET NOT NULL;
 ALTER TABLE "AuditLog" ALTER COLUMN "workspaceId" SET DEFAULT COALESCE(NULLIF(current_setting('app.workspace_id', true), ''), '00000000-0000-0000-0000-000000000001'), ALTER COLUMN "workspaceId" SET NOT NULL;
+ALTER TABLE "EncryptedCredential" ALTER COLUMN "workspaceId" SET DEFAULT COALESCE(NULLIF(current_setting('app.workspace_id', true), ''), '00000000-0000-0000-0000-000000000001'), ALTER COLUMN "workspaceId" SET NOT NULL;
 
 CREATE INDEX IF NOT EXISTS "AffiliateProgram_workspaceId_idx" ON "AffiliateProgram"("workspaceId");
 CREATE INDEX IF NOT EXISTS "AffiliateLink_workspaceId_idx" ON "AffiliateLink"("workspaceId");
@@ -182,6 +239,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS "TaxSetting_workspaceId_key" ON "TaxSetting"("
 CREATE INDEX IF NOT EXISTS "Integration_workspaceId_idx" ON "Integration"("workspaceId");
 CREATE INDEX IF NOT EXISTS "Agent_workspaceId_idx" ON "Agent"("workspaceId");
 CREATE INDEX IF NOT EXISTS "AuditLog_workspaceId_idx" ON "AuditLog"("workspaceId");
+CREATE INDEX IF NOT EXISTS "EncryptedCredential_workspaceId_idx" ON "EncryptedCredential"("workspaceId");
 
 ALTER TABLE "AffiliateProgram" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "AffiliateLink" ENABLE ROW LEVEL SECURITY;
@@ -192,11 +250,15 @@ ALTER TABLE "TaxSetting" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Integration" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "Agent" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "AuditLog" ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "EncryptedCredential" ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "affiliate_program_workspace_isolation" ON "AffiliateProgram";
 CREATE POLICY "affiliate_program_workspace_isolation" ON "AffiliateProgram" FOR ALL
 USING ("workspaceId" = current_setting('app.workspace_id', true))
-WITH CHECK ("workspaceId" = current_setting('app.workspace_id', true));
+WITH CHECK (
+  "workspaceId" = current_setting('app.workspace_id', true)
+  AND ("credentialId" IS NULL OR EXISTS (SELECT 1 FROM "EncryptedCredential" ec WHERE ec.id = "AffiliateProgram"."credentialId" AND ec."workspaceId" = "AffiliateProgram"."workspaceId"))
+);
 
 DROP POLICY IF EXISTS "affiliate_link_workspace_isolation" ON "AffiliateLink";
 CREATE POLICY "affiliate_link_workspace_isolation" ON "AffiliateLink" FOR ALL
@@ -242,7 +304,10 @@ WITH CHECK ("workspaceId" = current_setting('app.workspace_id', true));
 DROP POLICY IF EXISTS "integration_workspace_isolation" ON "Integration";
 CREATE POLICY "integration_workspace_isolation" ON "Integration" FOR ALL
 USING ("workspaceId" = current_setting('app.workspace_id', true))
-WITH CHECK ("workspaceId" = current_setting('app.workspace_id', true));
+WITH CHECK (
+  "workspaceId" = current_setting('app.workspace_id', true)
+  AND ("credentialId" IS NULL OR EXISTS (SELECT 1 FROM "EncryptedCredential" ec WHERE ec.id = "Integration"."credentialId" AND ec."workspaceId" = "Integration"."workspaceId"))
+);
 
 DROP POLICY IF EXISTS "agent_workspace_isolation" ON "Agent";
 CREATE POLICY "agent_workspace_isolation" ON "Agent" FOR ALL
@@ -251,5 +316,10 @@ WITH CHECK ("workspaceId" = current_setting('app.workspace_id', true));
 
 DROP POLICY IF EXISTS "audit_log_workspace_isolation" ON "AuditLog";
 CREATE POLICY "audit_log_workspace_isolation" ON "AuditLog" FOR ALL
+USING ("workspaceId" = current_setting('app.workspace_id', true))
+WITH CHECK ("workspaceId" = current_setting('app.workspace_id', true));
+
+DROP POLICY IF EXISTS "encrypted_credential_workspace_isolation" ON "EncryptedCredential";
+CREATE POLICY "encrypted_credential_workspace_isolation" ON "EncryptedCredential" FOR ALL
 USING ("workspaceId" = current_setting('app.workspace_id', true))
 WITH CHECK ("workspaceId" = current_setting('app.workspace_id', true));
