@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 import { writeAuditLog } from "@/lib/audit/log";
 
 export const dynamic = "force-dynamic";
@@ -15,17 +15,27 @@ export async function POST(
   if (guard) return guard.response;
 
   const { id } = await context.params;
-  const agent = await prisma.agent.findUnique({ where: { id } });
-  if (!agent) {
-    return NextResponse.json({ error: "Agent nicht gefunden." }, { status: 404 });
-  }
-
   const actor = (await getCurrentUser())?.id ?? "owner";
-  const run = await prisma.agentRun.create({
-    data: { agentId: id, status: "RUNNING" },
+
+  const run = await withWorkspaceDb(async (tx) => {
+    const agent = await tx.agent.findUnique({ where: { id }, select: { id: true } });
+    if (!agent) return null;
+
+    const created = await tx.agentRun.create({
+      data: { agentId: agent.id, status: "RUNNING" },
+    });
+
+    await tx.agent.update({
+      where: { id: agent.id },
+      data: { status: "RUNNING", lastRunAt: new Date() },
+    });
+
+    return created;
   });
 
-  await prisma.agent.update({ where: { id }, data: { status: "RUNNING", lastRunAt: new Date() } });
+  if (!run) {
+    return NextResponse.json({ error: "Agent nicht gefunden." }, { status: 404 });
+  }
 
   await writeAuditLog({
     action: "agent.run",
