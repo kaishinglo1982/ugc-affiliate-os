@@ -16,23 +16,21 @@ export async function listMediaAssets(filters: MediaListFilters) {
       tx.videoJob.findMany({ select: { id: true } }),
     ]);
 
-    const where: Prisma.MediaAssetWhereInput = {
-      AND: [
-        {
-          OR: [
-            { productId: { in: products.map((item) => item.id) } },
-            { campaignId: { in: campaigns.map((item) => item.id) } },
-            { videoJobId: { in: videoJobs.map((item) => item.id) } },
-          ],
-        },
-      ],
-    };
-    if (!filters.includeArchived) where.AND?.push({ archivedAt: null });
+    const conditions: Prisma.MediaAssetWhereInput[] = [
+      {
+        OR: [
+          { productId: { in: products.map((item) => item.id) } },
+          { campaignId: { in: campaigns.map((item) => item.id) } },
+          { videoJobId: { in: videoJobs.map((item) => item.id) } },
+        ],
+      },
+    ];
+    if (!filters.includeArchived) conditions.push({ archivedAt: null });
     if (filters.kind && filters.kind !== "ALL") {
-      where.AND?.push({ kind: filters.kind as Prisma.EnumMediaKindFilter["equals"] });
+      conditions.push({ kind: filters.kind as Prisma.EnumMediaKindFilter["equals"] });
     }
     if (filters.search) {
-      where.AND?.push({
+      conditions.push({
         OR: [
           { fileName: { contains: filters.search, mode: "insensitive" } },
           { tags: { has: filters.search } },
@@ -41,7 +39,7 @@ export async function listMediaAssets(filters: MediaListFilters) {
     }
 
     return tx.mediaAsset.findMany({
-      where,
+      where: { AND: conditions },
       include: {
         product: { select: { id: true, name: true } },
         campaign: { select: { id: true, name: true } },
