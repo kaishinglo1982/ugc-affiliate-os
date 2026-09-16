@@ -1,40 +1,47 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 import { summarizeFinance } from "@/lib/finance/calculations";
 
 export async function listRevenues() {
-  return prisma.revenue.findMany({
-    include: {
-      product: { select: { id: true, name: true } },
-      campaign: { select: { id: true, name: true } },
-      program: { select: { id: true, provider: true, customName: true } },
-    },
-    orderBy: { date: "desc" },
-  });
+  return withWorkspaceDb((tx) =>
+    tx.revenue.findMany({
+      include: {
+        product: { select: { id: true, name: true } },
+        campaign: { select: { id: true, name: true } },
+        program: { select: { id: true, provider: true, customName: true } },
+      },
+      orderBy: { date: "desc" },
+    }),
+  );
 }
 
 export async function listExpenses() {
-  return prisma.expense.findMany({
-    include: {
-      product: { select: { id: true, name: true } },
-      campaign: { select: { id: true, name: true } },
-    },
-    orderBy: { date: "desc" },
-  });
+  return withWorkspaceDb((tx) =>
+    tx.expense.findMany({
+      include: {
+        product: { select: { id: true, name: true } },
+        campaign: { select: { id: true, name: true } },
+      },
+      orderBy: { date: "desc" },
+    }),
+  );
 }
 
-/** Singleton settings row — created with sensible defaults on first read. */
+/** One tax-settings row per active workspace, enforced by the DB unique index. */
 export async function getOrCreateTaxSetting() {
-  const existing = await prisma.taxSetting.findFirst();
-  if (existing) return existing;
-  return prisma.taxSetting.create({
-    data: {
-      reserveRatePercent: 30,
-      vatRatePercent: 19,
-      vatEnabled: false,
-      tradeTaxReservePercent: 15,
-      incomeTaxReservePercent: 25,
-    },
+  return withWorkspaceDb(async (tx) => {
+    const existing = await tx.taxSetting.findFirst();
+    if (existing) return existing;
+
+    return tx.taxSetting.create({
+      data: {
+        reserveRatePercent: 30,
+        vatRatePercent: 19,
+        vatEnabled: false,
+        tradeTaxReservePercent: 15,
+        incomeTaxReservePercent: 25,
+      },
+    });
   });
 }
 
@@ -56,18 +63,20 @@ export interface FinanceOverview {
 }
 
 export async function getFinanceOverview(): Promise<FinanceOverview> {
-  const [revenues, expenses] = await Promise.all([
-    prisma.revenue.findMany({
-      include: { product: { select: { name: true } }, campaign: { select: { name: true } } },
-    }),
-    prisma.expense.findMany({
-      include: { product: { select: { name: true } }, campaign: { select: { name: true } } },
-    }),
-  ]);
+  const [revenues, expenses] = await withWorkspaceDb((tx) =>
+    Promise.all([
+      tx.revenue.findMany({
+        include: { product: { select: { name: true } }, campaign: { select: { name: true } } },
+      }),
+      tx.expense.findMany({
+        include: { product: { select: { name: true } }, campaign: { select: { name: true } } },
+      }),
+    ]),
+  );
 
   const summary = summarizeFinance(
-    revenues.map((r) => r.grossAmount),
-    expenses.map((e) => e.amount),
+    revenues.map((revenue) => revenue.grossAmount),
+    expenses.map((expense) => expense.amount),
   );
 
   function bucket<T extends { revenue: number; expense: number }>(): Map<string, T> {
@@ -91,30 +100,30 @@ export async function getFinanceOverview(): Promise<FinanceOverview> {
   const productMap = bucket<{ revenue: number; expense: number }>();
   const campaignMap = bucket<{ revenue: number; expense: number }>();
 
-  for (const r of revenues) {
-    const amount = Number(r.grossAmount);
-    accumulate(monthlyMap, monthKey(r.date), "revenue", amount);
-    accumulate(quarterlyMap, quarterKey(r.date), "revenue", amount);
-    accumulate(platformMap, r.platform ?? "Unbekannt", "revenue", amount);
-    accumulate(productMap, r.product?.name ?? "Ohne Produkt", "revenue", amount);
-    accumulate(campaignMap, r.campaign?.name ?? "Ohne Kampagne", "revenue", amount);
+  for (const revenue of revenues) {
+    const amount = Number(revenue.grossAmount);
+    accumulate(monthlyMap, monthKey(revenue.date), "revenue", amount);
+    accumulate(quarterlyMap, quarterKey(revenue.date), "revenue", amount);
+    accumulate(platformMap, revenue.platform ?? "Unbekannt", "revenue", amount);
+    accumulate(productMap, revenue.product?.name ?? "Ohne Produkt", "revenue", amount);
+    accumulate(campaignMap, revenue.campaign?.name ?? "Ohne Kampagne", "revenue", amount);
   }
-  for (const e of expenses) {
-    const amount = Number(e.amount);
-    accumulate(monthlyMap, monthKey(e.date), "expense", amount);
-    accumulate(quarterlyMap, quarterKey(e.date), "expense", amount);
-    accumulate(productMap, e.product?.name ?? "Ohne Produkt", "expense", amount);
-    accumulate(campaignMap, e.campaign?.name ?? "Ohne Kampagne", "expense", amount);
+  for (const expense of expenses) {
+    const amount = Number(expense.amount);
+    accumulate(monthlyMap, monthKey(expense.date), "expense", amount);
+    accumulate(quarterlyMap, quarterKey(expense.date), "expense", amount);
+    accumulate(productMap, expense.product?.name ?? "Ohne Produkt", "expense", amount);
+    accumulate(campaignMap, expense.campaign?.name ?? "Ohne Kampagne", "expense", amount);
   }
 
   const toSortedSeries = (map: Map<string, { revenue: number; expense: number }>) =>
     Array.from(map.entries())
-      .map(([period, v]) => ({ period, ...v, margin: v.revenue - v.expense }))
+      .map(([period, value]) => ({ period, ...value, margin: value.revenue - value.expense }))
       .sort((a, b) => a.period.localeCompare(b.period));
 
   const toRankedList = (map: Map<string, { revenue: number; expense: number }>) =>
     Array.from(map.entries())
-      .map(([label, v]) => ({ label, ...v, margin: v.revenue - v.expense }))
+      .map(([label, value]) => ({ label, ...value, margin: value.revenue - value.expense }))
       .sort((a, b) => b.revenue - a.revenue);
 
   return {
