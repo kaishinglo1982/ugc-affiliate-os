@@ -259,6 +259,7 @@ enum CampaignStatus {
 
 model Campaign {
   id              String         @id @default(uuid())
+  workspaceId     String         @default(dbgenerated("COALESCE(NULLIF(current_setting('app.workspace_id'::text, true), ''::text), '00000000-0000-0000-0000-000000000001'::text)"))
   name            String
   productId       String?
   product         Product?       @relation(fields: [productId], references: [id])
@@ -284,6 +285,7 @@ model Campaign {
   mediaAssets MediaAsset[]
   briefs      ContentBrief[]
 
+  @@index([workspaceId])
   @@index([status])
 }
 
@@ -299,6 +301,7 @@ enum ScriptStatus {
 
 model Script {
   id          String       @id @default(uuid())
+  workspaceId String       @default(dbgenerated("COALESCE(NULLIF(current_setting('app.workspace_id'::text, true), ''::text), '00000000-0000-0000-0000-000000000001'::text)"))
   title       String
   productId   String?
   product     Product?     @relation(fields: [productId], references: [id])
@@ -317,6 +320,7 @@ model Script {
   versions  ScriptVersion[]
   videoJobs VideoJob[]
 
+  @@index([workspaceId])
   @@index([status])
   @@index([campaignId])
 }
@@ -371,6 +375,7 @@ enum VideoProviderKey {
 
 model VideoJob {
   id           String           @id @default(uuid())
+  workspaceId  String           @default(dbgenerated("COALESCE(NULLIF(current_setting('app.workspace_id'::text, true), ''::text), '00000000-0000-0000-0000-000000000001'::text)"))
   scriptId     String?
   script       Script?          @relation(fields: [scriptId], references: [id])
   productId    String?
@@ -398,6 +403,7 @@ model VideoJob {
 
   mediaAssets MediaAsset[]
 
+  @@index([workspaceId])
   @@index([status])
   @@index([campaignId])
 }
@@ -415,6 +421,7 @@ enum MediaKind {
 
 model MediaAsset {
   id          String    @id @default(uuid())
+  workspaceId String    @default(dbgenerated("COALESCE(NULLIF(current_setting('app.workspace_id'::text, true), ''::text), '00000000-0000-0000-0000-000000000001'::text)"))
   kind        MediaKind
   fileName    String
   storageKey  String
@@ -438,6 +445,7 @@ model MediaAsset {
 
   primaryImageProducts Product[] @relation("ProductPrimaryImage")
 
+  @@index([workspaceId])
   @@index([kind])
   @@index([campaignId])
 }
@@ -459,6 +467,7 @@ enum SocialPlatform {
 
 model SocialAccount {
   id           String               @id @default(uuid())
+  workspaceId  String               @default(dbgenerated("COALESCE(NULLIF(current_setting('app.workspace_id'::text, true), ''::text), '00000000-0000-0000-0000-000000000001'::text)"))
   platform     SocialPlatform
   handle       String
   mode         IntegrationMode      @default(MOCK)
@@ -470,6 +479,7 @@ model SocialAccount {
 
   posts SocialPost[]
 
+  @@index([workspaceId])
   @@index([platform])
 }
 
@@ -486,6 +496,7 @@ enum SocialPostStatus {
 
 model SocialPost {
   id                String           @id @default(uuid())
+  workspaceId       String           @default(dbgenerated("COALESCE(NULLIF(current_setting('app.workspace_id'::text, true), ''::text), '00000000-0000-0000-0000-000000000001'::text)"))
   campaignId        String?
   campaign          Campaign?        @relation(fields: [campaignId], references: [id])
   mediaAssetId      String?
@@ -512,6 +523,7 @@ model SocialPost {
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
 
+  @@index([workspaceId])
   @@index([status])
   @@index([scheduledAt])
 }
@@ -2065,7 +2077,7 @@ model ProductDiscoveryProviderRun {
   discoveredOfferCount Int                       @default(0)
   newProductCount      Int                       @default(0)
   updatedProductCount  Int                       @default(0)
-  duplicateCount       Int                       @default(0)
+  duplicateCount      Int                       @default(0)
   rejectedCount        Int                       @default(0)
   failureCode          ProductSourceFailureCode?
   failureReason        String?
@@ -3145,7 +3157,7 @@ model CampaignFactoryTemplate {
   objective                 CampaignObjective
   defaultPlatforms          SocialPlatform[]              @default([])
   defaultFormats            PublishingFormat[]            @default([])
-  defaultCreativeAngleTypes CreativeAngleType[]           @default([])
+  defaultCreativeAngleTypes CreativeAngleType[]            @default([])
   plannedContentCount       Int                           @default(1)
   taskTemplateDefinition    Json                          @default("{}")
   status                    CampaignFactoryTemplateStatus @default(draft)
