@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 
 export interface AuditEntry {
   id: string;
@@ -10,10 +10,12 @@ export interface AuditEntry {
 }
 
 export async function listAudit(): Promise<AuditEntry[]> {
-  const entries = await prisma.auditLog.findMany({
-    orderBy: { createdAt: "desc" },
-    take: 100,
-  });
+  const entries = await withWorkspaceDb((tx) =>
+    tx.auditLog.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 100,
+    }),
+  );
 
   return entries.map((e) => ({
     id: e.id,
