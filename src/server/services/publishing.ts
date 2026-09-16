@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db/client";
 import { withWorkspaceDb } from "@/lib/db/workspace-context";
+import type { Prisma } from "@/generated/prisma/client";
 
 const isCoreBound = (): boolean => process.env.CARRYOS_INTEGRATION_MODE === "CORE_BOUND";
 
@@ -42,14 +43,14 @@ export async function listSocialAccounts() {
 
 /** Posts that occupy a day on the content calendar, keyed by their scheduled or already-published date. */
 export async function listPostsForCalendar() {
-  const query = {
+  const query: Prisma.SocialPostFindManyArgs = {
     where: { OR: [{ scheduledAt: { not: null } }, { publishedAt: { not: null } }] },
     include: {
       account: true,
       campaign: { select: { id: true, name: true } },
     },
     orderBy: { updatedAt: "desc" },
-  } as const;
+  };
 
   const posts = isCoreBound()
     ? await withWorkspaceDb((tx) => tx.socialPost.findMany(query))
