@@ -1,5 +1,5 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 import type { Prisma } from "@/generated/prisma/client";
 
 export interface MediaListFilters {
@@ -9,22 +9,44 @@ export interface MediaListFilters {
 }
 
 export async function listMediaAssets(filters: MediaListFilters) {
-  const where: Prisma.MediaAssetWhereInput = {};
-  if (!filters.includeArchived) where.archivedAt = null;
-  if (filters.kind && filters.kind !== "ALL") where.kind = filters.kind as Prisma.EnumMediaKindFilter["equals"];
-  if (filters.search) {
-    where.OR = [
-      { fileName: { contains: filters.search, mode: "insensitive" } },
-      { tags: { has: filters.search } },
-    ];
-  }
+  return withWorkspaceDb(async (tx, workspaceId) => {
+    const [products, campaigns, videoJobs] = await Promise.all([
+      tx.product.findMany({ where: { workspaceId }, select: { id: true } }),
+      tx.campaign.findMany({ select: { id: true } }),
+      tx.videoJob.findMany({ select: { id: true } }),
+    ]);
 
-  return prisma.mediaAsset.findMany({
-    where,
-    include: {
-      product: { select: { id: true, name: true } },
-      campaign: { select: { id: true, name: true } },
-    },
-    orderBy: { createdAt: "desc" },
+    const where: Prisma.MediaAssetWhereInput = {
+      AND: [
+        {
+          OR: [
+            { productId: { in: products.map((item) => item.id) } },
+            { campaignId: { in: campaigns.map((item) => item.id) } },
+            { videoJobId: { in: videoJobs.map((item) => item.id) } },
+          ],
+        },
+      ],
+    };
+    if (!filters.includeArchived) where.AND?.push({ archivedAt: null });
+    if (filters.kind && filters.kind !== "ALL") {
+      where.AND?.push({ kind: filters.kind as Prisma.EnumMediaKindFilter["equals"] });
+    }
+    if (filters.search) {
+      where.AND?.push({
+        OR: [
+          { fileName: { contains: filters.search, mode: "insensitive" } },
+          { tags: { has: filters.search } },
+        ],
+      });
+    }
+
+    return tx.mediaAsset.findMany({
+      where,
+      include: {
+        product: { select: { id: true, name: true } },
+        campaign: { select: { id: true, name: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
   });
 }
