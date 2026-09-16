@@ -109,6 +109,7 @@ describe.runIf(runDatabaseTest)("legacy workspace PostgreSQL RLS", () => {
       await admin.query(`DELETE FROM "Script" WHERE id = ANY($1::text[])`, [[scriptA, scriptB]]);
       await admin.query(`DELETE FROM "Campaign" WHERE id = ANY($1::text[])`, [[campaignA, campaignB]]);
       await admin.query(`DELETE FROM "Product" WHERE id = ANY($1::text[])`, [[productA, productB]]);
+      await admin.query(`DROP OWNED BY "${roleName}"`);
       await admin.query(`DROP ROLE IF EXISTS "${roleName}"`);
       await admin.end();
     }
