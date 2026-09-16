@@ -1,6 +1,5 @@
 import "server-only";
 import { withWorkspaceDb } from "@/lib/db/workspace-context";
-import { resolveLegacyWorkspaceOwnership } from "@/lib/db/workspace-ownership";
 import type { Prisma } from "@/generated/prisma/client";
 
 export interface MediaListFilters {
@@ -10,11 +9,8 @@ export interface MediaListFilters {
 }
 
 export async function listMediaAssets(filters: MediaListFilters) {
-  return withWorkspaceDb(async (tx, workspaceId) => {
-    const ownership = await resolveLegacyWorkspaceOwnership(tx, workspaceId);
-    const conditions: Prisma.MediaAssetWhereInput[] = [
-      { id: { in: ownership.mediaAssetIds } },
-    ];
+  return withWorkspaceDb(async (tx) => {
+    const conditions: Prisma.MediaAssetWhereInput[] = [];
     if (!filters.includeArchived) conditions.push({ archivedAt: null });
     if (filters.kind && filters.kind !== "ALL") {
       conditions.push({ kind: filters.kind as Prisma.EnumMediaKindFilter["equals"] });
@@ -29,7 +25,7 @@ export async function listMediaAssets(filters: MediaListFilters) {
     }
 
     return tx.mediaAsset.findMany({
-      where: { AND: conditions },
+      where: conditions.length > 0 ? { AND: conditions } : undefined,
       include: {
         product: { select: { id: true, name: true } },
         campaign: { select: { id: true, name: true } },
