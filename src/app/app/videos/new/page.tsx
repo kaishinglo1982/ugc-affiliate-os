@@ -1,15 +1,20 @@
 import type { Metadata } from "next";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 import { VideoJobForm } from "@/components/videos/video-job-form";
 import { listProductsForSelect } from "@/server/services/affiliate";
 
 export const metadata: Metadata = { title: "Neuer Videoauftrag" };
 
 export default async function NewVideoJobPage() {
-  const [scripts, products, campaigns] = await Promise.all([
-    prisma.script.findMany({ select: { id: true, title: true }, orderBy: { createdAt: "desc" } }),
+  const [workspaceData, products] = await Promise.all([
+    withWorkspaceDb(async (tx) => {
+      const [scripts, campaigns] = await Promise.all([
+        tx.script.findMany({ select: { id: true, title: true }, orderBy: { createdAt: "desc" } }),
+        tx.campaign.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+      ]);
+      return { scripts, campaigns };
+    }),
     listProductsForSelect(),
-    prisma.campaign.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
 
   return (
@@ -22,9 +27,9 @@ export default async function NewVideoJobPage() {
         </p>
       </div>
       <VideoJobForm
-        scripts={scripts.map((s) => ({ id: s.id, label: s.title }))}
+        scripts={workspaceData.scripts.map((s) => ({ id: s.id, label: s.title }))}
         products={products.map((p) => ({ id: p.id, label: p.name }))}
-        campaigns={campaigns.map((c) => ({ id: c.id, label: c.name }))}
+        campaigns={workspaceData.campaigns.map((c) => ({ id: c.id, label: c.name }))}
       />
     </div>
   );
