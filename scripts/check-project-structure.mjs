@@ -22,11 +22,16 @@ for (const path of architecture.requiredArchitectureFiles) {
 const sourceRoot = join(repositoryRoot, architecture.sourceRoot);
 if (existsSync(sourceRoot)) {
   for (const entry of readdirSync(sourceRoot, { withFileTypes: true })) {
-    if (entry.name.startsWith(".")) continue;
+    if (entry.name.startsWith(".") || !entry.isDirectory()) continue;
     if (!architecture.allowedSourceAreas.includes(entry.name)) {
       fail(`Unregistered source area: src/${entry.name}. Add it to architecture.config.mjs or move it.`);
     }
   }
+}
+
+function isAllowedAppRouteSegment(repositoryPath, directoryName) {
+  return repositoryPath.startsWith("src/app/")
+    && architecture.allowedAppRouteSegments.includes(directoryName.toLowerCase());
 }
 
 function walk(directory) {
@@ -36,7 +41,11 @@ function walk(directory) {
     const repositoryPath = relative(repositoryRoot, absolutePath).split(sep).join("/");
 
     if (entry.isDirectory()) {
-      if (architecture.forbiddenSourceDirectoryNames.includes(entry.name.toLowerCase())) {
+      const normalizedName = entry.name.toLowerCase();
+      if (
+        architecture.forbiddenSourceDirectoryNames.includes(normalizedName)
+        && !isAllowedAppRouteSegment(repositoryPath, normalizedName)
+      ) {
         fail(`Ambiguous directory name is forbidden: ${repositoryPath}`);
       }
       const depth = repositoryPath.split("/").length;

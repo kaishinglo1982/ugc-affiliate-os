@@ -2,10 +2,10 @@
   "name": "ugc-affiliate-os",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@11.13.0",
+  "packageManager": "pnpm@11.13.1",
   "engines": {
     "node": ">=20.9.0 <25",
-    "pnpm": "11.13.0"
+    "pnpm": "11.13.1"
   },
   "scripts": {
     "dev": "next dev",
@@ -96,7 +96,7 @@
     "tailwindcss": "^4",
     "tailwindcss-animate": "1.0.7",
     "tsx": "^4.23.0",
-    "typescript": "^7.0.2",
+    "typescript": "6.0.3",
     "vitest": "4.1.10"
   }
 }

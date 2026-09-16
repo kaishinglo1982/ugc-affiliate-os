@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { Prisma } from "@/generated/prisma/client";
 import { requireApiPermission } from "@/lib/api/guard";
@@ -9,10 +10,7 @@ import { writeAuditLog } from "@/lib/audit/log";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(
-  _request: Request,
-  context: { params: Promise<{ id: string }> },
-) {
+export async function POST(_request: Request, context: { params: Promise<{ id: string }> }) {
   const guard = await requireApiPermission(Permission.MANAGE_WORKFLOWS);
   if (guard) return guard.response;
 
@@ -27,16 +25,23 @@ export async function POST(
   }
 
   const { id } = await context.params;
-  const previous = await prisma.workflowRun.findFirst({
-    where: { id, workspaceId: workspaceId },
-  });
+  const previous = await prisma.workflowRun.findFirst({ where: { id, workspaceId } });
   if (!previous) {
     return NextResponse.json({ error: "Run nicht gefunden." }, { status: 404 });
   }
 
   const actor = (await getCurrentUser())?.id ?? "owner";
   const run = await prisma.workflowRun.create({
-    data: { workflowId: previous.workflowId, status: "RUNNING", context: previous.context as Prisma.InputJsonValue },
+    data: {
+      workspaceId,
+      workflowId: previous.workflowId,
+      workflowVersion: previous.workflowVersion,
+      definitionSnapshot: previous.definitionSnapshot as Prisma.InputJsonValue,
+      definitionHash: previous.definitionHash,
+      correlationId: randomUUID(),
+      status: "RUNNING",
+      context: previous.context as Prisma.InputJsonValue,
+    },
   });
 
   await writeAuditLog({
@@ -46,6 +51,5 @@ export async function POST(
     actor,
     metadata: { previousRunId: id },
   });
-
   return NextResponse.json({ run }, { status: 201 });
 }

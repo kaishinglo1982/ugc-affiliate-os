@@ -11,11 +11,17 @@ export const architecture = Object.freeze({
   allowedSourceAreas: [
     "app",
     "components",
+    "features",
     "generated",
     "hooks",
     "lib",
+    "server",
     "styles",
+    "test",
     "types",
+  ],
+  allowedAppRouteSegments: [
+    "new",
   ],
   platformDomains: [
     "agents",
