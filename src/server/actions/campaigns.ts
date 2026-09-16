@@ -1,13 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/db/client";
 import { runMutation } from "@/server/actions/action-helpers";
 import { campaignFormSchema, statusChangeSchema, idSchema } from "@/lib/validation/campaigns";
 import { isValidCampaignTransition, type CampaignStatus } from "@/features/campaigns/status";
 import { ok, fail, newRequestId, type Result } from "@/types/result";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 
 export async function saveCampaignAction(
   campaignId: string | null,
@@ -26,23 +26,43 @@ export async function saveCampaignAction(
     return fail("Eingabe ungültig.", requestId, parsed.error.flatten().fieldErrors);
   }
 
-  const data = {
-    name: parsed.data.name,
-    productId: parsed.data.productId || null,
-    affiliateLinkId: parsed.data.affiliateLinkId || null,
-    audience: parsed.data.audience || null,
-    targetPlatforms: parsed.data.targetPlatforms,
-    contentGoal: parsed.data.contentGoal || null,
-    budget: parsed.data.budget ?? null,
-    startDate: parsed.data.startDate ? new Date(parsed.data.startDate) : null,
-    endDate: parsed.data.endDate ? new Date(parsed.data.endDate) : null,
-    status: parsed.data.status,
-    notes: parsed.data.notes || null,
-  };
+  const campaign = await withWorkspaceDb(async (tx, workspaceId) => {
+    const productId = parsed.data.productId || null;
+    const affiliateLinkId = parsed.data.affiliateLinkId || null;
 
-  const campaign = campaignId
-    ? await prisma.campaign.update({ where: { id: campaignId }, data })
-    : await prisma.campaign.create({ data });
+    if (productId) {
+      const product = await tx.product.findFirst({ where: { id: productId, workspaceId }, select: { id: true } });
+      if (!product) throw new Error("CAMPAIGN_PRODUCT_OUTSIDE_WORKSPACE");
+    }
+    if (affiliateLinkId) {
+      const link = await tx.affiliateLink.findFirst({
+        where: { id: affiliateLinkId, product: { workspaceId } },
+        select: { id: true },
+      });
+      if (!link) throw new Error("CAMPAIGN_AFFILIATE_LINK_OUTSIDE_WORKSPACE");
+    }
+    if (!productId && !affiliateLinkId) {
+      throw new Error("CAMPAIGN_WORKSPACE_OWNERSHIP_REQUIRED");
+    }
+
+    const data = {
+      name: parsed.data.name,
+      productId,
+      affiliateLinkId,
+      audience: parsed.data.audience || null,
+      targetPlatforms: parsed.data.targetPlatforms,
+      contentGoal: parsed.data.contentGoal || null,
+      budget: parsed.data.budget ?? null,
+      startDate: parsed.data.startDate ? new Date(parsed.data.startDate) : null,
+      endDate: parsed.data.endDate ? new Date(parsed.data.endDate) : null,
+      status: parsed.data.status,
+      notes: parsed.data.notes || null,
+    };
+
+    return campaignId
+      ? tx.campaign.update({ where: { id: campaignId }, data })
+      : tx.campaign.create({ data });
+  });
 
   await writeAuditLog({
     action: campaignId ? "campaign.update" : "campaign.create",
@@ -64,19 +84,24 @@ export async function changeCampaignStatusAction(id: string, status: string) {
   if (!user) return fail("Nicht authentifiziert.", requestId);
   if (!parsed.success) return fail("Ungültiger Status.", requestId);
 
-  const current = await prisma.campaign.findUniqueOrThrow({ where: { id } });
+  const result = await withWorkspaceDb(async (tx) => {
+    const current = await tx.campaign.findUniqueOrThrow({ where: { id } });
+    if (!isValidCampaignTransition(current.status as CampaignStatus, parsed.data.status as CampaignStatus)) {
+      return { current, updated: null };
+    }
+    const updated = await tx.campaign.update({
+      where: { id },
+      data: { status: parsed.data.status },
+    });
+    return { current, updated };
+  });
 
-  if (!isValidCampaignTransition(current.status as CampaignStatus, parsed.data.status as CampaignStatus)) {
+  if (!result.updated) {
     return fail(
-      `Statuswechsel von "${current.status}" zu "${parsed.data.status}" ist nicht zulässig.`,
+      `Statuswechsel von "${result.current.status}" zu "${parsed.data.status}" ist nicht zulässig.`,
       requestId,
     );
   }
-
-  const updated = await prisma.campaign.update({
-    where: { id },
-    data: { status: parsed.data.status },
-  });
 
   await writeAuditLog({
     action: "campaign.status_change",
@@ -84,12 +109,12 @@ export async function changeCampaignStatusAction(id: string, status: string) {
     entityId: id,
     requestId,
     actor: user.email,
-    metadata: { from: current.status, to: parsed.data.status },
+    metadata: { from: result.current.status, to: parsed.data.status },
   });
 
   revalidatePath("/app/campaigns");
   revalidatePath(`/app/campaigns/${id}`);
-  return ok(updated, requestId);
+  return ok(result.updated, requestId);
 }
 
 export async function deleteCampaignAction(id: string) {
@@ -98,10 +123,11 @@ export async function deleteCampaignAction(id: string) {
     input: { id },
     auditAction: "campaign.delete",
     entityType: "Campaign",
-    handler: async (input) => {
-      await prisma.campaign.delete({ where: { id: input.id } });
-      return { id: input.id };
-    },
+    handler: async (input) =>
+      withWorkspaceDb(async (tx) => {
+        await tx.campaign.delete({ where: { id: input.id } });
+        return { id: input.id };
+      }),
     entityId: (output) => output.id,
   });
   revalidatePath("/app/campaigns");
