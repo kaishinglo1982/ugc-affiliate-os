@@ -19,37 +19,37 @@ export interface ProductListFilters {
 }
 
 export async function listProducts(filters: ProductListFilters) {
-  const where: Prisma.ProductWhereInput = {};
+  return withWorkspaceDb(async (tx, workspaceId) => {
+    const where: Prisma.ProductWhereInput = { workspaceId };
 
-  if (!filters.includeArchived) {
-    where.status = { not: "ARCHIVED" };
-  }
-  if (filters.status && filters.status !== "ALL") {
-    where.status = filters.status as ProductStatus;
-  }
-  if (filters.category && filters.category !== "ALL") {
-    where.categoryLabel = filters.category;
-  }
-  if (filters.trend && filters.trend !== "ALL") {
-    where.trend = filters.trend as TrendStatus;
-  }
-  if (filters.risk && filters.risk !== "ALL") {
-    where.risk = filters.risk as RiskLevel;
-  }
-  if (filters.favoritesOnly) {
-    where.isFavorite = true;
-  }
-  if (filters.search) {
-    where.OR = [
-      { name: { contains: filters.search, mode: "insensitive" } },
-      { vendor: { contains: filters.search, mode: "insensitive" } },
-      { categoryLabel: { contains: filters.search, mode: "insensitive" } },
-      { tags: { has: filters.search } },
-    ];
-  }
+    if (!filters.includeArchived) {
+      where.status = { not: "ARCHIVED" };
+    }
+    if (filters.status && filters.status !== "ALL") {
+      where.status = filters.status as ProductStatus;
+    }
+    if (filters.category && filters.category !== "ALL") {
+      where.categoryLabel = filters.category;
+    }
+    if (filters.trend && filters.trend !== "ALL") {
+      where.trend = filters.trend as TrendStatus;
+    }
+    if (filters.risk && filters.risk !== "ALL") {
+      where.risk = filters.risk as RiskLevel;
+    }
+    if (filters.favoritesOnly) {
+      where.isFavorite = true;
+    }
+    if (filters.search) {
+      where.OR = [
+        { name: { contains: filters.search, mode: "insensitive" } },
+        { vendor: { contains: filters.search, mode: "insensitive" } },
+        { categoryLabel: { contains: filters.search, mode: "insensitive" } },
+        { tags: { has: filters.search } },
+      ];
+    }
 
-  const products = await withWorkspaceDb((tx) =>
-    tx.product.findMany({
+    const products = await tx.product.findMany({
       where,
       include: { scores: { orderBy: { createdAt: "desc" }, take: 1 } },
       orderBy:
@@ -58,25 +58,25 @@ export async function listProducts(filters: ProductListFilters) {
           : filters.sort === "price"
             ? { price: "desc" }
             : { createdAt: "desc" },
-    }),
-  );
+    });
 
-  const withScore = products.map((p) => ({
-    ...p,
-    latestScore: p.scores[0]?.totalScore ?? 0,
-  }));
+    const withScore = products.map((p) => ({
+      ...p,
+      latestScore: p.scores[0]?.totalScore ?? 0,
+    }));
 
-  if (filters.sort === "score" || !filters.sort) {
-    withScore.sort((a, b) => b.latestScore - a.latestScore);
-  }
+    if (filters.sort === "score" || !filters.sort) {
+      withScore.sort((a, b) => b.latestScore - a.latestScore);
+    }
 
-  return withScore;
+    return withScore;
+  });
 }
 
 export async function getProductById(id: string) {
-  return withWorkspaceDb((tx) =>
-    tx.product.findUnique({
-      where: { id },
+  return withWorkspaceDb((tx, workspaceId) =>
+    tx.product.findFirst({
+      where: { id, workspaceId },
       include: {
         scores: { orderBy: { createdAt: "desc" }, take: 1 },
         affiliateLinks: { include: { program: true } },
@@ -87,9 +87,9 @@ export async function getProductById(id: string) {
 }
 
 export async function listProductCategories(): Promise<string[]> {
-  const products = await withWorkspaceDb((tx) =>
+  const products = await withWorkspaceDb((tx, workspaceId) =>
     tx.product.findMany({
-      where: { categoryLabel: { not: null } },
+      where: { workspaceId, categoryLabel: { not: null } },
       select: { categoryLabel: true },
       distinct: ["categoryLabel"],
     }),
