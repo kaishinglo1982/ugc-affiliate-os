@@ -1,5 +1,5 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 import type {
   Prisma,
   ProductStatus,
@@ -48,16 +48,18 @@ export async function listProducts(filters: ProductListFilters) {
     ];
   }
 
-  const products = await prisma.product.findMany({
-    where,
-    include: { scores: { orderBy: { createdAt: "desc" }, take: 1 } },
-    orderBy:
-      filters.sort === "name"
-        ? { name: "asc" }
-        : filters.sort === "price"
-          ? { price: "desc" }
-          : { createdAt: "desc" },
-  });
+  const products = await withWorkspaceDb((tx) =>
+    tx.product.findMany({
+      where,
+      include: { scores: { orderBy: { createdAt: "desc" }, take: 1 } },
+      orderBy:
+        filters.sort === "name"
+          ? { name: "asc" }
+          : filters.sort === "price"
+            ? { price: "desc" }
+            : { createdAt: "desc" },
+    }),
+  );
 
   const withScore = products.map((p) => ({
     ...p,
@@ -72,21 +74,25 @@ export async function listProducts(filters: ProductListFilters) {
 }
 
 export async function getProductById(id: string) {
-  return prisma.product.findUnique({
-    where: { id },
-    include: {
-      scores: { orderBy: { createdAt: "desc" }, take: 1 },
-      affiliateLinks: { include: { program: true } },
-      campaigns: true,
-    },
-  });
+  return withWorkspaceDb((tx) =>
+    tx.product.findUnique({
+      where: { id },
+      include: {
+        scores: { orderBy: { createdAt: "desc" }, take: 1 },
+        affiliateLinks: { include: { program: true } },
+        campaigns: true,
+      },
+    }),
+  );
 }
 
 export async function listProductCategories(): Promise<string[]> {
-  const products = await prisma.product.findMany({
-    where: { categoryLabel: { not: null } },
-    select: { categoryLabel: true },
-    distinct: ["categoryLabel"],
-  });
+  const products = await withWorkspaceDb((tx) =>
+    tx.product.findMany({
+      where: { categoryLabel: { not: null } },
+      select: { categoryLabel: true },
+      distinct: ["categoryLabel"],
+    }),
+  );
   return products.map((p) => p.categoryLabel).filter((c): c is string => Boolean(c));
 }
