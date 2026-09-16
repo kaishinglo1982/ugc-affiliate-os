@@ -2,9 +2,9 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { resolveWorkspaceId } from "@/lib/auth/tenant";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 import { getAgent } from "@/server/services/agents";
 import { listAgentMemory } from "@/server/services/agent-memory";
-import { prisma } from "@/lib/db/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -24,12 +24,18 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
   const agent = await getAgent(id);
   if (!agent) notFound();
 
-  const memory = await listAgentMemory(workspaceId, { agentKey: agent.key });
-  const audit = await prisma.auditLog.findMany({
-    where: { entityId: agent.id },
-    orderBy: { createdAt: "desc" },
-    take: 10,
-  });
+  const [memory, audit] = await Promise.all([
+    listAgentMemory(workspaceId, { agentKey: agent.key }),
+    withWorkspaceDb(
+      (tx) =>
+        tx.auditLog.findMany({
+          where: { entityId: agent.id },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+        }),
+      workspaceId,
+    ),
+  ]);
 
   return (
     <div className="space-y-6">
