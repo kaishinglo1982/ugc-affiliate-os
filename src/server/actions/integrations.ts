@@ -33,11 +33,19 @@ export async function saveHuggingFaceSettingsAction(
   const { apiKey, model, temperature, maxTokens, autoSuggestHooks } = parsed.data;
   const encrypted = apiKey ? encryptSecret(apiKey) : null;
 
-  const integration = await withWorkspaceDb(async (tx) => {
-    let current = await tx.integration.findUnique({ where: { providerKey: "huggingface" } });
+  const integration = await withWorkspaceDb(async (tx, workspaceId) => {
+    let current = await tx.integration.findUnique({
+      where: {
+        workspaceId_providerKey: {
+          workspaceId,
+          providerKey: "huggingface",
+        },
+      },
+    });
     if (!current) {
       current = await tx.integration.create({
         data: {
+          workspaceId,
           providerKey: "huggingface",
           displayName: "HuggingFace",
           category: "AI",
@@ -62,6 +70,7 @@ export async function saveHuggingFaceSettingsAction(
       } else {
         const credential = await tx.encryptedCredential.create({
           data: {
+            workspaceId,
             label: "HuggingFace API Key",
             cipherText: encrypted.cipherText,
             iv: encrypted.iv,
@@ -102,8 +111,15 @@ export async function disconnectIntegrationAction(providerKey: string) {
     auditAction: "integration.disconnect",
     entityType: "Integration",
     handler: async ({ providerKey: key }) =>
-      withWorkspaceDb(async (tx) => {
-        const integration = await tx.integration.findUnique({ where: { providerKey: key } });
+      withWorkspaceDb(async (tx, workspaceId) => {
+        const integration = await tx.integration.findUnique({
+          where: {
+            workspaceId_providerKey: {
+              workspaceId,
+              providerKey: key,
+            },
+          },
+        });
         if (!integration) return { providerKey: key };
 
         await tx.integration.update({
