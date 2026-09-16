@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
+import { listMediaAssets } from "@/server/services/media";
 import { listSocialPosts, listSocialAccounts } from "@/server/services/publishing";
 import { PublishingPageClient } from "@/components/publishing/publishing-page-client";
 import type { PostRow } from "@/components/publishing/posts-table";
@@ -11,12 +12,10 @@ export default async function PublishingPage() {
   const [posts, accounts, campaigns, mediaAssets] = await Promise.all([
     listSocialPosts(),
     listSocialAccounts(),
-    prisma.campaign.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
-    prisma.mediaAsset.findMany({
-      select: { id: true, fileName: true },
-      orderBy: { createdAt: "desc" },
-      take: 100,
-    }),
+    withWorkspaceDb((tx) =>
+      tx.campaign.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    ),
+    listMediaAssets({}),
   ]);
 
   const rows: PostRow[] = posts.map((p) => ({
@@ -68,7 +67,7 @@ export default async function PublishingPage() {
       postEditData={postEditData}
       accounts={accounts.map((a) => ({ id: a.id, label: a.handle, platform: a.platform }))}
       campaigns={campaigns.map((c) => ({ id: c.id, label: c.name }))}
-      mediaAssets={mediaAssets.map((m) => ({ id: m.id, label: m.fileName }))}
+      mediaAssets={mediaAssets.slice(0, 100).map((m) => ({ id: m.id, label: m.fileName }))}
     />
   );
 }
