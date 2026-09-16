@@ -4,7 +4,7 @@ import { BrainCircuit, KeyRound, Plug, ShieldCheck, Sparkles } from "lucide-reac
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 import { isLlmProviderConfigured, LLM_PROVIDER_KEYS } from "@/lib/providers/llm/registry";
 
 export const metadata: Metadata = { title: "Einstellungen" };
@@ -20,10 +20,12 @@ const PROVIDER_LABELS: Record<string, string> = {
 };
 
 export default async function SettingsPage() {
-  const hfIntegration = await prisma.integration.findUnique({
-    where: { providerKey: "huggingface" },
-    select: { status: true, credentialId: true },
-  });
+  const hfIntegration = await withWorkspaceDb((tx) =>
+    tx.integration.findFirst({
+      where: { providerKey: "huggingface" },
+      select: { status: true, credentialId: true },
+    }),
+  );
 
   const providerStatus: { key: string; label: string; configured: boolean; stored: boolean }[] =
     LLM_PROVIDER_KEYS.map((key) => ({
