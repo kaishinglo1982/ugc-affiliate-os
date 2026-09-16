@@ -128,11 +128,31 @@ DO $$
 BEGIN
   IF EXISTS (
     SELECT 1
+    FROM "Campaign" c
+    JOIN "Product" p ON p.id = c."productId"
+    WHERE c."workspaceId" <> p."workspaceId"
+  ) OR EXISTS (
+    SELECT 1
+    FROM "Campaign" c
+    JOIN "AffiliateLink" al ON al.id = c."affiliateLinkId"
+    JOIN "Product" p ON p.id = al."productId"
+    WHERE c."workspaceId" <> p."workspaceId"
+  ) THEN
+    RAISE EXCEPTION 'CAMPAIGN_PARENT_WORKSPACE_MISMATCH';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1
     FROM "Script" s
     JOIN "Campaign" c ON c.id = s."campaignId"
     WHERE s."workspaceId" <> c."workspaceId"
+  ) OR EXISTS (
+    SELECT 1
+    FROM "Script" s
+    JOIN "Product" p ON p.id = s."productId"
+    WHERE s."workspaceId" <> p."workspaceId"
   ) THEN
-    RAISE EXCEPTION 'SCRIPT_CAMPAIGN_WORKSPACE_MISMATCH';
+    RAISE EXCEPTION 'SCRIPT_PARENT_WORKSPACE_MISMATCH';
   END IF;
 
   IF EXISTS (
@@ -145,6 +165,11 @@ BEGIN
     FROM "VideoJob" v
     JOIN "Script" s ON s.id = v."scriptId"
     WHERE v."workspaceId" <> s."workspaceId"
+  ) OR EXISTS (
+    SELECT 1
+    FROM "VideoJob" v
+    JOIN "Product" p ON p.id = v."productId"
+    WHERE v."workspaceId" <> p."workspaceId"
   ) THEN
     RAISE EXCEPTION 'VIDEO_JOB_PARENT_WORKSPACE_MISMATCH';
   END IF;
@@ -159,6 +184,11 @@ BEGIN
     FROM "MediaAsset" m
     JOIN "VideoJob" v ON v.id = m."videoJobId"
     WHERE m."workspaceId" <> v."workspaceId"
+  ) OR EXISTS (
+    SELECT 1
+    FROM "MediaAsset" m
+    JOIN "Product" p ON p.id = m."productId"
+    WHERE m."workspaceId" <> p."workspaceId"
   ) THEN
     RAISE EXCEPTION 'MEDIA_PARENT_WORKSPACE_MISMATCH';
   END IF;
@@ -219,32 +249,135 @@ ALTER TABLE "MediaAsset" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "SocialPost" ENABLE ROW LEVEL SECURITY;
 ALTER TABLE "SocialAccount" ENABLE ROW LEVEL SECURITY;
 
+-- Each policy checks both direct row ownership and same-workspace parent
+-- references. This prevents a tenant-A row from pointing at tenant-B parents.
 DROP POLICY IF EXISTS "campaign_workspace_isolation" ON "Campaign";
 CREATE POLICY "campaign_workspace_isolation" ON "Campaign" FOR ALL
 USING ("workspaceId" = current_setting('app.workspace_id', true))
-WITH CHECK ("workspaceId" = current_setting('app.workspace_id', true));
+WITH CHECK (
+  "workspaceId" = current_setting('app.workspace_id', true)
+  AND (
+    "productId" IS NULL OR EXISTS (
+      SELECT 1 FROM "Product" p
+      WHERE p.id = "Campaign"."productId"
+        AND p."workspaceId" = current_setting('app.workspace_id', true)
+    )
+  )
+  AND (
+    "affiliateLinkId" IS NULL OR EXISTS (
+      SELECT 1
+      FROM "AffiliateLink" al
+      JOIN "Product" p ON p.id = al."productId"
+      WHERE al.id = "Campaign"."affiliateLinkId"
+        AND p."workspaceId" = current_setting('app.workspace_id', true)
+    )
+  )
+);
 
 DROP POLICY IF EXISTS "script_workspace_isolation" ON "Script";
 CREATE POLICY "script_workspace_isolation" ON "Script" FOR ALL
 USING ("workspaceId" = current_setting('app.workspace_id', true))
-WITH CHECK ("workspaceId" = current_setting('app.workspace_id', true));
+WITH CHECK (
+  "workspaceId" = current_setting('app.workspace_id', true)
+  AND (
+    "productId" IS NULL OR EXISTS (
+      SELECT 1 FROM "Product" p
+      WHERE p.id = "Script"."productId"
+        AND p."workspaceId" = current_setting('app.workspace_id', true)
+    )
+  )
+  AND (
+    "campaignId" IS NULL OR EXISTS (
+      SELECT 1 FROM "Campaign" c
+      WHERE c.id = "Script"."campaignId"
+        AND c."workspaceId" = current_setting('app.workspace_id', true)
+    )
+  )
+);
 
 DROP POLICY IF EXISTS "video_job_workspace_isolation" ON "VideoJob";
 CREATE POLICY "video_job_workspace_isolation" ON "VideoJob" FOR ALL
 USING ("workspaceId" = current_setting('app.workspace_id', true))
-WITH CHECK ("workspaceId" = current_setting('app.workspace_id', true));
+WITH CHECK (
+  "workspaceId" = current_setting('app.workspace_id', true)
+  AND (
+    "productId" IS NULL OR EXISTS (
+      SELECT 1 FROM "Product" p
+      WHERE p.id = "VideoJob"."productId"
+        AND p."workspaceId" = current_setting('app.workspace_id', true)
+    )
+  )
+  AND (
+    "campaignId" IS NULL OR EXISTS (
+      SELECT 1 FROM "Campaign" c
+      WHERE c.id = "VideoJob"."campaignId"
+        AND c."workspaceId" = current_setting('app.workspace_id', true)
+    )
+  )
+  AND (
+    "scriptId" IS NULL OR EXISTS (
+      SELECT 1 FROM "Script" s
+      WHERE s.id = "VideoJob"."scriptId"
+        AND s."workspaceId" = current_setting('app.workspace_id', true)
+    )
+  )
+);
 
 DROP POLICY IF EXISTS "media_asset_workspace_isolation" ON "MediaAsset";
 CREATE POLICY "media_asset_workspace_isolation" ON "MediaAsset" FOR ALL
+USING ("workspaceId" = current_setting('app.workspace_id', true))
+WITH CHECK (
+  "workspaceId" = current_setting('app.workspace_id', true)
+  AND (
+    "productId" IS NULL OR EXISTS (
+      SELECT 1 FROM "Product" p
+      WHERE p.id = "MediaAsset"."productId"
+        AND p."workspaceId" = current_setting('app.workspace_id', true)
+    )
+  )
+  AND (
+    "campaignId" IS NULL OR EXISTS (
+      SELECT 1 FROM "Campaign" c
+      WHERE c.id = "MediaAsset"."campaignId"
+        AND c."workspaceId" = current_setting('app.workspace_id', true)
+    )
+  )
+  AND (
+    "videoJobId" IS NULL OR EXISTS (
+      SELECT 1 FROM "VideoJob" v
+      WHERE v.id = "MediaAsset"."videoJobId"
+        AND v."workspaceId" = current_setting('app.workspace_id', true)
+    )
+  )
+);
+
+DROP POLICY IF EXISTS "social_account_workspace_isolation" ON "SocialAccount";
+CREATE POLICY "social_account_workspace_isolation" ON "SocialAccount" FOR ALL
 USING ("workspaceId" = current_setting('app.workspace_id', true))
 WITH CHECK ("workspaceId" = current_setting('app.workspace_id', true));
 
 DROP POLICY IF EXISTS "social_post_workspace_isolation" ON "SocialPost";
 CREATE POLICY "social_post_workspace_isolation" ON "SocialPost" FOR ALL
 USING ("workspaceId" = current_setting('app.workspace_id', true))
-WITH CHECK ("workspaceId" = current_setting('app.workspace_id', true));
-
-DROP POLICY IF EXISTS "social_account_workspace_isolation" ON "SocialAccount";
-CREATE POLICY "social_account_workspace_isolation" ON "SocialAccount" FOR ALL
-USING ("workspaceId" = current_setting('app.workspace_id', true))
-WITH CHECK ("workspaceId" = current_setting('app.workspace_id', true));
+WITH CHECK (
+  "workspaceId" = current_setting('app.workspace_id', true)
+  AND EXISTS (
+    SELECT 1 FROM "SocialAccount" sa
+    WHERE sa.id = "SocialPost"."accountId"
+      AND sa."workspaceId" = current_setting('app.workspace_id', true)
+  )
+  AND (
+    "campaignId" IS NULL OR EXISTS (
+      SELECT 1 FROM "Campaign" c
+      WHERE c.id = "SocialPost"."campaignId"
+        AND c."workspaceId" = current_setting('app.workspace_id', true)
+    )
+  )
+  AND (
+    "mediaAssetId" IS NULL OR EXISTS (
+      SELECT 1 FROM "MediaAsset" m
+      WHERE m.id = "SocialPost"."mediaAssetId"
+        AND m."workspaceId" = current_setting('app.workspace_id', true)
+    )
+  )
+);
