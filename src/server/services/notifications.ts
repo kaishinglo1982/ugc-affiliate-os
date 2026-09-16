@@ -1,13 +1,15 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 
 export async function listRecentNotifications(limit = 8) {
-  return prisma.notification.findMany({
-    orderBy: { createdAt: "desc" },
-    take: limit,
-  });
+  return withWorkspaceDb((tx) =>
+    tx.notification.findMany({
+      orderBy: { createdAt: "desc" },
+      take: limit,
+    }),
+  );
 }
 
 export async function countUnreadNotifications(): Promise<number> {
-  return prisma.notification.count({ where: { readAt: null } });
+  return withWorkspaceDb((tx) => tx.notification.count({ where: { readAt: null } }));
 }
