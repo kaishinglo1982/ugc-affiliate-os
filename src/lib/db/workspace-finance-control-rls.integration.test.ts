@@ -33,6 +33,8 @@ const ids = {
   runB: randomUUID(),
   auditA: randomUUID(),
   auditB: randomUUID(),
+  notificationA: randomUUID(),
+  notificationB: randomUUID(),
 };
 
 const slugA = `rls-a-${randomUUID()}`;
@@ -73,6 +75,7 @@ const protectedTables = [
   "Agent",
   "AgentRun",
   "AuditLog",
+  "Notification",
 ] as const;
 
 describe.runIf(runDatabaseTest)("finance, secret vault and control-plane PostgreSQL RLS", () => {
@@ -87,7 +90,7 @@ describe.runIf(runDatabaseTest)("finance, secret vault and control-plane Postgre
     await admin.query(
       `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
        "Product", "AffiliateProgram", "AffiliateLink", "LinkClick", "Revenue", "Expense",
-       "TaxSetting", "Integration", "EncryptedCredential", "Agent", "AgentRun", "AuditLog"
+       "TaxSetting", "Integration", "EncryptedCredential", "Agent", "AgentRun", "AuditLog", "Notification"
        TO "${roleName}"`,
     );
 
@@ -145,8 +148,6 @@ describe.runIf(runDatabaseTest)("finance, secret vault and control-plane Postgre
       [ids.taxA, workspaceA, ids.taxB, workspaceB],
     );
 
-    // Same providerKey in two workspaces proves the historical global unique
-    // constraint has been replaced by a tenant-scoped composite unique.
     await admin.query(
       `INSERT INTO "Integration" (id, "workspaceId", "providerKey", "displayName", category, "credentialId", "createdAt", "updatedAt")
        VALUES ($1, $2, 'shared-provider', 'Shared A', 'AI', $3, now(), now()),
@@ -154,7 +155,6 @@ describe.runIf(runDatabaseTest)("finance, secret vault and control-plane Postgre
       [ids.integrationA, workspaceA, ids.credentialA, ids.integrationB, workspaceB, ids.credentialB],
     );
 
-    // Same agent key is also valid once uniqueness is workspace-scoped.
     await admin.query(
       `INSERT INTO "Agent" (id, "workspaceId", key, name, role, description, "createdAt", "updatedAt")
        VALUES ($1, $2, 'shared-agent', 'Agent A', 'test', 'A', now(), now()),
@@ -174,6 +174,13 @@ describe.runIf(runDatabaseTest)("finance, secret vault and control-plane Postgre
       [ids.auditA, workspaceA, ids.auditB, workspaceB],
     );
 
+    await admin.query(
+      `INSERT INTO "Notification" (id, "workspaceId", level, title, message, "createdAt")
+       VALUES ($1, $2, 'INFO', 'Notification A', 'A', now()),
+              ($3, $4, 'INFO', 'Notification B', 'B', now())`,
+      [ids.notificationA, workspaceA, ids.notificationB, workspaceB],
+    );
+
     restricted = new Client({ connectionString: restrictedUrl() });
     await restricted.connect();
   });
@@ -182,6 +189,7 @@ describe.runIf(runDatabaseTest)("finance, secret vault and control-plane Postgre
     if (restricted) await restricted.end();
     if (!admin) return;
 
+    await admin.query(`DELETE FROM "Notification" WHERE id = ANY($1::text[])`, [[ids.notificationA, ids.notificationB]]);
     await admin.query(`DELETE FROM "AgentRun" WHERE id = ANY($1::text[])`, [[ids.runA, ids.runB]]);
     await admin.query(`DELETE FROM "Agent" WHERE id = ANY($1::text[])`, [[ids.agentA, ids.agentB]]);
     await admin.query(`DELETE FROM "AuditLog" WHERE id = ANY($1::text[])`, [[ids.auditA, ids.auditB]]);
@@ -230,10 +238,12 @@ describe.runIf(runDatabaseTest)("finance, secret vault and control-plane Postgre
       `SELECT id FROM "Agent" WHERE key = 'shared-agent'`,
     );
     const credentials = await restricted.query<{ id: string }>(`SELECT id FROM "EncryptedCredential"`);
+    const notifications = await restricted.query<{ id: string }>(`SELECT id FROM "Notification"`);
 
     expect(integrations.rows.map((row) => row.id)).toEqual([ids.integrationB]);
     expect(agents.rows.map((row) => row.id)).toEqual([ids.agentB]);
     expect(credentials.rows.map((row) => row.id)).toEqual([ids.credentialB]);
+    expect(notifications.rows.map((row) => row.id)).toEqual([ids.notificationB]);
     await rollback();
   });
 
@@ -284,18 +294,29 @@ describe.runIf(runDatabaseTest)("finance, secret vault and control-plane Postgre
     await rollback();
   });
 
-  it("inherits app.workspace_id for tenant-owned audit rows", async () => {
+  it("inherits app.workspace_id for tenant-owned audit and notification rows", async () => {
     await beginWorkspace(workspaceA);
-    const id = randomUUID();
+    const auditId = randomUUID();
+    const notificationId = randomUUID();
     await restricted.query(
       `INSERT INTO "AuditLog" (id, action, "entityType", "createdAt") VALUES ($1, 'auto.scope', 'Test', now())`,
-      [id],
+      [auditId],
     );
-    const result = await restricted.query<{ workspaceId: string }>(
+    await restricted.query(
+      `INSERT INTO "Notification" (id, level, title, message, "createdAt") VALUES ($1, 'INFO', 'Auto scope', 'Scoped', now())`,
+      [notificationId],
+    );
+
+    const audit = await restricted.query<{ workspaceId: string }>(
       `SELECT "workspaceId" FROM "AuditLog" WHERE id = $1`,
-      [id],
+      [auditId],
     );
-    expect(result.rows[0]?.workspaceId).toBe(workspaceA);
+    const notification = await restricted.query<{ workspaceId: string }>(
+      `SELECT "workspaceId" FROM "Notification" WHERE id = $1`,
+      [notificationId],
+    );
+    expect(audit.rows[0]?.workspaceId).toBe(workspaceA);
+    expect(notification.rows[0]?.workspaceId).toBe(workspaceA);
     await rollback();
   });
 });
