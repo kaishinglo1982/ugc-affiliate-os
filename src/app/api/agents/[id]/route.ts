@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 import { writeAuditLog } from "@/lib/audit/log";
 import type { AgentStatus } from "@/generated/prisma/client";
 
@@ -29,14 +29,23 @@ export async function PATCH(
   }
 
   const actor = (await getCurrentUser())?.id ?? "owner";
-  const agent = await prisma.agent.update({
-    where: { id },
-    data: {
-      status: parsed.data.status as AgentStatus,
-      ...(parsed.data.name ? { name: parsed.data.name } : {}),
-      ...(parsed.data.description !== undefined ? { description: parsed.data.description } : {}),
-    },
+  const agent = await withWorkspaceDb(async (tx) => {
+    const visible = await tx.agent.findUnique({ where: { id }, select: { id: true } });
+    if (!visible) return null;
+
+    return tx.agent.update({
+      where: { id: visible.id },
+      data: {
+        status: parsed.data.status as AgentStatus,
+        ...(parsed.data.name ? { name: parsed.data.name } : {}),
+        ...(parsed.data.description !== undefined ? { description: parsed.data.description } : {}),
+      },
+    });
   });
+
+  if (!agent) {
+    return NextResponse.json({ error: "Agent nicht gefunden." }, { status: 404 });
+  }
 
   await writeAuditLog({
     action: "agent.update",
