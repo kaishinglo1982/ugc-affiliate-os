@@ -1,5 +1,5 @@
 import { requireUser } from "@/lib/auth/require-user";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 import { AppShell } from "@/components/app-shell/app-shell";
 import { listRecentNotifications, countUnreadNotifications } from "@/server/services/notifications";
 
@@ -9,7 +9,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const [notifications, unreadCount, integrationIssueCount] = await Promise.all([
     listRecentNotifications(),
     countUnreadNotifications(),
-    prisma.integration.count({ where: { lastError: { not: null } } }),
+    withWorkspaceDb((tx) => tx.integration.count({ where: { lastError: { not: null } } })),
   ]);
 
   return (
