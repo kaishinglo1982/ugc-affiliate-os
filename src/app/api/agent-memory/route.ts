@@ -4,9 +4,9 @@ import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
 import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 import { writeAuditLog } from "@/lib/audit/log";
-import type { AgentMemoryType } from "@/generated/prisma/client";
+import type { AgentMemoryType, Prisma } from "@/generated/prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -32,14 +32,18 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "agentKey ist erforderlich." }, { status: 400 });
   }
 
-  const entries = await prisma.agentMemoryEntry.findMany({
-    where: {
-      workspaceId: workspaceId,
-      agentKey,
-      ...(type ? { type: type as AgentMemoryType } : {}),
-    },
-    orderBy: [{ importance: "desc" }, { createdAt: "desc" }],
-  });
+  const entries = await withWorkspaceDb(
+    (tx) =>
+      tx.agentMemoryEntry.findMany({
+        where: {
+          workspaceId,
+          agentKey,
+          ...(type ? { type: type as AgentMemoryType } : {}),
+        },
+        orderBy: [{ importance: "desc" }, { createdAt: "desc" }],
+      }),
+    workspaceId,
+  );
 
   return NextResponse.json({ entries });
 }
@@ -73,17 +77,21 @@ export async function POST(request: Request) {
   }
 
   const actor = (await getCurrentUser())?.id ?? "owner";
-  const entry = await prisma.agentMemoryEntry.create({
-    data: {
-      workspaceId: workspaceId,
-      agentKey: parsed.data.agentKey,
-      type: (parsed.data.type ?? "FACT") as AgentMemoryType,
-      key: parsed.data.key,
-      value: parsed.data.value as object | undefined,
-      importance: parsed.data.importance ?? 1,
-      expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,
-    },
-  });
+  const entry = await withWorkspaceDb(
+    (tx) =>
+      tx.agentMemoryEntry.create({
+        data: {
+          workspaceId,
+          agentKey: parsed.data.agentKey,
+          type: (parsed.data.type ?? "FACT") as AgentMemoryType,
+          key: parsed.data.key,
+          value: parsed.data.value as Prisma.InputJsonValue | undefined,
+          importance: parsed.data.importance ?? 1,
+          expiresAt: parsed.data.expiresAt ? new Date(parsed.data.expiresAt) : null,
+        },
+      }),
+    workspaceId,
+  );
 
   await writeAuditLog({
     action: "agent_memory.create",
