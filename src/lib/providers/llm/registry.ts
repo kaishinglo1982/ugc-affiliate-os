@@ -1,7 +1,18 @@
+import "server-only";
+
 import type { ScriptProvider } from "@/lib/providers/llm/types";
+import { carryOsScriptProvider } from "@/lib/providers/llm/carryos-provider";
 import { templateScriptProvider } from "@/lib/providers/llm/template-provider";
 
-export const LLM_PROVIDER_KEYS = ["openai", "anthropic", "google", "mistral", "openrouter", "huggingface", "custom"] as const;
+export const LLM_PROVIDER_KEYS = [
+  "openai",
+  "anthropic",
+  "google",
+  "mistral",
+  "openrouter",
+  "huggingface",
+  "custom",
+] as const;
 export type LlmProviderKey = (typeof LLM_PROVIDER_KEYS)[number];
 
 const ENV_KEY_BY_PROVIDER: Record<LlmProviderKey, string> = {
@@ -14,14 +25,24 @@ const ENV_KEY_BY_PROVIDER: Record<LlmProviderKey, string> = {
   custom: "OPENAI_API_KEY",
 };
 
+function isCoreBound(): boolean {
+  return process.env.CARRYOS_INTEGRATION_MODE === "CORE_BOUND";
+}
+
 export function isLlmProviderConfigured(provider: LlmProviderKey): boolean {
+  if (isCoreBound()) return false;
   return Boolean(process.env[ENV_KEY_BY_PROVIDER[provider]]);
 }
 
-/** Vendor SDK calls are not wired up yet (see docs/build-report.md "Known
- * limitations") — configured providers are reported as available in the UI,
- * but generation always runs through the local template provider so the
- * studio never makes an unexpected paid call. */
-export function resolveScriptProvider(_requested: LlmProviderKey | "template"): ScriptProvider {
+/**
+ * In CORE_BOUND mode any request that would otherwise select an external LLM
+ * is routed through CarryOS Core. The local deterministic template provider is
+ * still available for explicitly requested non-AI/offline generation.
+ */
+export function resolveScriptProvider(requested: LlmProviderKey | "template"): ScriptProvider {
+  if (requested === "template") return templateScriptProvider;
+  if (isCoreBound()) return carryOsScriptProvider;
+  // Direct vendor SDK calls are intentionally not wired in this repository.
+  // Standalone remains deterministic until a separately governed provider is implemented.
   return templateScriptProvider;
 }
