@@ -3,7 +3,7 @@ import { z } from "zod";
 import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 import { writeAuditLog } from "@/lib/audit/log";
 import type { AgentStatus } from "@/generated/prisma/client";
 
@@ -16,10 +16,12 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");
 
-  const agents = await prisma.agent.findMany({
-    where: { ...(status ? { status: status as AgentStatus } : {}) },
-    orderBy: { createdAt: "desc" },
-  });
+  const agents = await withWorkspaceDb((tx) =>
+    tx.agent.findMany({
+      where: { ...(status ? { status: status as AgentStatus } : {}) },
+      orderBy: { createdAt: "desc" },
+    }),
+  );
 
   return NextResponse.json({ agents });
 }
@@ -44,17 +46,19 @@ export async function POST(request: Request) {
   }
 
   const actor = (await getCurrentUser())?.id ?? "owner";
-  const agent = await prisma.agent.create({
-    data: {
-      key: parsed.data.key,
-      name: parsed.data.name,
-      role: parsed.data.role,
-      description: parsed.data.description ?? "",
-      capabilities: parsed.data.capabilities ?? [],
-      allowedActions: parsed.data.allowedActions ?? [],
-      status: (parsed.data.status ?? "IDLE") as AgentStatus,
-    },
-  });
+  const agent = await withWorkspaceDb((tx) =>
+    tx.agent.create({
+      data: {
+        key: parsed.data.key,
+        name: parsed.data.name,
+        role: parsed.data.role,
+        description: parsed.data.description ?? "",
+        capabilities: parsed.data.capabilities ?? [],
+        allowedActions: parsed.data.allowedActions ?? [],
+        status: (parsed.data.status ?? "IDLE") as AgentStatus,
+      },
+    }),
+  );
 
   await writeAuditLog({
     action: "agent.create",
