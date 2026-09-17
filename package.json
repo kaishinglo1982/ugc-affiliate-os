@@ -2,10 +2,10 @@
   "name": "ugc-affiliate-os",
   "version": "0.1.0",
   "private": true,
-  "packageManager": "pnpm@9.15.4",
+  "packageManager": "pnpm@10.30.3",
   "engines": {
     "node": ">=20.9.0 <25",
-    "pnpm": "9.15.4"
+    "pnpm": "10.30.3"
   },
   "scripts": {
     "dev": "next dev",
