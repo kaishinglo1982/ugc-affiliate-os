@@ -1,16 +1,154 @@
 name: CI
 
 on:
+  workflow_dispatch:
+  pull_request:
   push:
     branches:
       - master
-  pull_request:
+      - main
+      - phase-10-agentic-automation
 
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PNPM_VERSION: 11.13.0
+
 jobs:
-  smoke:
+  validate:
+    name: Validate
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ugc_affiliate_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ugc_affiliate_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ugc_affiliate_ci?schema=public
+      DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/ugc_affiliate_ci?schema=public
+      AUTH_SECRET: ci-auth-secret-at-least-thirty-two-characters
+      CREDENTIAL_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      WORKER_SECRET: ci-worker-secret-at-least-thirty-two-characters
+      APP_URL: http://127.0.0.1:3000
+      ADMIN_EMAIL: owner@example.com
+      ADMIN_PASSWORD: ChangeMe123!
     steps:
-      - run: echo "GitHub Actions runner started"
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@${PNPM_VERSION} --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate project structure
+        run: pnpm run architecture:check
+
+      - name: Generate Prisma client
+        run: pnpm run db:generate
+
+      - name: Apply migrations
+        run: pnpm run db:migrate:deploy
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Lint
+        run: pnpm run lint
+
+      - name: Unit and integration tests
+        run: pnpm run test
+
+      - name: Build
+        run: pnpm run build
+
+  e2e:
+    name: E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: ugc_affiliate_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d ugc_affiliate_e2e"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ugc_affiliate_e2e?schema=public
+      DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/ugc_affiliate_e2e?schema=public
+      AUTH_SECRET: ci-auth-secret-at-least-thirty-two-characters
+      CREDENTIAL_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      WORKER_SECRET: ci-worker-secret-at-least-thirty-two-characters
+      APP_URL: http://127.0.0.1:3000
+      E2E_BASE_URL: http://127.0.0.1:3000
+      ADMIN_EMAIL: owner@example.com
+      ADMIN_PASSWORD: ChangeMe123!
+      E2E_EMAIL: owner@example.com
+      E2E_PASSWORD: ChangeMe123!
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@${PNPM_VERSION} --activate
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate project structure
+        run: pnpm run architecture:check
+
+      - name: Generate Prisma client
+        run: pnpm run db:generate
+
+      - name: Apply migrations
+        run: pnpm run db:migrate:deploy
+
+      - name: Seed database
+        run: pnpm run db:seed
+
+      - name: Install Chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Build
+        run: pnpm run build
+
+      - name: Run e2e tests
+        run: pnpm run test:e2e
