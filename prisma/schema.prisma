@@ -2652,19 +2652,21 @@ enum CostReservationStatus {
 }
 
 model CostReservation {
-  id          String                @id @default(uuid())
-  workspaceId String                @default("00000000-0000-0000-0000-000000000001")
-  policyId    String?
-  policy      BudgetPolicy?         @relation(fields: [policyId], references: [id], onDelete: SetNull)
-  ownerType   String
-  ownerId     String
-  amount      Decimal               @db.Decimal(12, 2)
-  currency    String                @default("EUR")
-  status      CostReservationStatus @default(RESERVED)
-  expiresAt   DateTime?
-  createdAt   DateTime              @default(now())
-  updatedAt   DateTime              @updatedAt
+  id             String                @id @default(uuid())
+  workspaceId    String                @default("00000000-0000-0000-0000-000000000001")
+  policyId       String?
+  policy         BudgetPolicy?         @relation(fields: [policyId], references: [id], onDelete: SetNull)
+  ownerType      String
+  ownerId        String
+  amount         Decimal               @db.Decimal(12, 2)
+  currency       String                @default("EUR")
+  status         CostReservationStatus @default(RESERVED)
+  expiresAt      DateTime?
+  idempotencyKey String
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
 
+  @@unique([workspaceId, idempotencyKey])
   @@index([workspaceId, ownerType, ownerId])
   @@index([workspaceId, status])
 }
