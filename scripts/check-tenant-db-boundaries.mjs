@@ -2,13 +2,12 @@ import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const roots = [
-  "src/app/api",
-  "src/server/services",
-  "src/server/actions",
-];
+const roots = ["src"];
 
 const allowedDirectClientImports = new Set([
+  "src/lib/db/client.ts",
+  "src/lib/db/workspace-context.ts",
+  "src/lib/db/tenant-client.ts",
   "src/app/api/health/database/route.ts",
   "src/server/actions/auth.ts",
   "src/server/actions/contact.ts",
@@ -21,8 +20,15 @@ function walk(dir) {
   const files = [];
   for (const entry of entries) {
     const full = path.join(dir, entry.name);
-    if (entry.isDirectory()) files.push(...walk(full));
-    else if (entry.isFile() && (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx"))) {
+    if (entry.isDirectory()) {
+      if (entry.name === "__tests__" || entry.name === "generated") continue;
+      files.push(...walk(full));
+    } else if (
+      entry.isFile() &&
+      (entry.name.endsWith(".ts") || entry.name.endsWith(".tsx")) &&
+      !entry.name.includes(".test.") &&
+      !entry.name.includes(".spec.")
+    ) {
       files.push(full);
     }
   }
