@@ -38,30 +38,38 @@ export async function POST(
   }
 
   const actor = (await getCurrentUser())?.id ?? "owner";
-  const existing = await prisma.approval.findFirst({
-    where: { id, workspaceId: workspaceId },
-  });
-  if (!existing) {
-    return NextResponse.json({ error: "Freigabe nicht gefunden." }, { status: 404 });
+  try {
+    const approval = await decideApproval(
+      id,
+      workspaceId,
+      parsed.data.decision,
+      parsed.data.decisionReason,
+    );
+
+    await writeAuditLog({
+      action: "approval.decide",
+      entityType: "Approval",
+      entityId: approval.id,
+      actor,
+      metadata: {
+        decision: parsed.data.decision,
+        requiredApproverCount: approval.requiredApproverCount,
+        decisionCount: approval.decisions.length,
+        status: approval.status,
+        signed: true,
+      },
+    });
+
+    return NextResponse.json({ approval });
+  } catch (error) {
+    const code = error instanceof Error ? error.message : "APPROVAL_DECISION_FAILED";
+    const status =
+      code === "APPROVAL_NOT_FOUND" ? 404 :
+      code === "APPROVAL_EXPIRED" ? 410 :
+      code === "APPROVAL_NOT_PENDING" || code === "APPROVAL_ALREADY_CONSUMED" ? 409 :
+      code === "FOUR_EYES_REQUESTER_CANNOT_APPROVE" || code === "APPROVAL_ALREADY_DECIDED_BY_ACTOR" ? 403 :
+      409;
+    return NextResponse.json({ error: code }, { status });
   }
 
-  const approval = await prisma.approval.update({
-    where: { id },
-    data: {
-      status: parsed.data.decision,
-      decidedBy: actor,
-      decisionReason: parsed.data.decisionReason,
-      decidedAt: new Date(),
-    },
-  });
-
-  await writeAuditLog({
-    action: "approval.decide",
-    entityType: "Approval",
-    entityId: approval.id,
-    actor,
-    metadata: { decision: parsed.data.decision },
-  });
-
-  return NextResponse.json({ approval });
 }
