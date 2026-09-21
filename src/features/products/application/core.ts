@@ -249,7 +249,9 @@ export async function runDiscoveryForQuery(
     });
 
     try {
-      const programId = await ensureProgram(prisma, provider);
+      const programId = await tenantPrismaForWorkspace(workspaceId).$transaction((tx) =>
+        ensureProgram(tx, provider),
+      );
       const providerPort = getProductSourceProvider(provider);
       const request = {
         workspaceId,
