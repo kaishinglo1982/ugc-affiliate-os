@@ -43,14 +43,14 @@ export async function listSocialAccounts() {
 
 /** Posts that occupy a day on the content calendar, keyed by their scheduled or already-published date. */
 export async function listPostsForCalendar() {
-  const query: Prisma.SocialPostFindManyArgs = {
+  const query = {
     where: { OR: [{ scheduledAt: { not: null } }, { publishedAt: { not: null } }] },
     include: {
       account: true,
       campaign: { select: { id: true, name: true } },
     },
     orderBy: { updatedAt: "desc" },
-  };
+  } satisfies Prisma.SocialPostFindManyArgs;
 
   const posts = isCoreBound()
     ? await withWorkspaceDb((tx) => tx.socialPost.findMany(query))
