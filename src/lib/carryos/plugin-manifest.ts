@@ -14,6 +14,68 @@ const permissionSchema = z.enum([
 
 const eventFieldTypeSchema = z.enum(["string", "number", "boolean", "object", "array", "null"]);
 
+const companyOSContractSchema = z.object({
+  departments: z.array(z.object({
+    key: z.string().min(1),
+    name: z.string().min(1),
+    purpose: z.string().min(1),
+    parentKey: z.string().min(1).optional(),
+  }).strict()),
+  capabilities: z.array(z.object({
+    key: z.string().min(1),
+    name: z.string().min(1),
+    description: z.string().min(1),
+    departmentKey: z.string().min(1),
+    requiredSkillKeys: z.array(z.string().min(1)).optional(),
+    requiredConnectorKeys: z.array(z.string().min(1)).optional(),
+    requiredPluginIds: z.array(z.string().min(1)).optional(),
+    outcomeKeys: z.array(z.string().min(1)).optional(),
+  }).strict()),
+  skills: z.array(z.object({
+    key: z.string().min(1),
+    version: z.string().min(1),
+    name: z.string().min(1),
+    description: z.string().min(1),
+    kind: z.enum(["SKILL", "SOP"]),
+    departmentKey: z.string().min(1),
+    capabilityKeys: z.array(z.string().min(1)),
+    steps: z.array(z.string().min(1)).optional(),
+    approvalRequired: z.boolean().optional(),
+  }).strict()),
+  businessObjects: z.array(z.object({
+    type: z.string().min(1),
+    displayName: z.string().min(1),
+    owner: z.enum(["PLUGIN", "CORE_REFERENCE"]),
+    idField: z.string().min(1),
+    tenantField: z.string().min(1).optional(),
+    dataClass: z.enum(["PUBLIC", "INTERNAL", "CONFIDENTIAL", "PII"]),
+    eventTypes: z.array(z.string().min(1)).optional(),
+  }).strict()),
+  outcomes: z.array(z.object({
+    key: z.string().min(1),
+    name: z.string().min(1),
+    unit: z.string().min(1),
+    direction: z.enum(["HIGHER_IS_BETTER", "LOWER_IS_BETTER", "TARGET_RANGE"]),
+    source: z.enum(["AGENT_RUN", "WORKFLOW_RUN", "BUSINESS_OBJECT", "EXTERNAL_SYSTEM"]),
+    baselineRequired: z.boolean(),
+  }).strict()),
+  workforceTemplates: z.array(z.object({
+    key: z.string().min(1),
+    version: z.string().min(1),
+    name: z.string().min(1),
+    description: z.string().min(1),
+    departmentKeys: z.array(z.string().min(1)),
+    capabilityKeys: z.array(z.string().min(1)),
+    skillKeys: z.array(z.string().min(1)),
+    agentKeys: z.array(z.string().min(1)),
+    workflowKeys: z.array(z.string().min(1)),
+    requiredPluginIds: z.array(z.string().min(1)).optional(),
+    requiredConnectorKeys: z.array(z.string().min(1)).optional(),
+    outcomeKeys: z.array(z.string().min(1)).optional(),
+    defaultAutonomy: z.enum(["L0", "L1", "L2", "L3", "L4", "L5"]).optional(),
+  }).strict()),
+}).strict();
+
 const eventContractSchema = z.object({
   eventType: z.string().min(1),
   version: z.string().min(1),
@@ -46,6 +108,7 @@ export const carryOsPluginManifestSchema = z.object({
   }),
   permissions: z.array(permissionSchema),
   capabilities: z.array(z.string().min(1)),
+  companyOS: companyOSContractSchema,
   eventContracts: z.array(eventContractSchema).optional(),
   dependencies: z.record(z.string(), z.string()).optional(),
   lifecycle: z.enum(["draft", "review", "published", "deprecated", "suspended"]).optional(),
