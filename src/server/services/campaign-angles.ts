@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db/client";
+import { tenantPrismaForWorkspace } from "@/lib/db/tenant-client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
 import {
@@ -21,7 +21,7 @@ export async function listAngles(
   workspaceId: string,
   opts: { campaignStrategyId?: string; status?: CreativeAngleStatus } = {},
 ) {
-  return prisma.creativeAngle.findMany({
+  return tenantPrismaForWorkspace(workspaceId).creativeAngle.findMany({
     where: {
       workspaceId,
       ...(opts.campaignStrategyId ? { campaignStrategyId: opts.campaignStrategyId } : {}),
@@ -32,19 +32,19 @@ export async function listAngles(
 }
 
 export async function getAngle(id: string, workspaceId: string) {
-  return prisma.creativeAngle.findFirst({ where: { id, workspaceId } });
+  return tenantPrismaForWorkspace(workspaceId).creativeAngle.findFirst({ where: { id, workspaceId } });
 }
 
 export async function createAngle(input: CreateAngleInput, workspaceId: string) {
   const parsed = createAngleSchema.parse(input);
-  const strategy = await prisma.campaignStrategy.findFirst({
+  const strategy = await tenantPrismaForWorkspace(workspaceId).campaignStrategy.findFirst({
     where: { id: parsed.campaignStrategyId, workspaceId },
   });
   if (!strategy) throw new Error("Strategie nicht gefunden.");
   if (strategy.status !== "approved") {
     throw new Error("Creative Angles sind nur für freigegebene Strategien erlaubt.");
   }
-  const angle = await prisma.creativeAngle.create({
+  const angle = await tenantPrismaForWorkspace(workspaceId).creativeAngle.create({
     data: {
       workspaceId,
       campaignStrategyId: parsed.campaignStrategyId,
@@ -90,7 +90,7 @@ export async function updateAngle(id: string, input: UpdateAngleInput, workspace
   if (parsed.recommendedScriptStructures) {
     data.recommendedScriptStructures = parsed.recommendedScriptStructures as ScriptStructureType[];
   }
-  const updated = await prisma.creativeAngle.update({ where: { id }, data });
+  const updated = await tenantPrismaForWorkspace(workspaceId).creativeAngle.update({ where: { id }, data });
   const actor = (await getCurrentUser())?.id ?? "owner";
   await writeAuditLog({
     action: "creative_angle.updated",
@@ -108,7 +108,7 @@ export async function decideAngle(id: string, body: unknown, workspaceId: string
   const transition = canTransitionAngle(angle.status, parsed.decision);
   if (!transition.ok) throw new Error(transition.reason);
   const actor = (await getCurrentUser())?.id ?? "owner";
-  const updated = await prisma.creativeAngle.update({
+  const updated = await tenantPrismaForWorkspace(workspaceId).creativeAngle.update({
     where: { id },
     data: parsed.decision === "approved" ? { status: "approved" } : { status: "rejected" },
   });
