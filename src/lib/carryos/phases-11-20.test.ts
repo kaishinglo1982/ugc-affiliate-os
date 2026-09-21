@@ -61,6 +61,8 @@ describe("CarryOS UGC phases 11-20 governance contracts", () => {
 
   it("rejects duplicate workflow node ids", () => {
     expect(isWorkflowGraphStructurallySafe([{ id: "a", kind: "TRIGGER" }])).toBe(true);
+    expect(isWorkflowGraphStructurallySafe([{ id: "a", kind: "ACTION" }])).toBe(false);
+    expect(isWorkflowGraphStructurallySafe([{ id: "a", kind: "TRIGGER" }, { id: "b", kind: "TRIGGER" }])).toBe(false);
     expect(isWorkflowGraphStructurallySafe([{ id: "a", kind: "TRIGGER" }, { id: "a", kind: "ACTION" }])).toBe(false);
   });
 
