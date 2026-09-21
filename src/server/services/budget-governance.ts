@@ -36,6 +36,18 @@ export async function reserveBudget(input: BudgetReservationInput) {
     });
     if (existing) return existing;
 
+    // Serialize reservations per policy so concurrent workers cannot both pass
+    // the same remaining-budget check.
+    const lockedPolicy = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT "id"
+      FROM "BudgetPolicy"
+      WHERE "id" = ${input.policyId}
+        AND "workspaceId" = ${input.workspaceId}
+        AND "enabled" = true
+      FOR UPDATE
+    `;
+    if (lockedPolicy.length !== 1) throw new Error("BUDGET_POLICY_NOT_FOUND");
+
     const policy = await tx.budgetPolicy.findFirst({
       where: { id: input.policyId, workspaceId: input.workspaceId, enabled: true },
     });
