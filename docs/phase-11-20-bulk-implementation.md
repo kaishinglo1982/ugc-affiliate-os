@@ -1,31 +1,28 @@
-# UGC Affiliate OS — Bulk Implementation Phases 11–20
+# Phase 11–20 Bulk — concrete domain contracts
 
-This batch establishes the shared, typed governance contract used by phases 11–20. It deliberately extends existing domain models and CarryOS boundaries rather than introducing duplicate runtimes.
+The repository already contains substantial domain persistence for Brand, SocialAccount, Agent, Automation, Analytics, Experiments, Finance and approvals. This batch adds a single typed policy boundary instead of duplicating those domains.
 
-## Implemented in this batch
+## Phase mapping
 
-- Phase 11: brand lifecycle/policy contract and kill-switch boundary.
-- Phase 12: account risk, scope and publishing policy contract.
-- Phase 13: AI workforce/autonomy policy contract.
-- Phase 14: memory scope, evidence, confidence and secret-write guard.
-- Phase 15: plugin extension grant contract with explicit approval/scopes.
-- Phase 16: workflow-node contract and structural graph guard.
-- Phase 17: client entitlement/status policy boundary.
-- Phase 18: failure-domain taxonomy and shared operational vocabulary.
-- Phase 19: audited CarryOS module-bridge contract.
-- Phase 20: decision-class/autonomy execution guard.
+| Phase | Existing canonical model/service area | Added boundary |
+|---|---|---|
+| 11 | Brand | lifecycle + brand policy |
+| 12 | SocialAccount / publishing | risk + scope + kill switch |
+| 13 | Agent / AgentRun | autonomy + tool/spend guard |
+| 14 | Agent memory / knowledge | evidence + confidence + secret guard |
+| 15 | CarryOS plugin contract | explicit extension grant |
+| 16 | Automation / workflow validation | typed node graph guard |
+| 17 | workspace/client entitlement layer | active/entitled client guard |
+| 18 | analytics/worker operations | failure-domain taxonomy |
+| 19 | CarryOS runtime adapter | audited module bridge |
+| 20 | automation + agent governance | decision-class autonomy guard |
 
-## Intentionally not claimed
+## Non-claims
 
-This is not a claim that every UI, Prisma table, provider integration, worker, E2E journey, migration, or external API for phases 11–20 is complete. Existing repository models/services are reused where available; remaining feature-specific persistence and UI work must pass the same gates before those phases can be marked complete.
+This branch is a bulk foundation batch, not a claim that phases 11–20 have passed their complete 10/10 Definition of Done. Provider OAuth, all feature-specific APIs/UI, durable persistence for every future entity, worker execution, E2E, migrations, load/DR and external-provider contract tests remain subject to the repository gates.
 
-## Security invariants
+## Required follow-up gates
 
-- no caller-controlled tenant/workspace authority;
-- no secret-bearing memory writes;
-- no autonomous action when approval or kill switch is active;
-- critical accounts cannot publish;
-- extension installation requires explicit approval and scopes;
-- cross-module calls require correlation and audit;
-- no code/shell/SQL execution is represented by these contracts;
-- no Vercel deployment is performed by this batch.
+pnpm run typecheck, pnpm run lint, pnpm run test, pnpm run build, pnpm run validate:deploy, tenant isolation, security, integration/E2E, and migration checks must be verified before merge.
+
+Deployment policy: no Vercel deployment.
