@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { ScriptsTable, type ScriptRow } from "@/components/scripts/scripts-table";
 import { ScriptCreateSheet } from "@/components/scripts/script-create-sheet";
 import { ScriptDetailSheet, type ScriptDetailData } from "@/components/scripts/script-detail-sheet";
-import type { LlmProviderKey } from "@/lib/providers/llm/registry";
+import type { LlmProviderKey } from "@/lib/providers/llm/types";
 
 interface Option {
   id: string;
