@@ -6,29 +6,6 @@ if (!connectionString) {
   process.exit(2);
 }
 
-const protectedTables = [
-  "Product",
-  "AffiliateProgram",
-  "AffiliateLink",
-  "LinkClick",
-  "Campaign",
-  "Script",
-  "VideoJob",
-  "MediaAsset",
-  "SocialAccount",
-  "SocialPost",
-  "Revenue",
-  "Expense",
-  "TaxSetting",
-  "Integration",
-  "EncryptedCredential",
-  "Agent",
-  "AgentRun",
-  "AuditLog",
-  "Notification",
-  "AgentMemoryEntry",
-];
-
 const client = new Client({ connectionString });
 
 try {
@@ -53,30 +30,38 @@ try {
        pg_get_userbyid(c.relowner) AS owner
      FROM pg_class c
      JOIN pg_namespace n ON n.oid = c.relnamespace
+     JOIN information_schema.columns col
+       ON col.table_schema = n.nspname
+      AND col.table_name = c.relname
+      AND col.column_name = 'workspaceId'
      WHERE n.nspname = 'public'
        AND c.relkind = 'r'
-       AND c.relname = ANY($1::text[])
      ORDER BY c.relname`,
-    [protectedTables],
   );
 
-  const byName = new Map(tableResult.rows.map((row) => [row.relname, row]));
-  const missing = protectedTables.filter((name) => !byName.has(name));
-  if (missing.length) {
-    throw new Error(`RLS_PROTECTED_TABLES_MISSING: ${missing.join(", ")}`);
+  if (tableResult.rows.length === 0) {
+    throw new Error("NO_WORKSPACE_TABLES_FOUND");
   }
 
-  const noRls = protectedTables.filter((name) => !byName.get(name)?.relrowsecurity);
+  const noRls = tableResult.rows.filter((row) => !row.relrowsecurity);
   if (noRls.length) {
-    throw new Error(`RLS_NOT_ENABLED: ${noRls.join(", ")}`);
+    throw new Error(
+      `RLS_NOT_ENABLED: ${noRls.map((row) => row.relname).join(", ")}`,
+    );
   }
 
-  const owned = protectedTables.filter((name) => byName.get(name)?.owner === role.role_name);
+  const owned = tableResult.rows.filter((row) => row.owner === role.role_name);
   if (owned.length) {
-    throw new Error(`RUNTIME_DB_ROLE_MUST_NOT_OWN_PROTECTED_TABLES: ${owned.join(", ")}`);
+    throw new Error(
+      `RUNTIME_DB_ROLE_MUST_NOT_OWN_PROTECTED_TABLES: ${owned
+        .map((row) => row.relname)
+        .join(", ")}`,
+    );
   }
 
-  const forceRlsTables = protectedTables.filter((name) => byName.get(name)?.relforcerowsecurity);
+  const forceRlsTables = tableResult.rows
+    .filter((row) => row.relforcerowsecurity)
+    .map((row) => row.relname);
 
   console.log(
     JSON.stringify(
@@ -84,9 +69,11 @@ try {
         role: role.role_name,
         rolsuper: role.rolsuper,
         rolbypassrls: role.rolbypassrls,
-        protectedTableCount: protectedTables.length,
+        protectedTableCount: tableResult.rows.length,
         forceRlsTableCount: forceRlsTables.length,
         forceRlsTables,
+        forceRlsDecision:
+          "Runtime isolation is enforced by NOBYPASSRLS + non-owner role; FORCE RLS remains intentionally optional for owner/admin paths.",
         verdict: "PASS",
       },
       null,
