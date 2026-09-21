@@ -1,13 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/db/client";
 import { runMutation } from "@/server/actions/action-helpers";
 import { scriptGenerateSchema, idSchema, scriptStatusEnum } from "@/lib/validation/scripts";
 import { resolveScriptProvider } from "@/lib/providers/llm/registry";
 import { ok, fail, newRequestId, type Result } from "@/types/result";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 import { z } from "zod";
 
 export async function generateScriptAction(
@@ -24,15 +24,24 @@ export async function generateScriptAction(
   }
 
   const input = parsed.data;
-  const product = input.productId
-    ? await prisma.product.findUnique({ where: { id: input.productId } })
-    : null;
+  const ownership = await withWorkspaceDb(async (tx, workspaceId) => {
+    const product = input.productId
+      ? await tx.product.findFirst({ where: { id: input.productId, workspaceId } })
+      : null;
+    const campaign = input.campaignId
+      ? await tx.campaign.findUnique({ where: { id: input.campaignId }, select: { id: true } })
+      : null;
+    if (input.productId && !product) throw new Error("SCRIPT_PRODUCT_OUTSIDE_WORKSPACE");
+    if (input.campaignId && !campaign) throw new Error("SCRIPT_CAMPAIGN_OUTSIDE_WORKSPACE");
+    if (!product && !campaign) throw new Error("SCRIPT_WORKSPACE_OWNERSHIP_REQUIRED");
+    return { product };
+  });
 
   const provider = resolveScriptProvider(input.provider);
   const generated = await provider.generate({
-    productName: product?.name ?? input.title,
-    productDescription: product?.description,
-    problemSolved: product?.problemSolved,
+    productName: ownership.product?.name ?? input.title,
+    productDescription: ownership.product?.description,
+    problemSolved: ownership.product?.problemSolved,
     audience: input.audience,
     platform: input.platform,
     durationSec: input.durationSec,
@@ -41,28 +50,30 @@ export async function generateScriptAction(
     cta: input.cta,
   });
 
-  const script = await prisma.script.create({
-    data: {
-      title: input.title,
-      productId: input.productId || null,
-      campaignId: input.campaignId || null,
-      audience: input.audience,
-      platform: input.platform,
-      durationSec: input.durationSec,
-      tone: input.tone,
-      hookType: input.hookType,
-      cta: input.cta,
-      status: "DRAFT",
-      versions: {
-        create: {
-          versionNumber: 1,
-          ...generated,
-          sceneList: generated.sceneList,
-          generatedBy: provider.key,
+  const script = await withWorkspaceDb((tx) =>
+    tx.script.create({
+      data: {
+        title: input.title,
+        productId: input.productId || null,
+        campaignId: input.campaignId || null,
+        audience: input.audience,
+        platform: input.platform,
+        durationSec: input.durationSec,
+        tone: input.tone,
+        hookType: input.hookType,
+        cta: input.cta,
+        status: "DRAFT",
+        versions: {
+          create: {
+            versionNumber: 1,
+            ...generated,
+            sceneList: generated.sceneList,
+            generatedBy: provider.key,
+          },
         },
       },
-    },
-  });
+    }),
+  );
 
   await writeAuditLog({
     action: "script.create",
@@ -84,10 +95,12 @@ export async function regenerateScriptVersionAction(
   const user = await getCurrentUser();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
-  const script = await prisma.script.findUnique({
-    where: { id: scriptId },
-    include: { product: true, versions: { orderBy: { versionNumber: "desc" }, take: 1 } },
-  });
+  const script = await withWorkspaceDb((tx) =>
+    tx.script.findUnique({
+      where: { id: scriptId },
+      include: { product: true, versions: { orderBy: { versionNumber: "desc" }, take: 1 } },
+    }),
+  );
   if (!script) return fail("Skript nicht gefunden.", requestId);
 
   const provider = resolveScriptProvider("template");
@@ -104,15 +117,18 @@ export async function regenerateScriptVersionAction(
   });
 
   const nextVersion = (script.versions[0]?.versionNumber ?? 0) + 1;
-
-  await prisma.scriptVersion.create({
-    data: {
-      scriptId: script.id,
-      versionNumber: nextVersion,
-      ...generated,
-      sceneList: generated.sceneList,
-      generatedBy: provider.key,
-    },
+  await withWorkspaceDb(async (tx) => {
+    const ownedScript = await tx.script.findUnique({ where: { id: script.id }, select: { id: true } });
+    if (!ownedScript) throw new Error("SCRIPT_OUTSIDE_WORKSPACE");
+    await tx.scriptVersion.create({
+      data: {
+        scriptId: script.id,
+        versionNumber: nextVersion,
+        ...generated,
+        sceneList: generated.sceneList,
+        generatedBy: provider.key,
+      },
+    });
   });
 
   await writeAuditLog({
@@ -133,48 +149,51 @@ export async function duplicateScriptAction(id: string): Promise<Result<{ id: st
   const user = await getCurrentUser();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
-  const original = await prisma.script.findUnique({
-    where: { id },
-    include: { versions: { orderBy: { versionNumber: "desc" }, take: 1 } },
-  });
-  if (!original) return fail("Skript nicht gefunden.", requestId);
+  const copy = await withWorkspaceDb(async (tx) => {
+    const original = await tx.script.findUnique({
+      where: { id },
+      include: { versions: { orderBy: { versionNumber: "desc" }, take: 1 } },
+    });
+    if (!original) return null;
 
-  const latest = original.versions[0];
-  const copy = await prisma.script.create({
-    data: {
-      title: `${original.title} (Kopie)`,
-      productId: original.productId,
-      campaignId: original.campaignId,
-      audience: original.audience,
-      platform: original.platform,
-      durationSec: original.durationSec,
-      tone: original.tone,
-      hookType: original.hookType,
-      cta: original.cta,
-      status: "DRAFT",
-      versions: latest
-        ? {
-            create: {
-              versionNumber: 1,
-              hook: latest.hook,
-              problem: latest.problem,
-              situation: latest.situation,
-              productIntro: latest.productIntro,
-              demonstration: latest.demonstration,
-              benefit: latest.benefit,
-              socialProof: latest.socialProof,
-              objectionHandling: latest.objectionHandling,
-              cta: latest.cta,
-              onScreenText: latest.onScreenText,
-              bRollNotes: latest.bRollNotes,
-              voiceover: latest.voiceover,
-              sceneList: latest.sceneList as object,
-              generatedBy: latest.generatedBy,
-            },
-          }
-        : undefined,
-    },
+    const latest = original.versions[0];
+    return tx.script.create({
+      data: {
+        title: `${original.title} (Kopie)`,
+        productId: original.productId,
+        campaignId: original.campaignId,
+        audience: original.audience,
+        platform: original.platform,
+        durationSec: original.durationSec,
+        tone: original.tone,
+        hookType: original.hookType,
+        cta: original.cta,
+        status: "DRAFT",
+        versions: latest
+          ? {
+              create: {
+                versionNumber: 1,
+                hook: latest.hook,
+                problem: latest.problem,
+                situation: latest.situation,
+                productIntro: latest.productIntro,
+                demonstration: latest.demonstration,
+                benefit: latest.benefit,
+                socialProof: latest.socialProof,
+                objectionHandling: latest.objectionHandling,
+                cta: latest.cta,
+                onScreenText: latest.onScreenText,
+                bRollNotes: latest.bRollNotes,
+                voiceover: latest.voiceover,
+                sceneList: latest.sceneList as object,
+                generatedBy: latest.generatedBy,
+              },
+            }
+          : undefined,
+      },
+    });
   });
+  if (!copy) return fail("Skript nicht gefunden.", requestId);
 
   await writeAuditLog({
     action: "script.create",
@@ -197,7 +216,10 @@ export async function changeScriptStatusAction(id: string, status: string) {
     input: { id, status },
     auditAction: "script.status_change",
     entityType: "Script",
-    handler: async (input) => prisma.script.update({ where: { id: input.id }, data: { status: input.status } }),
+    handler: async (input) =>
+      withWorkspaceDb((tx) =>
+        tx.script.update({ where: { id: input.id }, data: { status: input.status } }),
+      ),
     entityId: (output) => output.id,
   });
   revalidatePath("/app/scripts");
@@ -210,10 +232,11 @@ export async function deleteScriptAction(id: string) {
     input: { id },
     auditAction: "script.delete",
     entityType: "Script",
-    handler: async (input) => {
-      await prisma.script.delete({ where: { id: input.id } });
-      return { id: input.id };
-    },
+    handler: async (input) =>
+      withWorkspaceDb(async (tx) => {
+        await tx.script.delete({ where: { id: input.id } });
+        return { id: input.id };
+      }),
     entityId: (output) => output.id,
   });
   revalidatePath("/app/scripts");

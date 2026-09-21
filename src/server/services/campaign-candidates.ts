@@ -1,5 +1,5 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
+import { tenantPrismaForWorkspace } from "@/lib/db/tenant-client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
 import {
@@ -18,7 +18,7 @@ export async function listCampaignCandidates(
   workspaceId: string,
   filters?: { status?: string; productOpportunityId?: string },
 ) {
-  return prisma.campaignCandidate.findMany({
+  return tenantPrismaForWorkspace(workspaceId).campaignCandidate.findMany({
     where: {
       workspaceId,
       ...(filters?.status ? { status: filters.status as CampaignCandidateStatus } : {}),
@@ -29,13 +29,13 @@ export async function listCampaignCandidates(
 }
 
 export async function getCampaignCandidate(id: string, workspaceId: string) {
-  return prisma.campaignCandidate.findFirst({
+  return tenantPrismaForWorkspace(workspaceId).campaignCandidate.findFirst({
     where: { id, workspaceId },
   });
 }
 
 async function assertConvertibleOpportunity(opportunityId: string, workspaceId: string) {
-  const opportunity = await prisma.productOpportunity.findFirst({
+  const opportunity = await tenantPrismaForWorkspace(workspaceId).productOpportunity.findFirst({
     where: { id: opportunityId, workspaceId },
     include: { product: true, offer: true },
   });
@@ -45,7 +45,7 @@ async function assertConvertibleOpportunity(opportunityId: string, workspaceId: 
   const offer = opportunity.offer;
   if (!offer || offer.status !== "ACTIVE") throw new Error("Affiliate Offer ist nicht aktiv.");
   if (opportunity.brandId) {
-    const brand = await prisma.brand.findUnique({ where: { id: opportunity.brandId } });
+    const brand = await tenantPrismaForWorkspace(workspaceId).brand.findUnique({ where: { id: opportunity.brandId } });
     if (brand && (brand.status === "PAUSED" || brand.status === "ARCHIVED")) {
       throw new Error("Brand ist pausiert.");
     }
@@ -62,7 +62,7 @@ export async function createCampaignCandidate(input: CreateCampaignCandidateInpu
   const parsed = createCampaignCandidateSchema.parse(input);
   const opportunity = await assertConvertibleOpportunity(parsed.productOpportunityId, workspaceId);
 
-  const existing = await prisma.campaignCandidate.findFirst({
+  const existing = await tenantPrismaForWorkspace(workspaceId).campaignCandidate.findFirst({
     where: {
       workspaceId,
       productOpportunityId: parsed.productOpportunityId,
@@ -74,7 +74,7 @@ export async function createCampaignCandidate(input: CreateCampaignCandidateInpu
   }
 
   const actor = (await getCurrentUser())?.id ?? "owner";
-  const candidate = await prisma.campaignCandidate.create({
+  const candidate = await tenantPrismaForWorkspace(workspaceId).campaignCandidate.create({
     data: {
       workspaceId,
       productOpportunityId: opportunity.id,
@@ -114,7 +114,7 @@ export async function requestCandidateApproval(id: string, body: unknown, worksp
     throw new Error("Kandidat kann nicht zur Prüfung eingereicht werden.");
   }
   const actor = (await getCurrentUser())?.id ?? "owner";
-  const updated = await prisma.campaignCandidate.update({
+  const updated = await tenantPrismaForWorkspace(workspaceId).campaignCandidate.update({
     where: { id },
     data: { status: "under_review" },
   });
@@ -146,7 +146,7 @@ export async function decideCandidate(id: string, body: unknown, workspaceId: st
     throw new Error("Statusübergang nicht erlaubt.");
   }
   const actor = (await getCurrentUser())?.id ?? "owner";
-  const updated = await prisma.campaignCandidate.update({ where: { id }, data: { status: to } });
+  const updated = await tenantPrismaForWorkspace(workspaceId).campaignCandidate.update({ where: { id }, data: { status: to } });
   await writeAuditLog({
     action: parsed.decision === "approved" ? "campaign_candidate.approved" : "campaign_candidate.rejected",
     entityType: "CampaignCandidate",
@@ -168,7 +168,7 @@ export async function convertCandidate(id: string, body: unknown, workspaceId: s
     throw new Error("Nur freigegebene Kandidaten können konvertiert werden.");
   }
   const actor = (await getCurrentUser())?.id ?? "owner";
-  const campaign = await prisma.campaign.create({
+  const campaign = await tenantPrismaForWorkspace(workspaceId).campaign.create({
     data: {
       name: parsed.name,
       productId: candidate.productId,
@@ -176,7 +176,7 @@ export async function convertCandidate(id: string, body: unknown, workspaceId: s
       notes: `Erzeugt aus Campaign Candidate ${id}`,
     },
   });
-  const updated = await prisma.campaignCandidate.update({
+  const updated = await tenantPrismaForWorkspace(workspaceId).campaignCandidate.update({
     where: { id },
     data: { status: "converted" },
   });
@@ -193,11 +193,11 @@ export async function convertCandidate(id: string, body: unknown, workspaceId: s
 export async function recalculateCandidate(id: string, workspaceId: string) {
   const candidate = await getCampaignCandidate(id, workspaceId);
   if (!candidate) throw new Error("Kandidat nicht gefunden.");
-  const opportunity = await prisma.productOpportunity.findFirst({
+  const opportunity = await tenantPrismaForWorkspace(workspaceId).productOpportunity.findFirst({
     where: { id: candidate.productOpportunityId, workspaceId },
   });
   if (!opportunity) throw new Error("Opportunity nicht gefunden.");
-  const updated = await prisma.campaignCandidate.update({
+  const updated = await tenantPrismaForWorkspace(workspaceId).campaignCandidate.update({
     where: { id },
     data: {
       opportunityScore: opportunity.totalScore,
@@ -220,7 +220,7 @@ export async function expireCandidate(id: string, workspaceId: string) {
   const candidate = await getCampaignCandidate(id, workspaceId);
   if (!candidate) return null;
   if (!["new", "under_review", "approved"].includes(candidate.status)) return candidate;
-  const updated = await prisma.campaignCandidate.update({ where: { id }, data: { status: "expired" } });
+  const updated = await tenantPrismaForWorkspace(workspaceId).campaignCandidate.update({ where: { id }, data: { status: "expired" } });
   const actor = (await getCurrentUser())?.id ?? "owner";
   await writeAuditLog({
     action: "campaign_candidate.expired",

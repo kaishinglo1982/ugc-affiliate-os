@@ -67,6 +67,12 @@ jobs:
       - name: Validate project structure
         run: pnpm run architecture:check
 
+      - name: Validate tenant DB boundaries
+        run: pnpm run tenant-db:check
+
+      - name: Validate CarryOS CORE_BOUND contract
+        run: pnpm run security:core-bound
+
       - name: Generate Prisma client
         run: pnpm run db:generate
 

@@ -1,5 +1,5 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 import { summarizeFinance } from "@/lib/finance/calculations";
 import type { DashboardPeriod } from "@/lib/dashboard-period";
 
@@ -60,39 +60,41 @@ export async function getDashboardData(period: DashboardPeriod) {
     scripts,
     videoJobs,
     socialPosts,
-  ] = await Promise.all([
-    prisma.revenue.findMany({
-      where: { date: { gte: from, lte: to } },
-      include: { product: true },
-      orderBy: { date: "asc" },
-    }),
-    prisma.expense.findMany({
-      where: { date: { gte: from, lte: to } },
-      orderBy: { date: "asc" },
-    }),
-    prisma.linkClick.count({ where: { occurredAt: { gte: from, lte: to } } }),
-    prisma.revenue.count({ where: { date: { gte: from, lte: to } } }),
-    prisma.socialPost.count({
-      where: { status: "PUBLISHED", publishedAt: { gte: from, lte: to } },
-    }),
-    prisma.campaign.count({ where: { status: "ACTIVE" } }),
-    prisma.videoJob.count({
-      where: { status: { in: ["QUEUED", "PROCESSING", "REVIEW_REQUIRED"] } },
-    }),
-    prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
-    prisma.socialPost.findMany({
-      where: { status: "SCHEDULED", scheduledAt: { gte: new Date() } },
-      orderBy: { scheduledAt: "asc" },
-      take: 5,
-      include: { account: true, campaign: true },
-    }),
-    prisma.integration.findMany({ where: { lastError: { not: null } } }),
-    prisma.agent.findMany({ orderBy: { name: "asc" } }),
-    prisma.campaign.groupBy({ by: ["status"], _count: { _all: true } }),
-    prisma.script.groupBy({ by: ["status"], _count: { _all: true } }),
-    prisma.videoJob.groupBy({ by: ["status"], _count: { _all: true } }),
-    prisma.socialPost.groupBy({ by: ["status"], _count: { _all: true } }),
-  ]);
+  ] = await withWorkspaceDb((tx) =>
+    Promise.all([
+      tx.revenue.findMany({
+        where: { date: { gte: from, lte: to } },
+        include: { product: true },
+        orderBy: { date: "asc" },
+      }),
+      tx.expense.findMany({
+        where: { date: { gte: from, lte: to } },
+        orderBy: { date: "asc" },
+      }),
+      tx.linkClick.count({ where: { occurredAt: { gte: from, lte: to } } }),
+      tx.revenue.count({ where: { date: { gte: from, lte: to } } }),
+      tx.socialPost.count({
+        where: { status: "PUBLISHED", publishedAt: { gte: from, lte: to } },
+      }),
+      tx.campaign.count({ where: { status: "ACTIVE" } }),
+      tx.videoJob.count({
+        where: { status: { in: ["QUEUED", "PROCESSING", "REVIEW_REQUIRED"] } },
+      }),
+      tx.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
+      tx.socialPost.findMany({
+        where: { status: "SCHEDULED", scheduledAt: { gte: new Date() } },
+        orderBy: { scheduledAt: "asc" },
+        take: 5,
+        include: { account: true, campaign: true },
+      }),
+      tx.integration.findMany({ where: { lastError: { not: null } } }),
+      tx.agent.findMany({ orderBy: { name: "asc" } }),
+      tx.campaign.groupBy({ by: ["status"], _count: { _all: true } }),
+      tx.script.groupBy({ by: ["status"], _count: { _all: true } }),
+      tx.videoJob.groupBy({ by: ["status"], _count: { _all: true } }),
+      tx.socialPost.groupBy({ by: ["status"], _count: { _all: true } }),
+    ]),
+  );
 
   const summary = summarizeFinance(
     revenues.map((r) => r.grossAmount),
@@ -102,7 +104,6 @@ export async function getDashboardData(period: DashboardPeriod) {
   const totalCommission = revenues.reduce((sum, r) => sum + Number(r.grossAmount), 0);
   const conversionRate = clickCount > 0 ? (conversionCount / clickCount) * 100 : 0;
 
-  // Revenue/cost history bucketed by day
   const historyMap = new Map<string, { revenue: number; expense: number }>();
   for (const r of revenues) {
     const key = dayKey(r.date);
@@ -120,7 +121,6 @@ export async function getDashboardData(period: DashboardPeriod) {
     .map(([date, values]) => ({ date, ...values }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  // Top products by revenue
   const productRevenue = new Map<string, { name: string; revenue: number }>();
   for (const r of revenues) {
     if (!r.productId || !r.product) continue;
@@ -132,7 +132,6 @@ export async function getDashboardData(period: DashboardPeriod) {
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 5);
 
-  // Top platforms by revenue
   const platformRevenue = new Map<string, number>();
   for (const r of revenues) {
     const platform = r.platform ?? "Unbekannt";

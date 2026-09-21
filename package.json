@@ -26,8 +26,11 @@
     "db:status": "prisma migrate status",
     "db:studio": "prisma studio",
     "db:reset": "prisma migrate reset",
-    "validate": "pnpm run architecture:check && pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run build",
-    "validate:deploy": "pnpm run db:generate && pnpm run architecture:check && pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run build"
+    "validate": "pnpm run architecture:check && pnpm run tenant-db:check && pnpm run security:core-bound && pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run build",
+    "validate:deploy": "pnpm run db:generate && pnpm run architecture:check && pnpm run tenant-db:check && pnpm run security:core-bound && pnpm run typecheck && pnpm run lint && pnpm run test && pnpm run build",
+    "tenant-db:check": "node scripts/check-tenant-db-boundaries.mjs",
+    "security:db-role": "node scripts/check-runtime-db-role.mjs",
+    "security:core-bound": "node scripts/check-core-bound-production-contract.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1085.0",
@@ -96,7 +99,7 @@
     "tailwindcss": "^4",
     "tailwindcss-animate": "1.0.7",
     "tsx": "^4.23.0",
-    "typescript": "^7.0.2",
+    "typescript": "6.0.3",
     "vitest": "4.1.10"
   }
 }

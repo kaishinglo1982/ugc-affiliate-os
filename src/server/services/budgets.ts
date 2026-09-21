@@ -1,8 +1,8 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
+import { tenantPrismaForWorkspace } from "@/lib/db/tenant-client";
 
 export async function listBudgets(workspaceId: string) {
-  return prisma.budgetPolicy.findMany({
+  return tenantPrismaForWorkspace(workspaceId).budgetPolicy.findMany({
     where: { workspaceId },
     orderBy: { createdAt: "desc" },
     include: {
@@ -16,7 +16,7 @@ export async function listBudgets(workspaceId: string) {
 }
 
 export async function getBudget(id: string, workspaceId: string) {
-  return prisma.budgetPolicy.findFirst({
+  return tenantPrismaForWorkspace(workspaceId).budgetPolicy.findFirst({
     where: { id, workspaceId },
     include: {
       reservations: { orderBy: { createdAt: "desc" } },

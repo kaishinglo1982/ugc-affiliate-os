@@ -1,15 +1,27 @@
+import { createHash, randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
 import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
+import { tenantPrisma as prisma } from "@/lib/db/tenant-client";
 import { writeAuditLog } from "@/lib/audit/log";
 import type { WorkflowStatus, WorkflowStepType } from "@/generated/prisma/client";
 import type { Prisma } from "@/generated/prisma/client";
 
 export const dynamic = "force-dynamic";
+
+function toWorkflowKey(name: string): string {
+  const slug = name
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 120);
+  return slug || `workflow-${randomUUID().slice(0, 8)}`;
+}
 
 export async function GET(request: Request) {
   const guard = await requireApiPermission(Permission.VIEW_WORKFLOWS);
@@ -27,16 +39,11 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");
-
   const workflows = await prisma.workflowDefinition.findMany({
-    where: {
-      workspaceId: workspaceId,
-      ...(status ? { status: status as WorkflowStatus } : {}),
-    },
+    where: { workspaceId, ...(status ? { status: status as WorkflowStatus } : {}) },
     orderBy: { createdAt: "desc" },
     include: { steps: { orderBy: { stepOrder: "asc" } } },
   });
-
   return NextResponse.json({ workflows });
 }
 
@@ -78,22 +85,34 @@ export async function POST(request: Request) {
 
   const actor = (await getCurrentUser())?.id ?? "owner";
   const { steps, ...rest } = parsed.data;
+  const key = toWorkflowKey(parsed.data.name);
+  const latest = await prisma.workflowDefinition.findFirst({
+    where: { workspaceId, key },
+    orderBy: { version: "desc" },
+    select: { version: true },
+  });
+  const version = (latest?.version ?? 0) + 1;
+  const normalizedSteps = (steps ?? []).map((step, index) => ({
+    key: `step-${index + 1}-${toWorkflowKey(step.name)}`.slice(0, 100),
+    stepOrder: index,
+    type: step.type as WorkflowStepType,
+    name: step.name,
+    dependsOn: [] as string[],
+    config: step.config as Prisma.InputJsonValue | undefined,
+  }));
+  const definitionHash = createHash("sha256")
+    .update(JSON.stringify({ key, version, ...rest, steps: normalizedSteps }))
+    .digest("hex");
 
   const workflow = await prisma.workflowDefinition.create({
     data: {
-      workspaceId: workspaceId,
+      workspaceId,
+      key,
+      version,
+      definitionHash,
       ...rest,
       config: rest.config as Prisma.InputJsonValue | undefined,
-      steps: steps
-        ? {
-            create: steps.map((s, index) => ({
-              stepOrder: index,
-              type: s.type as WorkflowStepType,
-              name: s.name,
-              config: s.config as Prisma.InputJsonValue | undefined,
-            })),
-          }
-        : undefined,
+      steps: normalizedSteps.length > 0 ? { create: normalizedSteps } : undefined,
     },
     include: { steps: { orderBy: { stepOrder: "asc" } } },
   });
@@ -104,6 +123,5 @@ export async function POST(request: Request) {
     entityId: workflow.id,
     actor,
   });
-
   return NextResponse.json({ workflow }, { status: 201 });
 }

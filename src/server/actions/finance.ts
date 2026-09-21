@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 import { runMutation } from "@/server/actions/action-helpers";
 import {
   revenueFormSchema,
@@ -39,9 +39,16 @@ export async function saveRevenueAction(
     notes: parsed.data.notes || null,
   };
 
-  const revenue = revenueId
-    ? await prisma.revenue.update({ where: { id: revenueId }, data })
-    : await prisma.revenue.create({ data });
+  const revenue = await withWorkspaceDb(async (tx) => {
+    if (revenueId) {
+      const visible = await tx.revenue.findUnique({ where: { id: revenueId }, select: { id: true } });
+      if (!visible) return null;
+      return tx.revenue.update({ where: { id: revenueId }, data });
+    }
+    return tx.revenue.create({ data });
+  });
+
+  if (!revenue) return fail("Einnahme nicht gefunden.", requestId);
 
   await writeAuditLog({
     action: revenueId ? "revenue.update" : "revenue.create",
@@ -61,10 +68,11 @@ export async function deleteRevenueAction(id: string) {
     input: { id },
     auditAction: "revenue.delete",
     entityType: "Revenue",
-    handler: async (input) => {
-      await prisma.revenue.delete({ where: { id: input.id } });
-      return { id: input.id };
-    },
+    handler: async (input) =>
+      withWorkspaceDb(async (tx) => {
+        await tx.revenue.delete({ where: { id: input.id } });
+        return { id: input.id };
+      }),
     entityId: (output) => output.id,
   });
   revalidatePath("/app/finance");
@@ -97,9 +105,16 @@ export async function saveExpenseAction(
     notes: parsed.data.notes || null,
   };
 
-  const expense = expenseId
-    ? await prisma.expense.update({ where: { id: expenseId }, data })
-    : await prisma.expense.create({ data });
+  const expense = await withWorkspaceDb(async (tx) => {
+    if (expenseId) {
+      const visible = await tx.expense.findUnique({ where: { id: expenseId }, select: { id: true } });
+      if (!visible) return null;
+      return tx.expense.update({ where: { id: expenseId }, data });
+    }
+    return tx.expense.create({ data });
+  });
+
+  if (!expense) return fail("Ausgabe nicht gefunden.", requestId);
 
   await writeAuditLog({
     action: expenseId ? "expense.update" : "expense.create",
@@ -119,10 +134,11 @@ export async function deleteExpenseAction(id: string) {
     input: { id },
     auditAction: "expense.delete",
     entityType: "Expense",
-    handler: async (input) => {
-      await prisma.expense.delete({ where: { id: input.id } });
-      return { id: input.id };
-    },
+    handler: async (input) =>
+      withWorkspaceDb(async (tx) => {
+        await tx.expense.delete({ where: { id: input.id } });
+        return { id: input.id };
+      }),
     entityId: (output) => output.id,
   });
   revalidatePath("/app/finance");
@@ -142,7 +158,6 @@ export async function saveTaxSettingAction(
     return fail("Eingabe ungültig.", requestId, parsed.error.flatten().fieldErrors);
   }
 
-  const existing = await prisma.taxSetting.findFirst();
   const data = {
     reserveRatePercent: parsed.data.reserveRatePercent,
     vatRatePercent: parsed.data.vatRatePercent,
@@ -151,9 +166,12 @@ export async function saveTaxSettingAction(
     incomeTaxReservePercent: parsed.data.incomeTaxReservePercent,
   };
 
-  const setting = existing
-    ? await prisma.taxSetting.update({ where: { id: existing.id }, data })
-    : await prisma.taxSetting.create({ data });
+  const setting = await withWorkspaceDb(async (tx) => {
+    const existing = await tx.taxSetting.findFirst();
+    return existing
+      ? tx.taxSetting.update({ where: { id: existing.id }, data })
+      : tx.taxSetting.create({ data });
+  });
 
   await writeAuditLog({
     action: "tax_setting.update",

@@ -18,8 +18,11 @@ test.describe("Navigation", () => {
 
   test("Hauptnavigation enthält die neuen Bereiche", async ({ page }) => {
     await page.goto("/app");
-    for (const label of ["Content Studio", "Agenten", "Workflows", "Freigaben", "Budgets", "Agent Memory", "Audit-Log"]) {
-      await expect(page.getByRole("link", { name: new RegExp(label, "i") }).first()).toBeVisible();
+    for (const section of ["Content Studio", "Agenten", "Workflows"]) {
+      await expect(page.getByText(section, { exact: true }).first()).toBeVisible();
+    }
+    for (const label of ["Freigaben", "Budgets", "Memory", "Audit"]) {
+      await expect(page.getByRole("link", { name: new RegExp(`^${label}$`, "i") }).first()).toBeVisible();
     }
   });
 });

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { prisma } from "@/lib/db/client";
+import { tenantPrismaForWorkspace } from "@/lib/db/tenant-client";
 import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -11,7 +11,7 @@ export const metadata: Metadata = { title: "Match-Review" };
 
 export default async function MatchesPage() {
   const workspaceId = await resolveWorkspaceId();
-  const matches = await prisma.productMatchCandidate.findMany({
+  const matches = await tenantPrismaForWorkspace(workspaceId).productMatchCandidate.findMany({
     where: { workspaceId, status: "PENDING" },
     include: { sourceOffer: true, candidateProduct: true },
     orderBy: { createdAt: "desc" },

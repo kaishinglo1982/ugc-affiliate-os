@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 import { runMutation } from "@/server/actions/action-helpers";
 import { productFormSchema, productIdSchema } from "@/lib/validation/products";
 import { computeProductScore } from "@/features/products/scoring";
@@ -25,44 +25,55 @@ async function persistProductWithScore(
 ) {
   const scoreResult = computeProductScore(input.dimensions);
 
-  const data = {
-    name: input.name,
-    canonicalName: input.name,
-    description: input.description || null,
-    vendor: input.vendor || null,
-    categoryLabel: input.category || null,
-    tags: splitTags(input.tags),
-    targetUrl: input.targetUrl || null,
-    imageUrl: input.imageUrl || null,
-    price: input.price ?? null,
-    commissionRate: input.commissionRate ?? null,
-    estimatedMargin:
-      input.price && input.commissionRate
-        ? Number(((input.price * input.commissionRate) / 100).toFixed(2))
-        : null,
-    audience: input.audience || null,
-    problemSolved: input.problemSolved || null,
-    notes: input.notes || null,
-    status: input.status,
-    trend: input.trend,
-    risk: input.risk,
-    isFavorite: input.isFavorite ?? false,
-  };
+  return withWorkspaceDb(async (tx, workspaceId) => {
+    const data = {
+      workspaceId,
+      name: input.name,
+      canonicalName: input.name,
+      description: input.description || null,
+      vendor: input.vendor || null,
+      categoryLabel: input.category || null,
+      tags: splitTags(input.tags),
+      targetUrl: input.targetUrl || null,
+      imageUrl: input.imageUrl || null,
+      price: input.price ?? null,
+      commissionRate: input.commissionRate ?? null,
+      estimatedMargin:
+        input.price && input.commissionRate
+          ? Number(((input.price * input.commissionRate) / 100).toFixed(2))
+          : null,
+      audience: input.audience || null,
+      problemSolved: input.problemSolved || null,
+      notes: input.notes || null,
+      status: input.status,
+      trend: input.trend,
+      risk: input.risk,
+      isFavorite: input.isFavorite ?? false,
+    };
 
-  const product = productId
-    ? await prisma.product.update({ where: { id: productId }, data })
-    : await prisma.product.create({ data });
+    let product;
+    if (productId) {
+      const visible = await tx.product.findFirst({
+        where: { id: productId, workspaceId },
+        select: { id: true },
+      });
+      if (!visible) return null;
+      product = await tx.product.update({ where: { id: visible.id }, data });
+    } else {
+      product = await tx.product.create({ data });
+    }
 
-  await prisma.productScore.create({
-    data: {
-      productId: product.id,
-      ...input.dimensions,
-      totalScore: scoreResult.totalScore,
-      breakdown: scoreResult.breakdown as unknown as object,
-    },
+    await tx.productScore.create({
+      data: {
+        productId: product.id,
+        ...input.dimensions,
+        totalScore: scoreResult.totalScore,
+        breakdown: scoreResult.breakdown as unknown as object,
+      },
+    });
+
+    return product;
   });
-
-  return product;
 }
 
 export async function createProductAction(
@@ -84,6 +95,7 @@ export async function createProductAction(
   }
 
   const product = await persistProductWithScore(undefined, parsed.data);
+  if (!product) return fail("Produkt konnte nicht erstellt werden.", requestId);
 
   await writeAuditLog({
     action: "product.create",
@@ -117,6 +129,7 @@ export async function updateProductAction(
   }
 
   const product = await persistProductWithScore(productId, parsed.data);
+  if (!product) return fail("Produkt nicht gefunden.", requestId);
 
   await writeAuditLog({
     action: "product.update",
@@ -138,7 +151,11 @@ export async function toggleFavoriteAction(id: string, isFavorite: boolean) {
     auditAction: "product.update",
     entityType: "Product",
     handler: async (input) =>
-      prisma.product.update({ where: { id: input.id }, data: { isFavorite } }),
+      withWorkspaceDb(async (tx, workspaceId) => {
+        const visible = await tx.product.findFirst({ where: { id: input.id, workspaceId }, select: { id: true } });
+        if (!visible) throw new Error("PRODUCT_NOT_FOUND");
+        return tx.product.update({ where: { id: visible.id }, data: { isFavorite } });
+      }),
     entityId: (output) => output.id,
   });
   revalidatePath("/app/products");
@@ -152,9 +169,13 @@ export async function archiveProductAction(id: string) {
     auditAction: "product.archive",
     entityType: "Product",
     handler: async (input) =>
-      prisma.product.update({
-        where: { id: input.id },
-        data: { status: "ARCHIVED", archivedAt: new Date() },
+      withWorkspaceDb(async (tx, workspaceId) => {
+        const visible = await tx.product.findFirst({ where: { id: input.id, workspaceId }, select: { id: true } });
+        if (!visible) throw new Error("PRODUCT_NOT_FOUND");
+        return tx.product.update({
+          where: { id: visible.id },
+          data: { status: "ARCHIVED", archivedAt: new Date() },
+        });
       }),
     entityId: (output) => output.id,
   });
@@ -168,10 +189,13 @@ export async function deleteProductAction(id: string) {
     input: { id },
     auditAction: "product.delete",
     entityType: "Product",
-    handler: async (input) => {
-      await prisma.product.delete({ where: { id: input.id } });
-      return { id: input.id };
-    },
+    handler: async (input) =>
+      withWorkspaceDb(async (tx, workspaceId) => {
+        const visible = await tx.product.findFirst({ where: { id: input.id, workspaceId }, select: { id: true } });
+        if (!visible) throw new Error("PRODUCT_NOT_FOUND");
+        await tx.product.delete({ where: { id: visible.id } });
+        return { id: visible.id };
+      }),
     entityId: (output) => output.id,
   });
   revalidatePath("/app/products");
@@ -209,52 +233,56 @@ export async function importProductsCsvAction(
   const commissionIdx = header.indexOf("commissionrate");
   const tagsIdx = header.indexOf("tags");
 
-  let imported = 0;
-  for (const row of rows.slice(1)) {
-    const name = row[nameIdx]?.trim();
-    if (!name) continue;
+  const imported = await withWorkspaceDb(async (tx, workspaceId) => {
+    let count = 0;
+    for (const row of rows.slice(1)) {
+      const name = row[nameIdx]?.trim();
+      if (!name) continue;
 
-    const dimensions = {
-      demand: 5,
-      commission: 5,
-      contentPotential: 5,
-      competition: 5,
-      problemSolvingPower: 5,
-      visualDemonstrability: 5,
-      platformFit: 5,
-      trendMomentum: 5,
-      returnRisk: 5,
-      complianceRisk: 5,
-    };
-    const scoreResult = computeProductScore(dimensions);
+      const dimensions = {
+        demand: 5,
+        commission: 5,
+        contentPotential: 5,
+        competition: 5,
+        problemSolvingPower: 5,
+        visualDemonstrability: 5,
+        platformFit: 5,
+        trendMomentum: 5,
+        returnRisk: 5,
+        complianceRisk: 5,
+      };
+      const scoreResult = computeProductScore(dimensions);
 
-    const product = await prisma.product.create({
-      data: {
-        name,
-        canonicalName: name,
-        categoryLabel: categoryIdx >= 0 ? row[categoryIdx]?.trim() || null : null,
-        vendor: vendorIdx >= 0 ? row[vendorIdx]?.trim() || null : null,
-        price: priceIdx >= 0 && row[priceIdx] ? Number(row[priceIdx]) : null,
-        commissionRate:
-          commissionIdx >= 0 && row[commissionIdx] ? Number(row[commissionIdx]) : null,
-        tags: tagsIdx >= 0 ? splitTags(row[tagsIdx]) : [],
-        status: "DISCOVERED",
-        trend: "STABLE",
-        risk: "MEDIUM",
-      },
-    });
+      const product = await tx.product.create({
+        data: {
+          workspaceId,
+          name,
+          canonicalName: name,
+          categoryLabel: categoryIdx >= 0 ? row[categoryIdx]?.trim() || null : null,
+          vendor: vendorIdx >= 0 ? row[vendorIdx]?.trim() || null : null,
+          price: priceIdx >= 0 && row[priceIdx] ? Number(row[priceIdx]) : null,
+          commissionRate:
+            commissionIdx >= 0 && row[commissionIdx] ? Number(row[commissionIdx]) : null,
+          tags: tagsIdx >= 0 ? splitTags(row[tagsIdx]) : [],
+          status: "DISCOVERED",
+          trend: "STABLE",
+          risk: "MEDIUM",
+        },
+      });
 
-    await prisma.productScore.create({
-      data: {
-        productId: product.id,
-        ...dimensions,
-        totalScore: scoreResult.totalScore,
-        breakdown: scoreResult.breakdown as unknown as object,
-      },
-    });
+      await tx.productScore.create({
+        data: {
+          productId: product.id,
+          ...dimensions,
+          totalScore: scoreResult.totalScore,
+          breakdown: scoreResult.breakdown as unknown as object,
+        },
+      });
 
-    imported += 1;
-  }
+      count += 1;
+    }
+    return count;
+  });
 
   await writeAuditLog({
     action: "product.create",

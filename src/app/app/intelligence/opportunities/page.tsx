@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { prisma } from "@/lib/db/client";
+import { tenantPrismaForWorkspace } from "@/lib/db/tenant-client";
 import { Prisma, type $Enums } from "@/generated/prisma/client";
 import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -44,7 +44,7 @@ export default async function OpportunitiesPage({ searchParams }: OpportunitiesP
   const where: Prisma.ProductOpportunityWhereInput = { workspaceId };
   if (params.status) where.status = params.status as $Enums.OpportunityStatus;
 
-  const opportunities = await prisma.productOpportunity.findMany({
+  const opportunities = await tenantPrismaForWorkspace(workspaceId).productOpportunity.findMany({
     where,
     include: { product: { select: { id: true, canonicalName: true } } },
     orderBy: { totalScore: "desc" },

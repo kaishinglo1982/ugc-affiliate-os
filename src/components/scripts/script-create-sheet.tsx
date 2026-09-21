@@ -16,7 +16,7 @@ import { FormField } from "@/components/ui/form-field";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { generateScriptAction } from "@/server/actions/scripts";
-import { isLlmProviderConfigured, LLM_PROVIDER_KEYS, type LlmProviderKey } from "@/lib/providers/llm/registry";
+import { LLM_PROVIDER_KEYS, type LlmProviderKey } from "@/lib/providers/llm/types";
 import type { Result } from "@/types/result";
 
 const PLATFORMS = ["TikTok", "Instagram", "YouTube Shorts", "Pinterest", "Facebook", "X", "LinkedIn", "Reddit"];
@@ -143,14 +143,14 @@ export function ScriptCreateSheet({
           <FormField label="CTA" htmlFor="cta" required error={fieldErrors?.cta?.[0]}>
             <Input id="cta" name="cta" placeholder="z. B. Link in Bio" defaultValue="Link in Bio" required />
           </FormField>
-          <FormField label="Provider" htmlFor="provider" hint="Ohne hinterlegten API-Key wird automatisch der lokale Template-Generator verwendet.">
+          <FormField label="Provider" htmlFor="provider" hint="In CORE_BOUND routet CarryOS externe Modelle; lokal bleibt nur der Template-Generator verfügbar.">
             <Select name="provider" defaultValue="template">
               <SelectTrigger id="provider"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="template">{PROVIDER_LABELS.template}</SelectItem>
                 {LLM_PROVIDER_KEYS.map((key) => (
                   <SelectItem key={key} value={key} disabled={!providerAvailability[key]}>
-                    {PROVIDER_LABELS[key]} {providerAvailability[key] ? "" : "(kein API-Key hinterlegt)"}
+                    {PROVIDER_LABELS[key]} {providerAvailability[key] ? "" : "(nicht lokal verfügbar)"}
                   </SelectItem>
                 ))}
               </SelectContent>

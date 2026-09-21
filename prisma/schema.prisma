@@ -29,15 +29,15 @@ model User {
 }
 
 model Session {
-  id           String   @id @default(uuid())
-  userId       String
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash    String   @unique
-  userAgent    String?
-  ipAddress    String?
-  expiresAt    DateTime
-  createdAt    DateTime @default(now())
-  revokedAt    DateTime?
+  id        String    @id @default(uuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique
+  userAgent String?
+  ipAddress String?
+  expiresAt DateTime
+  createdAt DateTime  @default(now())
+  revokedAt DateTime?
 
   @@index([userId])
   @@index([expiresAt])
@@ -73,68 +73,68 @@ enum RiskLevel {
 }
 
 model Product {
-  id                        String        @id @default(uuid())
-  workspaceId               String        @default("00000000-0000-0000-0000-000000000001")
+  id                      String        @id @default(uuid())
+  workspaceId             String        @default("00000000-0000-0000-0000-000000000001")
   // Canonical Phase 7 product identity
-  canonicalName             String
-  slug                      String?
-  description               String?
-  brandName                 String?
-  manufacturerName          String?
-  categoryId                String?
-  nicheId                   String?
-  status                    ProductStatus @default(DISCOVERED)
-  riskLevel                 RiskLevel     @default(MEDIUM)
-  primaryImageReferenceId   String?
-  languageCode              String        @default("de")
-  targetCountryCodes        String[]      @default(["DE"])
-  lastVerifiedAt            DateTime?
+  canonicalName           String
+  slug                    String?
+  description             String?
+  brandName               String?
+  manufacturerName        String?
+  categoryId              String?
+  nicheId                 String?
+  status                  ProductStatus @default(DISCOVERED)
+  riskLevel               RiskLevel     @default(MEDIUM)
+  primaryImageReferenceId String?
+  languageCode            String        @default("de")
+  targetCountryCodes      String[]      @default(["DE"])
+  lastVerifiedAt          DateTime?
   // Legacy "Product Radar" columns retained for backward compatibility
-  name                      String        @default("")
-  imageUrl                  String?
-  vendor                    String?
-  targetUrl                 String?
-  categoryLabel             String?
-  tags                      String[]      @default([])
-  price                     Decimal?      @db.Decimal(12, 2)
-  currency                  String        @default("EUR")
-  commissionRate            Decimal?      @db.Decimal(6, 3)
-  estimatedMargin           Decimal?      @db.Decimal(12, 2)
-  audience                  String?
-  problemSolved             String?
-  notes                     String?
-  trend                     TrendStatus   @default(STABLE)
-  risk                      RiskLevel     @default(MEDIUM)
-  isFavorite                Boolean       @default(false)
-  archivedAt                DateTime?
-  createdAt                 DateTime      @default(now())
-  updatedAt                 DateTime      @updatedAt
+  name                    String        @default("")
+  imageUrl                String?
+  vendor                  String?
+  targetUrl               String?
+  categoryLabel           String?
+  tags                    String[]      @default([])
+  price                   Decimal?      @db.Decimal(12, 2)
+  currency                String        @default("EUR")
+  commissionRate          Decimal?      @db.Decimal(6, 3)
+  estimatedMargin         Decimal?      @db.Decimal(12, 2)
+  audience                String?
+  problemSolved           String?
+  notes                   String?
+  trend                   TrendStatus   @default(STABLE)
+  risk                    RiskLevel     @default(MEDIUM)
+  isFavorite              Boolean       @default(false)
+  archivedAt              DateTime?
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
 
   // Relations
-  category                  ProductCategory?     @relation(fields: [categoryId], references: [id])
-  niche                     Niche?               @relation(fields: [nicheId], references: [id])
-  primaryImage              MediaAsset?          @relation("ProductPrimaryImage", fields: [primaryImageReferenceId], references: [id])
-  scores                    ProductScore[]
-  affiliateLinks            AffiliateLink[]
-  offers                    AffiliateOffer[]
-  complianceProfiles        ProductComplianceProfile[]
-  contentFitProfiles        ProductContentFitProfile[]
-  profitabilityEstimates    ProductProfitabilityEstimate[]
-  opportunities             ProductOpportunity[]
-  dataQualityReports        ProductDataQualityReport[]
-  matchCandidates           ProductMatchCandidate[] @relation("MatchSourceProduct")
-  campaigns                 Campaign[]
-  scripts                   Script[]
-  videoJobs                 VideoJob[]
-  mediaAssets               MediaAsset[]
-  revenues                  Revenue[]
-  expenses                  Expense[]
+  category               ProductCategory?               @relation(fields: [categoryId], references: [id])
+  niche                  Niche?                         @relation(fields: [nicheId], references: [id])
+  primaryImage           MediaAsset?                    @relation("ProductPrimaryImage", fields: [primaryImageReferenceId], references: [id])
+  scores                 ProductScore[]
+  affiliateLinks         AffiliateLink[]
+  offers                 AffiliateOffer[]
+  complianceProfiles     ProductComplianceProfile[]
+  contentFitProfiles     ProductContentFitProfile[]
+  profitabilityEstimates ProductProfitabilityEstimate[]
+  opportunities          ProductOpportunity[]
+  dataQualityReports     ProductDataQualityReport[]
+  matchCandidates        ProductMatchCandidate[]        @relation("MatchSourceProduct")
+  campaigns              Campaign[]
+  scripts                Script[]
+  videoJobs              VideoJob[]
+  mediaAssets            MediaAsset[]
+  revenues               Revenue[]
+  expenses               Expense[]
 
+  @@unique([workspaceId, slug])
   @@index([workspaceId, status])
   @@index([workspaceId, categoryId])
   @@index([workspaceId, nicheId])
   @@index([workspaceId, riskLevel])
-  @@unique([workspaceId, slug])
 }
 
 model ProductScore {
@@ -182,17 +182,17 @@ enum IntegrationMode {
 }
 
 model AffiliateProgram {
-  id             String               @id @default(uuid())
-  provider       AffiliateProviderKey
-  customName     String?
-  trackingId     String?
-  credentialId   String?
-  credential     EncryptedCredential? @relation(fields: [credentialId], references: [id])
-  mode           IntegrationMode      @default(MOCK)
-  status         String               @default("DISCONNECTED")
-  notes          String?
-  createdAt      DateTime             @default(now())
-  updatedAt      DateTime             @updatedAt
+  id           String               @id @default(uuid())
+  provider     AffiliateProviderKey
+  customName   String?
+  trackingId   String?
+  credentialId String?
+  credential   EncryptedCredential? @relation(fields: [credentialId], references: [id])
+  mode         IntegrationMode      @default(MOCK)
+  status       String               @default("DISCONNECTED")
+  notes        String?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
 
   links    AffiliateLink[]
   revenues Revenue[]
@@ -202,28 +202,28 @@ model AffiliateProgram {
 }
 
 model AffiliateLink {
-  id               String            @id @default(uuid())
-  programId        String
-  program          AffiliateProgram  @relation(fields: [programId], references: [id], onDelete: Cascade)
-  productId        String?
-  product          Product?          @relation(fields: [productId], references: [id])
-  label            String
-  destinationUrl   String
-  deepLink         String?
-  shortSlug        String            @unique
-  utmSource        String?
-  utmMedium        String?
-  utmCampaign      String?
-  utmContent       String?
-  utmTerm          String?
-  platform         String?
-  clickCount       Int               @default(0)
-  lastCheckedAt    DateTime?
-  lastCheckStatus  String?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+  id              String           @id @default(uuid())
+  programId       String
+  program         AffiliateProgram @relation(fields: [programId], references: [id], onDelete: Cascade)
+  productId       String?
+  product         Product?         @relation(fields: [productId], references: [id])
+  label           String
+  destinationUrl  String
+  deepLink        String?
+  shortSlug       String           @unique
+  utmSource       String?
+  utmMedium       String?
+  utmCampaign     String?
+  utmContent      String?
+  utmTerm         String?
+  platform        String?
+  clickCount      Int              @default(0)
+  lastCheckedAt   DateTime?
+  lastCheckStatus String?
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
 
-  clicks       LinkClick[]
+  clicks        LinkClick[]
   campaignLinks Campaign[]
 
   @@index([programId])
@@ -231,11 +231,11 @@ model AffiliateLink {
 }
 
 model LinkClick {
-  id        String        @id @default(uuid())
-  linkId    String
-  link      AffiliateLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
-  occurredAt DateTime     @default(now())
-  source    String?
+  id         String        @id @default(uuid())
+  linkId     String
+  link       AffiliateLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
+  occurredAt DateTime      @default(now())
+  source     String?
 
   @@index([linkId])
 }
@@ -258,23 +258,24 @@ enum CampaignStatus {
 }
 
 model Campaign {
-  id             String         @id @default(uuid())
-  name           String
-  productId      String?
-  product        Product?       @relation(fields: [productId], references: [id])
+  id              String         @id @default(uuid())
+  workspaceId     String         @default(dbgenerated("COALESCE(NULLIF(current_setting('app.workspace_id'::text, true), ''::text), '00000000-0000-0000-0000-000000000001'::text)"))
+  name            String
+  productId       String?
+  product         Product?       @relation(fields: [productId], references: [id])
   affiliateLinkId String?
-  affiliateLink  AffiliateLink? @relation(fields: [affiliateLinkId], references: [id])
-  audience       String?
-  targetPlatforms String[]      @default([])
-  contentGoal    String?
-  budget         Decimal?       @db.Decimal(12, 2)
-  currency       String         @default("EUR")
-  startDate      DateTime?
-  endDate        DateTime?
-  status         CampaignStatus @default(DRAFT)
-  notes          String?
-  createdAt      DateTime       @default(now())
-  updatedAt      DateTime       @updatedAt
+  affiliateLink   AffiliateLink? @relation(fields: [affiliateLinkId], references: [id])
+  audience        String?
+  targetPlatforms String[]       @default([])
+  contentGoal     String?
+  budget          Decimal?       @db.Decimal(12, 2)
+  currency        String         @default("EUR")
+  startDate       DateTime?
+  endDate         DateTime?
+  status          CampaignStatus @default(DRAFT)
+  notes           String?
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   scripts     Script[]
   videoJobs   VideoJob[]
@@ -284,6 +285,7 @@ model Campaign {
   mediaAssets MediaAsset[]
   briefs      ContentBrief[]
 
+  @@index([workspaceId])
   @@index([status])
 }
 
@@ -299,6 +301,7 @@ enum ScriptStatus {
 
 model Script {
   id          String       @id @default(uuid())
+  workspaceId String       @default(dbgenerated("COALESCE(NULLIF(current_setting('app.workspace_id'::text, true), ''::text), '00000000-0000-0000-0000-000000000001'::text)"))
   title       String
   productId   String?
   product     Product?     @relation(fields: [productId], references: [id])
@@ -317,30 +320,31 @@ model Script {
   versions  ScriptVersion[]
   videoJobs VideoJob[]
 
+  @@index([workspaceId])
   @@index([status])
   @@index([campaignId])
 }
 
 model ScriptVersion {
-  id             String   @id @default(uuid())
-  scriptId       String
-  script         Script   @relation(fields: [scriptId], references: [id], onDelete: Cascade)
-  versionNumber  Int
-  hook           String
-  problem        String
-  situation      String
-  productIntro   String
-  demonstration  String
-  benefit        String
-  socialProof    String
+  id                String   @id @default(uuid())
+  scriptId          String
+  script            Script   @relation(fields: [scriptId], references: [id], onDelete: Cascade)
+  versionNumber     Int
+  hook              String
+  problem           String
+  situation         String
+  productIntro      String
+  demonstration     String
+  benefit           String
+  socialProof       String
   objectionHandling String
-  cta            String
-  onScreenText   String?
-  bRollNotes     String?
-  voiceover      String?
-  sceneList      Json
-  generatedBy    String   @default("template")
-  createdAt      DateTime @default(now())
+  cta               String
+  onScreenText      String?
+  bRollNotes        String?
+  voiceover         String?
+  sceneList         Json
+  generatedBy       String   @default("template")
+  createdAt         DateTime @default(now())
 
   @@unique([scriptId, versionNumber])
 }
@@ -370,13 +374,14 @@ enum VideoProviderKey {
 }
 
 model VideoJob {
-  id           String         @id @default(uuid())
+  id           String           @id @default(uuid())
+  workspaceId  String           @default(dbgenerated("COALESCE(NULLIF(current_setting('app.workspace_id'::text, true), ''::text), '00000000-0000-0000-0000-000000000001'::text)"))
   scriptId     String?
-  script       Script?        @relation(fields: [scriptId], references: [id])
+  script       Script?          @relation(fields: [scriptId], references: [id])
   productId    String?
-  product      Product?       @relation(fields: [productId], references: [id])
+  product      Product?         @relation(fields: [productId], references: [id])
   campaignId   String?
-  campaign     Campaign?      @relation(fields: [campaignId], references: [id])
+  campaign     Campaign?        @relation(fields: [campaignId], references: [id])
   provider     VideoProviderKey @default(MOCK)
   format       String
   aspectRatio  String
@@ -384,20 +389,21 @@ model VideoJob {
   style        String?
   avatar       String?
   voice        String?
-  language     String         @default("de")
-  subtitles    Boolean        @default(true)
+  language     String           @default("de")
+  subtitles    Boolean          @default(true)
   music        String?
-  status       VideoJobStatus @default(QUEUED)
-  progress     Int            @default(0)
+  status       VideoJobStatus   @default(QUEUED)
+  progress     Int              @default(0)
   errorMessage String?
   resultUrl    String?
-  attempts     Int            @default(0)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  attempts     Int              @default(0)
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
   completedAt  DateTime?
 
   mediaAssets MediaAsset[]
 
+  @@index([workspaceId])
   @@index([status])
   @@index([campaignId])
 }
@@ -415,6 +421,7 @@ enum MediaKind {
 
 model MediaAsset {
   id          String    @id @default(uuid())
+  workspaceId String    @default(dbgenerated("COALESCE(NULLIF(current_setting('app.workspace_id'::text, true), ''::text), '00000000-0000-0000-0000-000000000001'::text)"))
   kind        MediaKind
   fileName    String
   storageKey  String
@@ -438,6 +445,7 @@ model MediaAsset {
 
   primaryImageProducts Product[] @relation("ProductPrimaryImage")
 
+  @@index([workspaceId])
   @@index([kind])
   @@index([campaignId])
 }
@@ -458,18 +466,20 @@ enum SocialPlatform {
 }
 
 model SocialAccount {
-  id           String          @id @default(uuid())
+  id           String               @id @default(uuid())
+  workspaceId  String               @default(dbgenerated("COALESCE(NULLIF(current_setting('app.workspace_id'::text, true), ''::text), '00000000-0000-0000-0000-000000000001'::text)"))
   platform     SocialPlatform
   handle       String
-  mode         IntegrationMode @default(MOCK)
+  mode         IntegrationMode      @default(MOCK)
   credentialId String?
   credential   EncryptedCredential? @relation(fields: [credentialId], references: [id])
-  status       String          @default("DISCONNECTED")
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  status       String               @default("DISCONNECTED")
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
 
   posts SocialPost[]
 
+  @@index([workspaceId])
   @@index([platform])
 }
 
@@ -485,33 +495,35 @@ enum SocialPostStatus {
 }
 
 model SocialPost {
-  id              String            @id @default(uuid())
-  campaignId      String?
-  campaign        Campaign?         @relation(fields: [campaignId], references: [id])
-  mediaAssetId    String?
-  mediaAsset      MediaAsset?       @relation(fields: [mediaAssetId], references: [id])
-  accountId       String
-  account         SocialAccount     @relation(fields: [accountId], references: [id])
-  caption         String
-  hashtags        String[]          @default([])
+  id                String           @id @default(uuid())
+  workspaceId       String           @default(dbgenerated("COALESCE(NULLIF(current_setting('app.workspace_id'::text, true), ''::text), '00000000-0000-0000-0000-000000000001'::text)"))
+  campaignId        String?
+  campaign          Campaign?        @relation(fields: [campaignId], references: [id])
+  mediaAssetId      String?
+  mediaAsset        MediaAsset?      @relation(fields: [mediaAssetId], references: [id])
+  accountId         String
+  account           SocialAccount    @relation(fields: [accountId], references: [id])
+  caption           String
+  hashtags          String[]         @default([])
   affiliateLinkText String?
-  disclosure      String?
-  scheduledAt     DateTime?
-  publishedAt     DateTime?
-  status          SocialPostStatus  @default(DRAFT)
-  errorMessage     String?
-  attempts        Int               @default(0)
-  approvedBy      String?
-  approvedAt      DateTime?
-  publishJobs     PublishJob[]
-  impressions     Int?
-  reach           Int?
-  likes           Int?
-  comments        Int?
-  shares          Int?
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @updatedAt
+  disclosure        String?
+  scheduledAt       DateTime?
+  publishedAt       DateTime?
+  status            SocialPostStatus @default(DRAFT)
+  errorMessage      String?
+  attempts          Int              @default(0)
+  approvedBy        String?
+  approvedAt        DateTime?
+  publishJobs       PublishJob[]
+  impressions       Int?
+  reach             Int?
+  likes             Int?
+  comments          Int?
+  shares            Int?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
 
+  @@index([workspaceId])
   @@index([status])
   @@index([scheduledAt])
 }
@@ -534,6 +546,7 @@ enum PublishJobStatus {
  */
 model PublishJob {
   id              String           @id @default(uuid())
+  workspaceId     String           @default(dbgenerated("COALESCE(NULLIF(current_setting('app.workspace_id'::text, true), ''::text), '00000000-0000-0000-0000-000000000001'::text)"))
   postId          String
   post            SocialPost       @relation(fields: [postId], references: [id], onDelete: Cascade)
   status          PublishJobStatus @default(PENDING)
@@ -544,6 +557,8 @@ model PublishJob {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
+  @@index([workspaceId])
+  @@index([workspaceId, status, nextAttemptAt])
   @@index([status, nextAttemptAt])
 }
 
@@ -559,22 +574,22 @@ enum RevenueStatus {
 }
 
 model Revenue {
-  id            String        @id @default(uuid())
-  date          DateTime
-  programId     String?
-  program       AffiliateProgram? @relation(fields: [programId], references: [id])
-  productId     String?
-  product       Product?      @relation(fields: [productId], references: [id])
-  campaignId    String?
-  campaign      Campaign?     @relation(fields: [campaignId], references: [id])
-  platform      String?
-  grossAmount   Decimal       @db.Decimal(12, 2)
-  currency      String        @default("EUR")
-  status        RevenueStatus @default(PENDING)
-  reference     String?
-  notes         String?
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id          String            @id @default(uuid())
+  date        DateTime
+  programId   String?
+  program     AffiliateProgram? @relation(fields: [programId], references: [id])
+  productId   String?
+  product     Product?          @relation(fields: [productId], references: [id])
+  campaignId  String?
+  campaign    Campaign?         @relation(fields: [campaignId], references: [id])
+  platform    String?
+  grossAmount Decimal           @db.Decimal(12, 2)
+  currency    String            @default("EUR")
+  status      RevenueStatus     @default(PENDING)
+  reference   String?
+  notes       String?
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
 
   @@index([date])
   @@index([campaignId])
@@ -595,35 +610,35 @@ enum ExpenseCategory {
 }
 
 model Expense {
-  id           String          @id @default(uuid())
-  date         DateTime
-  category     ExpenseCategory
-  vendor       String?
-  campaignId   String?
-  campaign     Campaign?       @relation(fields: [campaignId], references: [id])
-  productId    String?
-  product      Product?        @relation(fields: [productId], references: [id])
-  amount       Decimal         @db.Decimal(12, 2)
-  currency     String          @default("EUR")
-  isRecurring  Boolean         @default(false)
-  isTaxRelevant Boolean        @default(true)
-  receiptUrl   String?
-  notes        String?
-  createdAt    DateTime        @default(now())
-  updatedAt    DateTime        @updatedAt
+  id            String          @id @default(uuid())
+  date          DateTime
+  category      ExpenseCategory
+  vendor        String?
+  campaignId    String?
+  campaign      Campaign?       @relation(fields: [campaignId], references: [id])
+  productId     String?
+  product       Product?        @relation(fields: [productId], references: [id])
+  amount        Decimal         @db.Decimal(12, 2)
+  currency      String          @default("EUR")
+  isRecurring   Boolean         @default(false)
+  isTaxRelevant Boolean         @default(true)
+  receiptUrl    String?
+  notes         String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
   @@index([date])
   @@index([campaignId])
 }
 
 model TaxSetting {
-  id                    String   @id @default(uuid())
-  reserveRatePercent    Decimal  @db.Decimal(5, 2) @default(30)
-  vatRatePercent        Decimal  @db.Decimal(5, 2) @default(19)
-  vatEnabled            Boolean  @default(false)
-  tradeTaxReservePercent Decimal @db.Decimal(5, 2) @default(15)
-  incomeTaxReservePercent Decimal @db.Decimal(5, 2) @default(25)
-  updatedAt             DateTime @updatedAt
+  id                      String   @id @default(uuid())
+  reserveRatePercent      Decimal  @default(30) @db.Decimal(5, 2)
+  vatRatePercent          Decimal  @default(19) @db.Decimal(5, 2)
+  vatEnabled              Boolean  @default(false)
+  tradeTaxReservePercent  Decimal  @default(15) @db.Decimal(5, 2)
+  incomeTaxReservePercent Decimal  @default(25) @db.Decimal(5, 2)
+  updatedAt               DateTime @updatedAt
 }
 
 // ---------------------------------------------------------------------------
@@ -641,19 +656,19 @@ enum IntegrationCategory {
 }
 
 model Integration {
-  id            String              @id @default(uuid())
-  providerKey   String              @unique
-  displayName   String
-  category      IntegrationCategory
-  mode          IntegrationMode     @default(MOCK)
-  status        String              @default("DISCONNECTED")
-  lastSyncAt    DateTime?
-  lastError     String?
-  credentialId  String?
-  credential    EncryptedCredential? @relation(fields: [credentialId], references: [id])
-  config        Json?
-  createdAt     DateTime            @default(now())
-  updatedAt     DateTime            @updatedAt
+  id           String               @id @default(uuid())
+  providerKey  String               @unique
+  displayName  String
+  category     IntegrationCategory
+  mode         IntegrationMode      @default(MOCK)
+  status       String               @default("DISCONNECTED")
+  lastSyncAt   DateTime?
+  lastError    String?
+  credentialId String?
+  credential   EncryptedCredential? @relation(fields: [credentialId], references: [id])
+  config       Json?
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
 
   @@index([category])
 }
@@ -711,11 +726,11 @@ enum AgentRunStatus {
 }
 
 model AgentRun {
-  id         String         @id @default(uuid())
+  id         String          @id @default(uuid())
   agentId    String
-  agent      Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
-  status     AgentRunStatus @default(RUNNING)
-  startedAt  DateTime       @default(now())
+  agent      Agent           @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  status     AgentRunStatus  @default(RUNNING)
+  startedAt  DateTime        @default(now())
   finishedAt DateTime?
   summary    String?
   logs       Json?
@@ -747,16 +762,16 @@ enum AutomationActionType {
 }
 
 model Automation {
-  id           String            @id @default(uuid())
-  name         String
-  isActive     Boolean           @default(true)
-  trigger      AutomationTrigger
-  conditions   Json?
-  actions      Json
-  lastRunAt    DateTime?
-  nextRunAt    DateTime?
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
+  id         String            @id @default(uuid())
+  name       String
+  isActive   Boolean           @default(true)
+  trigger    AutomationTrigger
+  conditions Json?
+  actions    Json
+  lastRunAt  DateTime?
+  nextRunAt  DateTime?
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
 
   runs AutomationRun[]
 }
@@ -768,11 +783,11 @@ enum AutomationRunStatus {
 }
 
 model AutomationRun {
-  id           String               @id @default(uuid())
+  id           String              @id @default(uuid())
   automationId String
-  automation   Automation           @relation(fields: [automationId], references: [id], onDelete: Cascade)
+  automation   Automation          @relation(fields: [automationId], references: [id], onDelete: Cascade)
   status       AutomationRunStatus
-  runAt        DateTime             @default(now())
+  runAt        DateTime            @default(now())
   message      String?
 
   @@index([automationId])
@@ -790,24 +805,24 @@ enum NotificationLevel {
 }
 
 model Notification {
-  id        String             @id @default(uuid())
-  level     NotificationLevel  @default(INFO)
+  id        String            @id @default(uuid())
+  level     NotificationLevel @default(INFO)
   title     String
   message   String
   link      String?
   readAt    DateTime?
-  createdAt DateTime           @default(now())
+  createdAt DateTime          @default(now())
 
   @@index([readAt])
 }
 
 model ContactRequest {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   name      String
   email     String
   subject   String
   message   String
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
   handledAt DateTime?
 }
 
@@ -1011,24 +1026,52 @@ enum ApprovalResourceType {
 /// Phase 5/7 approval workflow. One row per approval request; the resource's
 /// own `status` (Product.status / ProductOpportunity.status) mirrors the outcome.
 model Approval {
-  id           String               @id @default(uuid())
-  workspaceId  String               @default("00000000-0000-0000-0000-000000000001")
-  resourceType ApprovalResourceType
-  resourceId   String
-  status       ApprovalStatus       @default(PENDING)
-  requestedBy    String?
-  decidedBy    String?
-  decisionReason String?
-  decidedAt    DateTime?
-  cost       Decimal?          @db.Decimal(12, 2)
-  currency   String?
-  expiresAt  DateTime?
-  payload    Json?
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
+  id                    String               @id @default(uuid())
+  workspaceId           String               @default("00000000-0000-0000-0000-000000000001")
+  resourceType          ApprovalResourceType
+  resourceId            String
+  status                ApprovalStatus       @default(PENDING)
+  requestedBy           String?
+  decidedBy             String?
+  decisionReason        String?
+  decidedAt             DateTime?
+  cost                  Decimal?             @db.Decimal(12, 2)
+  currency              String?
+  expiresAt             DateTime?
+  escalationAt          DateTime?
+  escalatedAt           DateTime?
+  requiredApproverCount Int                  @default(1)
+  consumedAt            DateTime?
+  consumedBy            String?
+  payload               Json?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  decisions ApprovalDecision[]
 
   @@index([workspaceId, resourceType, resourceId])
   @@index([resourceType, resourceId])
+  @@index([workspaceId, status, expiresAt])
+}
+
+enum ApprovalDecisionStatus {
+  APPROVED
+  REJECTED
+}
+
+model ApprovalDecision {
+  id            String                 @id @default(uuid())
+  approvalId    String
+  approval      Approval               @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+  approverId    String
+  status        ApprovalDecisionStatus
+  reason        String?
+  signedAt      DateTime               @default(now())
+  signatureHash String
+  createdAt     DateTime               @default(now())
+
+  @@unique([approvalId, approverId])
+  @@index([approvalId, status])
 }
 
 enum ExperimentStatus {
@@ -1194,22 +1237,22 @@ enum OptimizationRuleStatus {
 // ---------------------------------------------------------------------------
 
 model Brand {
-  id        String   @id @default(uuid())
+  id          String   @id @default(uuid())
   workspaceId String
-  name      String
-  status    String   @default("ACTIVE")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  name        String
+  status      String   @default("ACTIVE")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   @@index([workspaceId])
 }
 
 model Niche {
-  id        String   @id @default(uuid())
+  id          String   @id @default(uuid())
   workspaceId String
-  name      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  name        String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   products Product[]
 
@@ -1217,15 +1260,15 @@ model Niche {
 }
 
 model ContentAsset {
-  id            String   @id @default(uuid())
-  workspaceId   String
-  name          String
-  mediaAssetId  String?
-  brandId       String?
-  nicheId       String?
-  format        PublishingFormat?
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  id           String            @id @default(uuid())
+  workspaceId  String
+  name         String
+  mediaAssetId String?
+  brandId      String?
+  nicheId      String?
+  format       PublishingFormat?
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
 
   intelligenceProfiles ContentIntelligenceProfile[]
   variants             ContentVariant[]
@@ -1240,33 +1283,33 @@ model ContentAsset {
 // ---------------------------------------------------------------------------
 
 model AnalyticsEvent {
-  id                 String              @id @default(uuid())
-  workspaceId        String
-  eventType          AnalyticsEventType
-  platform           SocialPlatform?
-  socialAccountId    String?
-  brandId            String?
-  nicheId            String?
-  campaignId         String?
-  publishingJobId    String?
-  externalPostId     String?
-  contentAssetId     String?
-  contentVariantId   String?
-  productId          String?
-  affiliateProgramId String?
-  affiliateLinkId    String?
-  experimentId       String?
+  id                  String               @id @default(uuid())
+  workspaceId         String
+  eventType           AnalyticsEventType
+  platform            SocialPlatform?
+  socialAccountId     String?
+  brandId             String?
+  nicheId             String?
+  campaignId          String?
+  publishingJobId     String?
+  externalPostId      String?
+  contentAssetId      String?
+  contentVariantId    String?
+  productId           String?
+  affiliateProgramId  String?
+  affiliateLinkId     String?
+  experimentId        String?
   experimentVariantId String?
-  numericValue       Decimal?            @db.Decimal(14, 2)
-  currency           String?
-  occurredAt         DateTime            @db.Timestamptz(6)
-  sourceTimezone     String?
-  importedAt         DateTime            @default(now())
-  source             AnalyticsEventSource
-  externalEventId    String?
-  idempotencyKey     String              @unique
+  numericValue        Decimal?             @db.Decimal(14, 2)
+  currency            String?
+  occurredAt          DateTime             @db.Timestamptz(6)
+  sourceTimezone      String?
+  importedAt          DateTime             @default(now())
+  source              AnalyticsEventSource
+  externalEventId     String?
+  idempotencyKey      String               @unique
   metadataReferenceId String?
-  correctedByEventId String?
+  correctedByEventId  String?
 
   @@index([workspaceId, occurredAt])
   @@index([workspaceId, eventType])
@@ -1280,33 +1323,33 @@ model AnalyticsEvent {
 // ---------------------------------------------------------------------------
 
 model PlatformMetricSnapshot {
-  id                  String             @id @default(uuid())
-  workspaceId         String
-  platform            SocialPlatform
-  socialAccountId     String
-  externalPostId      String
-  publishingJobId     String?
-  contentAssetId      String?
-  measuredAt          DateTime           @db.Timestamptz(6)
-  periodStart         DateTime?          @db.Timestamptz(6)
-  periodEnd           DateTime?          @db.Timestamptz(6)
-  impressions         BigInt?
-  reach               BigInt?
-  views               BigInt?
-  videoStarts         BigInt?
-  videoCompletions    BigInt?
-  likes               BigInt?
-  comments            BigInt?
-  shares              BigInt?
-  saves               BigInt?
-  profileVisits       BigInt?
-  linkClicks          BigInt?
-  averageWatchTimeSeconds Decimal?        @db.Decimal(12, 2)
-  totalWatchTimeSeconds   Decimal?        @db.Decimal(14, 2)
-  completionRate      Decimal?           @db.Decimal(6, 4)
-  source              MetricSnapshotSource
-  externalSnapshotId  String?
-  createdAt           DateTime           @default(now())
+  id                      String               @id @default(uuid())
+  workspaceId             String
+  platform                SocialPlatform
+  socialAccountId         String
+  externalPostId          String
+  publishingJobId         String?
+  contentAssetId          String?
+  measuredAt              DateTime             @db.Timestamptz(6)
+  periodStart             DateTime?            @db.Timestamptz(6)
+  periodEnd               DateTime?            @db.Timestamptz(6)
+  impressions             BigInt?
+  reach                   BigInt?
+  views                   BigInt?
+  videoStarts             BigInt?
+  videoCompletions        BigInt?
+  likes                   BigInt?
+  comments                BigInt?
+  shares                  BigInt?
+  saves                   BigInt?
+  profileVisits           BigInt?
+  linkClicks              BigInt?
+  averageWatchTimeSeconds Decimal?             @db.Decimal(12, 2)
+  totalWatchTimeSeconds   Decimal?             @db.Decimal(14, 2)
+  completionRate          Decimal?             @db.Decimal(6, 4)
+  source                  MetricSnapshotSource
+  externalSnapshotId      String?
+  createdAt               DateTime             @default(now())
 
   @@index([workspaceId, platform])
   @@index([socialAccountId, measuredAt])
@@ -1318,23 +1361,23 @@ model PlatformMetricSnapshot {
 // ---------------------------------------------------------------------------
 
 model AnalyticsSyncJob {
-  id               String              @id @default(uuid())
-  workspaceId      String
-  jobType          SyncJobType
-  socialAccountId  String?
-  externalPostId   String?
-  correlationId    String
-  idempotencyKey   String?             @unique
-  periodStart      DateTime?
-  periodEnd        DateTime?
-  attempts         Int                 @default(0)
-  maxAttempts      Int                 @default(5)
-  status           SyncJobStatus       @default(PENDING)
-  failureCode      AnalyticsSyncFailureCode?
-  lastError        String?
-  nextAttemptAt    DateTime?
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
+  id              String                    @id @default(uuid())
+  workspaceId     String
+  jobType         SyncJobType
+  socialAccountId String?
+  externalPostId  String?
+  correlationId   String
+  idempotencyKey  String?                   @unique
+  periodStart     DateTime?
+  periodEnd       DateTime?
+  attempts        Int                       @default(0)
+  maxAttempts     Int                       @default(5)
+  status          SyncJobStatus             @default(PENDING)
+  failureCode     AnalyticsSyncFailureCode?
+  lastError       String?
+  nextAttemptAt   DateTime?
+  createdAt       DateTime                  @default(now())
+  updatedAt       DateTime                  @updatedAt
 
   @@index([status, nextAttemptAt])
   @@index([workspaceId, jobType])
@@ -1342,12 +1385,13 @@ model AnalyticsSyncJob {
 }
 
 model AnalyticsProviderMapping {
-  id              String   @id @default(uuid())
-  workspaceId     String
-  platform        SocialPlatform
-  version         Int      @default(1)
-  mapping         Json
-  createdAt       DateTime @default(now())
+  id          String         @id @default(uuid())
+  workspaceId String
+  platform    SocialPlatform
+  version     Int            @default(1)
+  mapping     Json
+  createdAt   DateTime       @default(now())
+
   @@unique([platform, version])
   @@index([workspaceId, platform])
 }
@@ -1357,64 +1401,64 @@ model AnalyticsProviderMapping {
 // ---------------------------------------------------------------------------
 
 model ContentIntelligenceProfile {
-  id                    String         @id @default(uuid())
-  workspaceId           String
-  contentAssetId        String
-  contentVariantId      String?
-  language              String
-  durationSeconds       Decimal?       @db.Decimal(10, 2)
-  aspectRatio           String?
-  contentFormat         PublishingFormat?
-  hookType              HookType?
-  scriptStructure       ScriptStructureType?
-  callToActionType      CallToActionType?
-  visualStyle           String?
-  voiceStyle            String?
-  pacing               String?
-  sentiment             String?
-  productMentionCount   Int            @default(0)
-  affiliateDisclosurePresent Boolean    @default(false)
-  subtitlePresent       Boolean         @default(false)
-  faceVisible           Boolean?
-  avatarUsed            Boolean?
-  analysisSource        AnalysisSource
-  modelReference        String?
-  confidenceScore       Decimal?       @db.Decimal(4, 3)
-  analyzedAt            DateTime       @default(now())
-  supersededByProfileId String?
+  id                         String               @id @default(uuid())
+  workspaceId                String
+  contentAssetId             String
+  contentVariantId           String?
+  language                   String
+  durationSeconds            Decimal?             @db.Decimal(10, 2)
+  aspectRatio                String?
+  contentFormat              PublishingFormat?
+  hookType                   HookType?
+  scriptStructure            ScriptStructureType?
+  callToActionType           CallToActionType?
+  visualStyle                String?
+  voiceStyle                 String?
+  pacing                     String?
+  sentiment                  String?
+  productMentionCount        Int                  @default(0)
+  affiliateDisclosurePresent Boolean              @default(false)
+  subtitlePresent            Boolean              @default(false)
+  faceVisible                Boolean?
+  avatarUsed                 Boolean?
+  analysisSource             AnalysisSource
+  modelReference             String?
+  confidenceScore            Decimal?             @db.Decimal(4, 3)
+  analyzedAt                 DateTime             @default(now())
+  supersededByProfileId      String?
 
-  contentAsset          ContentAsset   @relation(fields: [contentAssetId], references: [id], onDelete: Cascade)
-  contentVariant        ContentVariant? @relation(fields: [contentVariantId], references: [id])
+  contentAsset   ContentAsset    @relation(fields: [contentAssetId], references: [id], onDelete: Cascade)
+  contentVariant ContentVariant? @relation(fields: [contentVariantId], references: [id])
 
   @@index([workspaceId, contentAssetId])
   @@index([hookType])
 }
 
 model ContentVariant {
-  id                        String              @id @default(uuid())
-  workspaceId               String
-  parentContentAssetId      String
-  name                      String
-  version                   Int
-  status                    ContentVariantStatus @default(DRAFT)
-  hookText                  String?
-  scriptText                String?
-  captionText               String?
-  titleText                 String?
-  callToActionText          String?
-  mediaAssetId              String?
-  thumbnailAssetId          String?
-  voiceAssetId              String?
-  generatedBy               GeneratedBy         @default(HUMAN)
-  sourceVariantId           String?
+  id                          String               @id @default(uuid())
+  workspaceId                 String
+  parentContentAssetId        String
+  name                        String
+  version                     Int
+  status                      ContentVariantStatus @default(DRAFT)
+  hookText                    String?
+  scriptText                  String?
+  captionText                 String?
+  titleText                   String?
+  callToActionText            String?
+  mediaAssetId                String?
+  thumbnailAssetId            String?
+  voiceAssetId                String?
+  generatedBy                 GeneratedBy          @default(HUMAN)
+  sourceVariantId             String?
   generationPromptReferenceId String?
-  approvalStatus            ApprovalStatus      @default(DRAFT)
-  createdAt                 DateTime            @default(now())
-  updatedAt                 DateTime            @updatedAt
+  approvalStatus              ApprovalStatus       @default(DRAFT)
+  createdAt                   DateTime             @default(now())
+  updatedAt                   DateTime             @updatedAt
 
-  parentContentAsset        ContentAsset         @relation(fields: [parentContentAssetId], references: [id], onDelete: Cascade)
-  intelligenceProfiles      ContentIntelligenceProfile[]
-  experimentVariants        ExperimentVariant[]
+  parentContentAsset   ContentAsset                 @relation(fields: [parentContentAssetId], references: [id], onDelete: Cascade)
+  intelligenceProfiles ContentIntelligenceProfile[]
+  experimentVariants   ExperimentVariant[]
 
   @@index([workspaceId, parentContentAssetId])
   @@index([status])
@@ -1425,92 +1469,92 @@ model ContentVariant {
 // ---------------------------------------------------------------------------
 
 model ContentPerformanceSnapshot {
-  id                  String    @id @default(uuid())
-  workspaceId         String
-  contentAssetId      String
-  contentVariantId    String?
-  platform            SocialPlatform?
-  socialAccountId     String?
-  brandId             String?
-  nicheId             String?
-  productId           String?
-  campaignId          String?
-  periodStart         DateTime  @db.Timestamptz(6)
-  periodEnd           DateTime  @db.Timestamptz(6)
-  impressions         BigInt    @default(0)
-  views               BigInt    @default(0)
-  engagements         BigInt    @default(0)
-  linkClicks          BigInt    @default(0)
-  conversions         BigInt    @default(0)
-  grossRevenue        Decimal   @db.Decimal(14, 2) @default(0)
-  commissionRevenue   Decimal   @db.Decimal(14, 2) @default(0)
-  attributedCosts     Decimal   @db.Decimal(14, 2) @default(0)
-  estimatedNetRevenue Decimal   @db.Decimal(14, 2) @default(0)
-  engagementRate      Decimal?  @db.Decimal(6, 4)
-  clickThroughRate    Decimal?  @db.Decimal(6, 4)
-  conversionRate      Decimal?  @db.Decimal(6, 4)
-  completionRate      Decimal?  @db.Decimal(6, 4)
-  revenuePerView      Decimal?  @db.Decimal(14, 4)
-  revenuePerClick     Decimal?  @db.Decimal(14, 4)
-  revenuePerPost      Decimal?  @db.Decimal(14, 4)
-  returnOnContentSpend Decimal? @db.Decimal(10, 4)
-  sampleSize          BigInt    @default(0)
-  formulaVersion      String    @default("1.0.0")
-  generatedAt         DateTime  @default(now())
+  id                   String          @id @default(uuid())
+  workspaceId          String
+  contentAssetId       String
+  contentVariantId     String?
+  platform             SocialPlatform?
+  socialAccountId      String?
+  brandId              String?
+  nicheId              String?
+  productId            String?
+  campaignId           String?
+  periodStart          DateTime        @db.Timestamptz(6)
+  periodEnd            DateTime        @db.Timestamptz(6)
+  impressions          BigInt          @default(0)
+  views                BigInt          @default(0)
+  engagements          BigInt          @default(0)
+  linkClicks           BigInt          @default(0)
+  conversions          BigInt          @default(0)
+  grossRevenue         Decimal         @default(0) @db.Decimal(14, 2)
+  commissionRevenue    Decimal         @default(0) @db.Decimal(14, 2)
+  attributedCosts      Decimal         @default(0) @db.Decimal(14, 2)
+  estimatedNetRevenue  Decimal         @default(0) @db.Decimal(14, 2)
+  engagementRate       Decimal?        @db.Decimal(6, 4)
+  clickThroughRate     Decimal?        @db.Decimal(6, 4)
+  conversionRate       Decimal?        @db.Decimal(6, 4)
+  completionRate       Decimal?        @db.Decimal(6, 4)
+  revenuePerView       Decimal?        @db.Decimal(14, 4)
+  revenuePerClick      Decimal?        @db.Decimal(14, 4)
+  revenuePerPost       Decimal?        @db.Decimal(14, 4)
+  returnOnContentSpend Decimal?        @db.Decimal(10, 4)
+  sampleSize           BigInt          @default(0)
+  formulaVersion       String          @default("1.0.0")
+  generatedAt          DateTime        @default(now())
 
   @@index([workspaceId, contentAssetId])
   @@index([periodStart, periodEnd])
 }
 
 model ProductPerformanceSnapshot {
-  id                  String    @id @default(uuid())
-  workspaceId         String
-  productId           String
-  brandId             String?
-  nicheId             String?
-  periodStart         DateTime  @db.Timestamptz(6)
-  periodEnd           DateTime  @db.Timestamptz(6)
-  publishedPostCount  Int       @default(0)
-  impressions         BigInt    @default(0)
-  views               BigInt    @default(0)
-  affiliateClicks     BigInt    @default(0)
-  conversions         BigInt    @default(0)
-  grossRevenue        Decimal   @db.Decimal(14, 2) @default(0)
-  commissionRevenue   Decimal   @db.Decimal(14, 2) @default(0)
-  attributedCosts     Decimal   @db.Decimal(14, 2) @default(0)
-  estimatedNetRevenue Decimal   @db.Decimal(14, 2) @default(0)
-  clickThroughRate    Decimal?  @db.Decimal(6, 4)
-  conversionRate      Decimal?  @db.Decimal(6, 4)
+  id                   String   @id @default(uuid())
+  workspaceId          String
+  productId            String
+  brandId              String?
+  nicheId              String?
+  periodStart          DateTime @db.Timestamptz(6)
+  periodEnd            DateTime @db.Timestamptz(6)
+  publishedPostCount   Int      @default(0)
+  impressions          BigInt   @default(0)
+  views                BigInt   @default(0)
+  affiliateClicks      BigInt   @default(0)
+  conversions          BigInt   @default(0)
+  grossRevenue         Decimal  @default(0) @db.Decimal(14, 2)
+  commissionRevenue    Decimal  @default(0) @db.Decimal(14, 2)
+  attributedCosts      Decimal  @default(0) @db.Decimal(14, 2)
+  estimatedNetRevenue  Decimal  @default(0) @db.Decimal(14, 2)
+  clickThroughRate     Decimal? @db.Decimal(6, 4)
+  conversionRate       Decimal? @db.Decimal(6, 4)
   returnOnContentSpend Decimal? @db.Decimal(10, 4)
-  refundRate          Decimal?  @db.Decimal(6, 4)
-  chargebackRate      Decimal?  @db.Decimal(6, 4)
-  dataQualityScore    Decimal   @db.Decimal(4, 3) @default(0)
-  formulaVersion      String    @default("1.0.0")
-  generatedAt         DateTime  @default(now())
+  refundRate           Decimal? @db.Decimal(6, 4)
+  chargebackRate       Decimal? @db.Decimal(6, 4)
+  dataQualityScore     Decimal  @default(0) @db.Decimal(4, 3)
+  formulaVersion       String   @default("1.0.0")
+  generatedAt          DateTime @default(now())
 
   @@index([workspaceId, productId])
   @@index([periodStart, periodEnd])
 }
 
 model PostingTimePerformance {
-  id                  String         @id @default(uuid())
-  workspaceId         String
-  socialAccountId     String
-  platform            SocialPlatform
-  weekday             Int
-  hourOfDay           Int
-  timezone            String
-  postCount           Int            @default(0)
-  impressions         BigInt         @default(0)
-  views               BigInt         @default(0)
-  linkClicks          BigInt         @default(0)
-  conversions         BigInt         @default(0)
-  commissionRevenue   Decimal        @db.Decimal(14, 2) @default(0)
-  engagementRate      Decimal?       @db.Decimal(6, 4)
-  clickThroughRate    Decimal?       @db.Decimal(6, 4)
-  conversionRate      Decimal?       @db.Decimal(6, 4)
-  sampleSize          BigInt         @default(0)
-  generatedAt         DateTime       @default(now())
+  id                String         @id @default(uuid())
+  workspaceId       String
+  socialAccountId   String
+  platform          SocialPlatform
+  weekday           Int
+  hourOfDay         Int
+  timezone          String
+  postCount         Int            @default(0)
+  impressions       BigInt         @default(0)
+  views             BigInt         @default(0)
+  linkClicks        BigInt         @default(0)
+  conversions       BigInt         @default(0)
+  commissionRevenue Decimal        @default(0) @db.Decimal(14, 2)
+  engagementRate    Decimal?       @db.Decimal(6, 4)
+  clickThroughRate  Decimal?       @db.Decimal(6, 4)
+  conversionRate    Decimal?       @db.Decimal(6, 4)
+  sampleSize        BigInt         @default(0)
+  generatedAt       DateTime       @default(now())
 
   @@unique([socialAccountId, weekday, hourOfDay, timezone])
   @@index([workspaceId, socialAccountId])
@@ -1521,65 +1565,65 @@ model PostingTimePerformance {
 // ---------------------------------------------------------------------------
 
 model ContentExperiment {
-  id                            String              @id @default(uuid())
-  workspaceId                   String
-  brandId                       String
-  name                          String
-  description                   String?
-  experimentType                ExperimentType
-  status                        ExperimentStatus    @default(DRAFT)
-  primaryMetric                 ExperimentMetric
-  secondaryMetrics              ExperimentMetric[]
-  minimumSampleSize             Int
-  minimumRuntimeHours           Int
-  maximumRuntimeHours           Int
-  confidenceThreshold           Decimal             @db.Decimal(4, 3)
-  practicalSignificanceThreshold Decimal            @db.Decimal(14, 4)
-  trafficAllocationMode         TrafficAllocationMode @default(EQUAL)
-  approvalStatus                ApprovalStatus      @default(DRAFT)
-  startedAt                     DateTime?
-  endedAt                       DateTime?
-  createdAt                     DateTime            @default(now())
-  updatedAt                     DateTime            @updatedAt
+  id                             String                @id @default(uuid())
+  workspaceId                    String
+  brandId                        String
+  name                           String
+  description                    String?
+  experimentType                 ExperimentType
+  status                         ExperimentStatus      @default(DRAFT)
+  primaryMetric                  ExperimentMetric
+  secondaryMetrics               ExperimentMetric[]
+  minimumSampleSize              Int
+  minimumRuntimeHours            Int
+  maximumRuntimeHours            Int
+  confidenceThreshold            Decimal               @db.Decimal(4, 3)
+  practicalSignificanceThreshold Decimal               @db.Decimal(14, 4)
+  trafficAllocationMode          TrafficAllocationMode @default(EQUAL)
+  approvalStatus                 ApprovalStatus        @default(DRAFT)
+  startedAt                      DateTime?
+  endedAt                        DateTime?
+  createdAt                      DateTime              @default(now())
+  updatedAt                      DateTime              @updatedAt
 
-  variants                      ExperimentVariant[]
-  assignments                   ExperimentAssignment[]
-  results                       ExperimentResult[]
+  variants    ExperimentVariant[]
+  assignments ExperimentAssignment[]
+  results     ExperimentResult[]
 
   @@index([workspaceId, status])
   @@index([brandId])
 }
 
 model ExperimentVariant {
-  id                      String                  @id @default(uuid())
-  experimentId            String
-  contentVariantId        String?
+  id                        String                  @id @default(uuid())
+  experimentId              String
+  contentVariantId          String?
   publishingConfigurationId String?
-  name                    String
-  isControl               Boolean                 @default(false)
-  trafficWeight           Int
-  status                  ExperimentVariantStatus @default(DRAFT)
-  createdAt               DateTime                @default(now())
+  name                      String
+  isControl                 Boolean                 @default(false)
+  trafficWeight             Int
+  status                    ExperimentVariantStatus @default(DRAFT)
+  createdAt                 DateTime                @default(now())
 
-  experiment              ContentExperiment       @relation(fields: [experimentId], references: [id], onDelete: Cascade)
-  contentVariant          ContentVariant?         @relation(fields: [contentVariantId], references: [id])
-  assignments             ExperimentAssignment[]
+  experiment     ContentExperiment      @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  contentVariant ContentVariant?        @relation(fields: [contentVariantId], references: [id])
+  assignments    ExperimentAssignment[]
 
   @@index([experimentId])
 }
 
 model ExperimentAssignment {
-  id                  String                  @id @default(uuid())
-  workspaceId         String
-  experimentId        String
-  experimentVariantId String
-  assignmentKey       String
-  assignmentType      ExperimentAssignmentType
+  id                    String                   @id @default(uuid())
+  workspaceId           String
+  experimentId          String
+  experimentVariantId   String
+  assignmentKey         String
+  assignmentType        ExperimentAssignmentType
   assignmentReferenceId String
-  assignedAt          DateTime                @default(now())
+  assignedAt            DateTime                 @default(now())
 
-  experiment          ContentExperiment        @relation(fields: [experimentId], references: [id], onDelete: Cascade)
-  variant             ExperimentVariant        @relation(fields: [experimentVariantId], references: [id])
+  experiment ContentExperiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  variant    ExperimentVariant @relation(fields: [experimentVariantId], references: [id])
 
   @@unique([experimentId, assignmentKey])
   @@index([workspaceId, experimentId])
@@ -1587,24 +1631,24 @@ model ExperimentAssignment {
 }
 
 model ExperimentResult {
-  id                    String                @id @default(uuid())
-  experimentId          String
-  analyzedAt            DateTime              @default(now())
-  status                ExperimentResultStatus
-  winningVariantId      String?
-  primaryMetric         ExperimentMetric
-  controlValue          Decimal?              @db.Decimal(14, 4)
-  winningValue          Decimal?              @db.Decimal(14, 4)
-  relativeLift          Decimal?              @db.Decimal(10, 4)
-  absoluteLift          Decimal?              @db.Decimal(14, 4)
-  sampleSize            BigInt                @default(0)
-  confidenceScore       Decimal?              @db.Decimal(4, 3)
-  practicalSignificanceReached Boolean        @default(false)
-  analysisMethod        AnalysisMethod        @default(FREQUENTIST)
-  analysisVersion       String
-  explanation           String
+  id                           String                 @id @default(uuid())
+  experimentId                 String
+  analyzedAt                   DateTime               @default(now())
+  status                       ExperimentResultStatus
+  winningVariantId             String?
+  primaryMetric                ExperimentMetric
+  controlValue                 Decimal?               @db.Decimal(14, 4)
+  winningValue                 Decimal?               @db.Decimal(14, 4)
+  relativeLift                 Decimal?               @db.Decimal(10, 4)
+  absoluteLift                 Decimal?               @db.Decimal(14, 4)
+  sampleSize                   BigInt                 @default(0)
+  confidenceScore              Decimal?               @db.Decimal(4, 3)
+  practicalSignificanceReached Boolean                @default(false)
+  analysisMethod               AnalysisMethod         @default(FREQUENTIST)
+  analysisVersion              String
+  explanation                  String
 
-  experiment            ContentExperiment      @relation(fields: [experimentId], references: [id], onDelete: Cascade)
+  experiment ContentExperiment @relation(fields: [experimentId], references: [id], onDelete: Cascade)
 
   @@index([experimentId])
 }
@@ -1614,47 +1658,47 @@ model ExperimentResult {
 // ---------------------------------------------------------------------------
 
 model OptimizationRecommendation {
-  id                    String           @id @default(uuid())
-  workspaceId           String
-  recommendationType    RecommendationType
-  scopeType             ScopeType
-  scopeId               String
-  title                 String
-  explanation           String
-  confidenceScore       Decimal           @db.Decimal(4, 3)
-  expectedImpact        ExpectedImpact
-  evidenceReferences    String[]
-  minimumEvidenceCount  Int
-  sampleSize            BigInt?
-  status                RecommendationStatus @default(GENERATED)
-  requiresApproval      Boolean          @default(true)
-  expiresAt             DateTime?
-  ruleId                String?
-  generatedAt           DateTime         @default(now())
-  reviewedAt            DateTime?
-  reviewedBy            String?
+  id                   String               @id @default(uuid())
+  workspaceId          String
+  recommendationType   RecommendationType
+  scopeType            ScopeType
+  scopeId              String
+  title                String
+  explanation          String
+  confidenceScore      Decimal              @db.Decimal(4, 3)
+  expectedImpact       ExpectedImpact
+  evidenceReferences   String[]
+  minimumEvidenceCount Int
+  sampleSize           BigInt?
+  status               RecommendationStatus @default(GENERATED)
+  requiresApproval     Boolean              @default(true)
+  expiresAt            DateTime?
+  ruleId               String?
+  generatedAt          DateTime             @default(now())
+  reviewedAt           DateTime?
+  reviewedBy           String?
 
   @@index([workspaceId, status])
   @@index([recommendationType, scopeType, scopeId])
 }
 
 model OptimizationPolicy {
-  id                              String         @id @default(uuid())
-  workspaceId                     String
-  scopeType                       ScopeType
-  scopeId                         String
-  mode                            OptimizationMode @default(OBSERVE_ONLY)
-  minimumSampleSize               Int
-  minimumConfidenceScore          Decimal        @db.Decimal(4, 3)
-  maximumRecommendationsPerDay    Int
-  allowAiAnalysis                 Boolean        @default(false)
-  allowAiVariantDrafts            Boolean        @default(false)
-  requireApprovalForExperiment    Boolean        @default(true)
-  requireApprovalForVariantDraft  Boolean        @default(true)
-  requireApprovalForScheduleChange Boolean       @default(true)
-  blockedRecommendationTypes      RecommendationType[]
-  createdAt                       DateTime       @default(now())
-  updatedAt                       DateTime       @updatedAt
+  id                               String               @id @default(uuid())
+  workspaceId                      String
+  scopeType                        ScopeType
+  scopeId                          String
+  mode                             OptimizationMode     @default(OBSERVE_ONLY)
+  minimumSampleSize                Int
+  minimumConfidenceScore           Decimal              @db.Decimal(4, 3)
+  maximumRecommendationsPerDay     Int
+  allowAiAnalysis                  Boolean              @default(false)
+  allowAiVariantDrafts             Boolean              @default(false)
+  requireApprovalForExperiment     Boolean              @default(true)
+  requireApprovalForVariantDraft   Boolean              @default(true)
+  requireApprovalForScheduleChange Boolean              @default(true)
+  blockedRecommendationTypes       RecommendationType[]
+  createdAt                        DateTime             @default(now())
+  updatedAt                        DateTime             @updatedAt
 
   @@index([workspaceId, scopeType, scopeId])
 }
@@ -1664,18 +1708,18 @@ model OptimizationPolicy {
 // ---------------------------------------------------------------------------
 
 model AudienceSegment {
-  id                  String   @id @default(uuid())
-  workspaceId         String
-  name                String
-  description         String?
-  platform            SocialPlatform?
-  countryCodes        String[]
-  languageCodes       String[]
-  interestTags        String[]
-  behaviorTags        String[]
-  status              String   @default("draft")
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id            String          @id @default(uuid())
+  workspaceId   String
+  name          String
+  description   String?
+  platform      SocialPlatform?
+  countryCodes  String[]
+  languageCodes String[]
+  interestTags  String[]
+  behaviorTags  String[]
+  status        String          @default("draft")
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
 
   @@index([workspaceId])
 }
@@ -1685,49 +1729,51 @@ model AudienceSegment {
 // ---------------------------------------------------------------------------
 
 model DataQualityReport {
-  id                  String           @id @default(uuid())
-  workspaceId         String
-  scopeType           DataQualityScope
-  scopeId             String
-  completenessScore   Decimal          @db.Decimal(4, 3)
-  consistencyScore    Decimal          @db.Decimal(4, 3)
-  freshnessScore      Decimal          @db.Decimal(4, 3)
-  attributionScore    Decimal          @db.Decimal(4, 3)
-  overallScore        Decimal          @db.Decimal(4, 3)
-  issueCount          Int              @default(0)
-  generatedAt         DateTime         @default(now())
+  id                String           @id @default(uuid())
+  workspaceId       String
+  scopeType         DataQualityScope
+  scopeId           String
+  completenessScore Decimal          @db.Decimal(4, 3)
+  consistencyScore  Decimal          @db.Decimal(4, 3)
+  freshnessScore    Decimal          @db.Decimal(4, 3)
+  attributionScore  Decimal          @db.Decimal(4, 3)
+  overallScore      Decimal          @db.Decimal(4, 3)
+  issueCount        Int              @default(0)
+  generatedAt       DateTime         @default(now())
 
-  issues              DataQualityIssue[]
+  issues DataQualityIssue[]
+
   @@index([workspaceId, scopeType, scopeId])
 }
 
 model DataQualityIssue {
-  id                String               @id @default(uuid())
-  reportId          String
-  issueType         DataQualityIssueType
-  severity          AnomalySeverity
-  detail            String?
-  detectedAt        DateTime             @default(now())
+  id         String               @id @default(uuid())
+  reportId   String
+  issueType  DataQualityIssueType
+  severity   AnomalySeverity
+  detail     String?
+  detectedAt DateTime             @default(now())
 
-  report            DataQualityReport    @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  report DataQualityReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+
   @@index([reportId])
 }
 
 model AnalyticsAnomaly {
-  id                  String           @id @default(uuid())
-  workspaceId         String
-  anomalyType         String
-  scopeType           ScopeType
-  scopeId             String
-  severity            AnomalySeverity
-  observedValue       Decimal?         @db.Decimal(14, 4)
-  expectedRangeMin    Decimal?         @db.Decimal(14, 4)
-  expectedRangeMax    Decimal?         @db.Decimal(14, 4)
-  explanation         String
-  evidenceReferences  String[]
-  status              AnomalyStatus    @default(OPEN)
-  detectedAt          DateTime         @default(now())
-  resolvedAt          DateTime?
+  id                 String          @id @default(uuid())
+  workspaceId        String
+  anomalyType        String
+  scopeType          ScopeType
+  scopeId            String
+  severity           AnomalySeverity
+  observedValue      Decimal?        @db.Decimal(14, 4)
+  expectedRangeMin   Decimal?        @db.Decimal(14, 4)
+  expectedRangeMax   Decimal?        @db.Decimal(14, 4)
+  explanation        String
+  evidenceReferences String[]
+  status             AnomalyStatus   @default(OPEN)
+  detectedAt         DateTime        @default(now())
+  resolvedAt         DateTime?
 
   @@index([workspaceId, status])
   @@index([scopeType, scopeId])
@@ -1738,17 +1784,18 @@ model AnalyticsAnomaly {
 // ---------------------------------------------------------------------------
 
 model OptimizationRule {
-  id          String               @id @default(uuid())
+  id          String                 @id @default(uuid())
   workspaceId String
   code        String
   name        String
-  version     Int                  @default(1)
+  version     Int                    @default(1)
   description String?
   status      OptimizationRuleStatus @default(ACTIVE)
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
 
-  executions  OptimizationRuleExecution[]
+  executions OptimizationRuleExecution[]
+
   @@unique([code, version])
   @@index([workspaceId, status])
 }
@@ -1762,7 +1809,8 @@ model OptimizationRuleExecution {
   evaluatedCount    Int      @default(0)
   matchedCount      Int      @default(0)
 
-  rule              OptimizationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+  rule OptimizationRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
   @@index([workspaceId, ruleId])
 }
 
@@ -1898,21 +1946,21 @@ enum ProductDataQualityIssueType {
 }
 
 model ProductCategory {
-  id                       String       @id @default(uuid())
-  workspaceId              String       @default("00000000-0000-0000-0000-000000000001")
-  name                     String
-  slug                     String
-  parentCategoryId         String?
-  riskLevel                RiskLevel    @default(LOW)
-  requiresManualApproval   Boolean      @default(false)
-  contentGenerationAllowed Boolean      @default(true)
-  affiliatePromotionAllowed Boolean      @default(true)
-  createdAt                DateTime     @default(now())
-  updatedAt                DateTime     @updatedAt
+  id                        String    @id @default(uuid())
+  workspaceId               String    @default("00000000-0000-0000-0000-000000000001")
+  name                      String
+  slug                      String
+  parentCategoryId          String?
+  riskLevel                 RiskLevel @default(LOW)
+  requiresManualApproval    Boolean   @default(false)
+  contentGenerationAllowed  Boolean   @default(true)
+  affiliatePromotionAllowed Boolean   @default(true)
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
 
-  parent    ProductCategory?    @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id])
-  children  ProductCategory[]   @relation("CategoryHierarchy")
-  products  Product[]
+  parent   ProductCategory?  @relation("CategoryHierarchy", fields: [parentCategoryId], references: [id])
+  children ProductCategory[] @relation("CategoryHierarchy")
+  products Product[]
 
   @@unique([workspaceId, slug])
   @@index([workspaceId, parentCategoryId])
@@ -1947,12 +1995,12 @@ model AffiliateOffer {
   lastCheckedAt        DateTime?
   rawReferenceId       String?
 
-  product           Product                 @relation(fields: [productId], references: [id], onDelete: Cascade)
-  affiliateProgram  AffiliateProgram        @relation(fields: [affiliateProgramId], references: [id])
-  snapshots         AffiliateOfferSnapshot[]
-  matchCandidates   ProductMatchCandidate[] @relation("MatchOffer")
+  product                Product                        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  affiliateProgram       AffiliateProgram               @relation(fields: [affiliateProgramId], references: [id])
+  snapshots              AffiliateOfferSnapshot[]
+  matchCandidates        ProductMatchCandidate[]        @relation("MatchOffer")
   profitabilityEstimates ProductProfitabilityEstimate[]
-  opportunities     ProductOpportunity[]
+  opportunities          ProductOpportunity[]
 
   @@unique([provider, externalProductId, externalOfferId])
   @@index([workspaceId, productId])
@@ -1962,51 +2010,51 @@ model AffiliateOffer {
 }
 
 model AffiliateOfferSnapshot {
-  id                String       @id @default(uuid())
-  workspaceId       String       @default("00000000-0000-0000-0000-000000000001")
-  affiliateOfferId  String
-  priceAmount       Decimal?     @db.Decimal(12, 2)
-  originalPriceAmount Decimal?   @db.Decimal(12, 2)
-  currency          String?
-  commissionRate    Decimal?     @db.Decimal(6, 4)
-  commissionAmount  Decimal?     @db.Decimal(12, 2)
-  availability      Availability
-  averageRating     Decimal?     @db.Decimal(3, 2)
-  ratingCount       BigInt?
-  capturedAt        DateTime     @default(now())
+  id                  String       @id @default(uuid())
+  workspaceId         String       @default("00000000-0000-0000-0000-000000000001")
+  affiliateOfferId    String
+  priceAmount         Decimal?     @db.Decimal(12, 2)
+  originalPriceAmount Decimal?     @db.Decimal(12, 2)
+  currency            String?
+  commissionRate      Decimal?     @db.Decimal(6, 4)
+  commissionAmount    Decimal?     @db.Decimal(12, 2)
+  availability        Availability
+  averageRating       Decimal?     @db.Decimal(3, 2)
+  ratingCount         BigInt?
+  capturedAt          DateTime     @default(now())
 
-  offer  AffiliateOffer @relation(fields: [affiliateOfferId], references: [id], onDelete: Cascade)
+  offer AffiliateOffer @relation(fields: [affiliateOfferId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, affiliateOfferId, capturedAt])
 }
 
 model ProductDiscoveryQuery {
-  id                    String               @id @default(uuid())
-  workspaceId           String               @default("00000000-0000-0000-0000-000000000001")
-  name                  String
-  nicheId               String?
-  keywords              String[]             @default([])
-  excludedKeywords      String[]             @default([])
-  categoryIds           String[]             @default([])
-  excludedCategoryIds   String[]             @default([])
-  targetCountryCodes    String[]             @default([])
-  languageCodes         String[]             @default([])
-  minimumPrice          Decimal?             @db.Decimal(12, 2)
-  maximumPrice          Decimal?             @db.Decimal(12, 2)
-  currency              String?
-  minimumCommissionRate Decimal?             @db.Decimal(6, 4)
-  minimumCommissionAmount Decimal?           @db.Decimal(12, 2)
-  minimumRating         Decimal?             @db.Decimal(3, 2)
-  minimumRatingCount    Int?
-  requireInStock        Boolean              @default(false)
-  providerIds           String[]             @default([])
-  status                DiscoveryQueryStatus @default(DRAFT)
-  currentVersion        Int                  @default(1)
-  createdAt             DateTime             @default(now())
-  updatedAt             DateTime             @updatedAt
+  id                      String               @id @default(uuid())
+  workspaceId             String               @default("00000000-0000-0000-0000-000000000001")
+  name                    String
+  nicheId                 String?
+  keywords                String[]             @default([])
+  excludedKeywords        String[]             @default([])
+  categoryIds             String[]             @default([])
+  excludedCategoryIds     String[]             @default([])
+  targetCountryCodes      String[]             @default([])
+  languageCodes           String[]             @default([])
+  minimumPrice            Decimal?             @db.Decimal(12, 2)
+  maximumPrice            Decimal?             @db.Decimal(12, 2)
+  currency                String?
+  minimumCommissionRate   Decimal?             @db.Decimal(6, 4)
+  minimumCommissionAmount Decimal?             @db.Decimal(12, 2)
+  minimumRating           Decimal?             @db.Decimal(3, 2)
+  minimumRatingCount      Int?
+  requireInStock          Boolean              @default(false)
+  providerIds             String[]             @default([])
+  status                  DiscoveryQueryStatus @default(DRAFT)
+  currentVersion          Int                  @default(1)
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
 
-  versions  ProductDiscoveryQueryVersion[]
-  runs      ProductDiscoveryRun[]
+  versions ProductDiscoveryQueryVersion[]
+  runs     ProductDiscoveryRun[]
 
   @@index([workspaceId, status])
 }
@@ -2019,103 +2067,103 @@ model ProductDiscoveryQueryVersion {
   querySnapshot Json
   createdAt     DateTime @default(now())
 
-  query  ProductDiscoveryQuery @relation(fields: [queryId], references: [id], onDelete: Cascade)
+  query ProductDiscoveryQuery @relation(fields: [queryId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, queryId])
 }
 
 model ProductDiscoveryRun {
-  id                    String              @id @default(uuid())
-  workspaceId           String              @default("00000000-0000-0000-0000-000000000001")
-  queryId               String
-  status                DiscoveryRunStatus   @default(QUEUED)
-  providerCount         Int                 @default(0)
+  id                      String             @id @default(uuid())
+  workspaceId             String             @default("00000000-0000-0000-0000-000000000001")
+  queryId                 String
+  status                  DiscoveryRunStatus @default(QUEUED)
+  providerCount           Int                @default(0)
   successfulProviderCount Int                @default(0)
-  failedProviderCount   Int                 @default(0)
-  discoveredOfferCount  Int                 @default(0)
-  newProductCount       Int                 @default(0)
-  updatedProductCount   Int                 @default(0)
-  duplicateCount        Int                 @default(0)
-  rejectedCount         Int                 @default(0)
-  startedAt             DateTime?
-  completedAt           DateTime?
-  correlationId         String
-  idempotencyKey        String              @unique
-  failureReason         String?
-  createdAt             DateTime            @default(now())
+  failedProviderCount     Int                @default(0)
+  discoveredOfferCount    Int                @default(0)
+  newProductCount         Int                @default(0)
+  updatedProductCount     Int                @default(0)
+  duplicateCount          Int                @default(0)
+  rejectedCount           Int                @default(0)
+  startedAt               DateTime?
+  completedAt             DateTime?
+  correlationId           String
+  idempotencyKey          String             @unique
+  failureReason           String?
+  createdAt               DateTime           @default(now())
 
-  query         ProductDiscoveryQuery       @relation(fields: [queryId], references: [id])
-  providerRuns  ProductDiscoveryProviderRun[]
+  query        ProductDiscoveryQuery         @relation(fields: [queryId], references: [id])
+  providerRuns ProductDiscoveryProviderRun[]
 
   @@index([workspaceId, queryId])
   @@index([workspaceId, status])
 }
 
 model ProductDiscoveryProviderRun {
-  id                 String              @id @default(uuid())
-  workspaceId        String              @default("00000000-0000-0000-0000-000000000001")
-  discoveryRunId     String
-  provider           AffiliateProviderKey
-  status             DiscoveryRunStatus   @default(QUEUED)
-  discoveredOfferCount Int                @default(0)
-  newProductCount    Int                 @default(0)
-  updatedProductCount Int                @default(0)
-  duplicateCount     Int                 @default(0)
-  rejectedCount      Int                 @default(0)
-  failureCode        ProductSourceFailureCode?
-  failureReason      String?
-  startedAt          DateTime?
-  completedAt        DateTime?
-  run                ProductDiscoveryRun  @relation(fields: [discoveryRunId], references: [id], onDelete: Cascade)
+  id                   String                    @id @default(uuid())
+  workspaceId          String                    @default("00000000-0000-0000-0000-000000000001")
+  discoveryRunId       String
+  provider             AffiliateProviderKey
+  status               DiscoveryRunStatus        @default(QUEUED)
+  discoveredOfferCount Int                       @default(0)
+  newProductCount      Int                       @default(0)
+  updatedProductCount  Int                       @default(0)
+  duplicateCount      Int                       @default(0)
+  rejectedCount        Int                       @default(0)
+  failureCode          ProductSourceFailureCode?
+  failureReason        String?
+  startedAt            DateTime?
+  completedAt          DateTime?
+  run                  ProductDiscoveryRun       @relation(fields: [discoveryRunId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, discoveryRunId])
   @@index([workspaceId, provider])
 }
 
 model ProductImportBatch {
-  id           String   @id @default(uuid())
-  workspaceId  String   @default("00000000-0000-0000-0000-000000000001")
+  id           String    @id @default(uuid())
+  workspaceId  String    @default("00000000-0000-0000-0000-000000000001")
   fileName     String?
   fileHash     String?
-  source       String   @default("csv")
-  status       String   @default("preview")
-  previewToken String?  @unique
-  validRows    Int      @default(0)
-  invalidRows  Int      @default(0)
-  warningRows  Int      @default(0)
+  source       String    @default("csv")
+  status       String    @default("preview")
+  previewToken String?   @unique
+  validRows    Int       @default(0)
+  invalidRows  Int       @default(0)
+  warningRows  Int       @default(0)
   committedAt  DateTime?
-  createdAt    DateTime @default(now())
+  createdAt    DateTime  @default(now())
 
-  rows  ProductImportRow[]
+  rows ProductImportRow[]
 
   @@index([workspaceId, previewToken])
 }
 
 model ProductImportRow {
-  id              String   @id @default(uuid())
-  workspaceId     String   @default("00000000-0000-0000-0000-000000000001")
-  batchId         String
-  rowIndex        Int
-  status          String   @default("valid")
-  rawData         Json
-  normalizedData  Json?
-  errors          Json?
-  warnings        Json?
-  batch           ProductImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  id             String             @id @default(uuid())
+  workspaceId    String             @default("00000000-0000-0000-0000-000000000001")
+  batchId        String
+  rowIndex       Int
+  status         String             @default("valid")
+  rawData        Json
+  normalizedData Json?
+  errors         Json?
+  warnings       Json?
+  batch          ProductImportBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, batchId])
 }
 
 model ProductMatchCandidate {
-  id                 String       @id @default(uuid())
-  workspaceId        String       @default("00000000-0000-0000-0000-000000000001")
+  id                 String      @id @default(uuid())
+  workspaceId        String      @default("00000000-0000-0000-0000-000000000001")
   sourceOfferId      String
   candidateProductId String
   matchMethod        MatchMethod
-  confidenceScore    Decimal      @db.Decimal(4, 3)
-  evidence           String[]     @default([])
-  status             MatchStatus  @default(PENDING)
-  createdAt          DateTime     @default(now())
+  confidenceScore    Decimal     @db.Decimal(4, 3)
+  evidence           String[]    @default([])
+  status             MatchStatus @default(PENDING)
+  createdAt          DateTime    @default(now())
   decidedAt          DateTime?
   decidedBy          String?
 
@@ -2128,109 +2176,109 @@ model ProductMatchCandidate {
 }
 
 model ProductComplianceProfile {
-  id                           String           @id @default(uuid())
-  workspaceId                  String           @default("00000000-0000-0000-0000-000000000001")
-  productId                    String
-  categoryAllowed              Boolean          @default(true)
-  nicheAllowed                 Boolean          @default(true)
-  targetMarketAllowed          Boolean          @default(true)
+  id                              String           @id @default(uuid())
+  workspaceId                     String           @default("00000000-0000-0000-0000-000000000001")
+  productId                       String
+  categoryAllowed                 Boolean          @default(true)
+  nicheAllowed                    Boolean          @default(true)
+  targetMarketAllowed             Boolean          @default(true)
   affiliateProgramAllowsPromotion Boolean?
-  ageRestrictionDetected       Boolean          @default(false)
-  healthClaimRiskDetected      Boolean          @default(false)
-  financialClaimRiskDetected   Boolean          @default(false)
-  regulatedProductRiskDetected Boolean          @default(false)
-  trademarkRiskDetected        Boolean          @default(false)
-  misleadingClaimRiskDetected  Boolean          @default(false)
-  disclosureRequired           Boolean          @default(false)
-  manualReviewRequired         Boolean          @default(false)
-  riskLevel                    RiskLevel        @default(LOW)
-  status                       ComplianceStatus @default(PENDING)
-  reasons                      String[]         @default([])
-  evidenceReferences           String[]         @default([])
-  evaluatedAt                  DateTime         @default(now())
-  evaluationVersion            String
+  ageRestrictionDetected          Boolean          @default(false)
+  healthClaimRiskDetected         Boolean          @default(false)
+  financialClaimRiskDetected      Boolean          @default(false)
+  regulatedProductRiskDetected    Boolean          @default(false)
+  trademarkRiskDetected           Boolean          @default(false)
+  misleadingClaimRiskDetected     Boolean          @default(false)
+  disclosureRequired              Boolean          @default(false)
+  manualReviewRequired            Boolean          @default(false)
+  riskLevel                       RiskLevel        @default(LOW)
+  status                          ComplianceStatus @default(PENDING)
+  reasons                         String[]         @default([])
+  evidenceReferences              String[]         @default([])
+  evaluatedAt                     DateTime         @default(now())
+  evaluationVersion               String
 
-  product  Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, productId])
 }
 
 model ProductContentFitProfile {
-  id                        String               @id @default(uuid())
-  workspaceId               String               @default("00000000-0000-0000-0000-000000000001")
-  productId                 String
-  demonstrabilityScore      Int                  @default(0)
-  visualAppealScore         Int                  @default(0)
-  problemSolutionFitScore   Int                  @default(0)
-  testimonialFitScore       Int                  @default(0)
-  tutorialFitScore          Int                  @default(0)
-  shortVideoFitScore        Int                  @default(0)
-  recommendedHookTypes      HookType[]           @default([])
+  id                          String                @id @default(uuid())
+  workspaceId                 String                @default("00000000-0000-0000-0000-000000000001")
+  productId                   String
+  demonstrabilityScore        Int                   @default(0)
+  visualAppealScore           Int                   @default(0)
+  problemSolutionFitScore     Int                   @default(0)
+  testimonialFitScore         Int                   @default(0)
+  tutorialFitScore            Int                   @default(0)
+  shortVideoFitScore          Int                   @default(0)
+  recommendedHookTypes        HookType[]            @default([])
   recommendedScriptStructures ScriptStructureType[] @default([])
-  recommendedContentFormats PublishingFormat[]   @default([])
-  confidenceScore           Decimal              @db.Decimal(4, 3) @default("0")
-  evidenceReferences        String[]             @default([])
-  generatedAt               DateTime             @default(now())
+  recommendedContentFormats   PublishingFormat[]    @default([])
+  confidenceScore             Decimal               @default("0") @db.Decimal(4, 3)
+  evidenceReferences          String[]              @default([])
+  generatedAt                 DateTime              @default(now())
 
-  product  Product @relation(fields: [productId], references: [id], onDelete: Cascade)
+  product Product @relation(fields: [productId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, productId])
 }
 
 model ProductProfitabilityEstimate {
-  id                           String   @id @default(uuid())
-  workspaceId                  String   @default("00000000-0000-0000-0000-000000000001")
-  productId                    String
-  affiliateOfferId             String
-  currency                     String
+  id                               String   @id @default(uuid())
+  workspaceId                      String   @default("00000000-0000-0000-0000-000000000001")
+  productId                        String
+  affiliateOfferId                 String
+  currency                         String
   estimatedCommissionPerConversion Decimal? @db.Decimal(12, 2)
-  estimatedConversionRate      Decimal?  @db.Decimal(6, 4)
-  estimatedRevenuePerPost      Decimal?  @db.Decimal(12, 2)
-  estimatedContentCost         Decimal?  @db.Decimal(12, 2)
-  estimatedPlatformCost        Decimal?  @db.Decimal(12, 2)
-  estimatedNetRevenuePerPost   Decimal?  @db.Decimal(12, 2)
-  lowerBound                   Decimal?  @db.Decimal(12, 2)
-  upperBound                   Decimal?  @db.Decimal(12, 2)
-  confidenceScore              Decimal   @db.Decimal(4, 3) @default("0")
-  estimationVersion            String
-  assumptions                  String[]  @default([])
-  generatedAt                  DateTime  @default(now())
+  estimatedConversionRate          Decimal? @db.Decimal(6, 4)
+  estimatedRevenuePerPost          Decimal? @db.Decimal(12, 2)
+  estimatedContentCost             Decimal? @db.Decimal(12, 2)
+  estimatedPlatformCost            Decimal? @db.Decimal(12, 2)
+  estimatedNetRevenuePerPost       Decimal? @db.Decimal(12, 2)
+  lowerBound                       Decimal? @db.Decimal(12, 2)
+  upperBound                       Decimal? @db.Decimal(12, 2)
+  confidenceScore                  Decimal  @default("0") @db.Decimal(4, 3)
+  estimationVersion                String
+  assumptions                      String[] @default([])
+  generatedAt                      DateTime @default(now())
 
-  product  Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
-  offer    AffiliateOffer @relation(fields: [affiliateOfferId], references: [id], onDelete: Cascade)
+  product Product        @relation(fields: [productId], references: [id], onDelete: Cascade)
+  offer   AffiliateOffer @relation(fields: [affiliateOfferId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, productId])
 }
 
 model ProductOpportunity {
-  id                  String            @id @default(uuid())
-  workspaceId         String            @default("00000000-0000-0000-0000-000000000001")
-  productId           String
-  affiliateOfferId    String
-  nicheId             String?
-  brandId             String?
-  status              OpportunityStatus @default(NEW)
-  totalScore          Int               @default(0)
-  commissionScore     Int               @default(0)
-  demandScore         Int               @default(0)
-  competitionScore    Int               @default(0)
-  contentFitScore     Int               @default(0)
-  audienceFitScore    Int               @default(0)
-  trendScore          Int               @default(0)
-  profitabilityScore  Int               @default(0)
-  dataQualityScore    Int               @default(0)
-  complianceScore     Int               @default(0)
-  confidenceScore     Decimal           @db.Decimal(4, 3) @default("0")
-  sampleSize          BigInt?
-  scoringVersion      String
-  explanation         String
-  evidenceReferences  String[]          @default([])
-  calculatedAt        DateTime          @default(now())
-  expiresAt           DateTime?
+  id                 String            @id @default(uuid())
+  workspaceId        String            @default("00000000-0000-0000-0000-000000000001")
+  productId          String
+  affiliateOfferId   String
+  nicheId            String?
+  brandId            String?
+  status             OpportunityStatus @default(NEW)
+  totalScore         Int               @default(0)
+  commissionScore    Int               @default(0)
+  demandScore        Int               @default(0)
+  competitionScore   Int               @default(0)
+  contentFitScore    Int               @default(0)
+  audienceFitScore   Int               @default(0)
+  trendScore         Int               @default(0)
+  profitabilityScore Int               @default(0)
+  dataQualityScore   Int               @default(0)
+  complianceScore    Int               @default(0)
+  confidenceScore    Decimal           @default("0") @db.Decimal(4, 3)
+  sampleSize         BigInt?
+  scoringVersion     String
+  explanation        String
+  evidenceReferences String[]          @default([])
+  calculatedAt       DateTime          @default(now())
+  expiresAt          DateTime?
 
-  product          Product                       @relation(fields: [productId], references: [id], onDelete: Cascade)
-  offer            AffiliateOffer                @relation(fields: [affiliateOfferId], references: [id], onDelete: Cascade)
-  scoreComponents  ProductOpportunityScoreComponent[]
+  product         Product                            @relation(fields: [productId], references: [id], onDelete: Cascade)
+  offer           AffiliateOffer                     @relation(fields: [affiliateOfferId], references: [id], onDelete: Cascade)
+  scoreComponents ProductOpportunityScoreComponent[]
 
   @@index([workspaceId, status])
   @@index([workspaceId, productId])
@@ -2249,76 +2297,76 @@ model ProductOpportunityScoreComponent {
   explanation        String?
   evidenceReferences String[] @default([])
 
-  opportunity  ProductOpportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  opportunity ProductOpportunity @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, opportunityId])
 }
 
 model ProductDataQualityReport {
-  id                   String   @id @default(uuid())
-  workspaceId          String   @default("00000000-0000-0000-0000-000000000001")
-  productId            String
-  affiliateOfferId     String?
-  completenessScore    Int      @default(0)
-  freshnessScore       Int      @default(0)
-  consistencyScore     Int      @default(0)
-  identityScore        Int      @default(0)
-  commercialDataScore  Int      @default(0)
-  complianceDataScore   Int      @default(0)
-  overallScore         Int      @default(0)
-  issueCount           Int      @default(0)
-  generatedAt          DateTime @default(now())
+  id                  String   @id @default(uuid())
+  workspaceId         String   @default("00000000-0000-0000-0000-000000000001")
+  productId           String
+  affiliateOfferId    String?
+  completenessScore   Int      @default(0)
+  freshnessScore      Int      @default(0)
+  consistencyScore    Int      @default(0)
+  identityScore       Int      @default(0)
+  commercialDataScore Int      @default(0)
+  complianceDataScore Int      @default(0)
+  overallScore        Int      @default(0)
+  issueCount          Int      @default(0)
+  generatedAt         DateTime @default(now())
 
-  product  Product                  @relation(fields: [productId], references: [id], onDelete: Cascade)
-  issues   ProductDataQualityIssue[]
+  product Product                   @relation(fields: [productId], references: [id], onDelete: Cascade)
+  issues  ProductDataQualityIssue[]
 
   @@index([workspaceId, productId])
 }
 
 model ProductDataQualityIssue {
-  id          String                     @id @default(uuid())
-  workspaceId String                     @default("00000000-0000-0000-0000-000000000001")
+  id          String                      @id @default(uuid())
+  workspaceId String                      @default("00000000-0000-0000-0000-000000000001")
   reportId    String
   issueType   ProductDataQualityIssueType
-  severity    RiskLevel                  @default(MEDIUM)
+  severity    RiskLevel                   @default(MEDIUM)
   detail      String?
 
-  report  ProductDataQualityReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  report ProductDataQualityReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
 
   @@index([workspaceId, reportId])
 }
 
 model ProductResearchJob {
-  id             String            @id @default(uuid())
-  workspaceId    String            @default("00000000-0000-0000-0000-000000000001")
+  id             String                @id @default(uuid())
+  workspaceId    String                @default("00000000-0000-0000-0000-000000000001")
   jobType        ResearchJobType
-  status         ResearchJobStatus @default(QUEUED)
+  status         ResearchJobStatus     @default(QUEUED)
   correlationId  String
-  idempotencyKey String            @unique
+  idempotencyKey String                @unique
   queryId        String?
   productId      String?
   provider       AffiliateProviderKey?
-  attemptCount   Int               @default(0)
-  maxAttempts    Int               @default(3)
+  attemptCount   Int                   @default(0)
+  maxAttempts    Int                   @default(3)
   errorMessage   String?
   startedAt      DateTime?
   completedAt    DateTime?
-  createdAt      DateTime          @default(now())
+  createdAt      DateTime              @default(now())
 
   @@index([workspaceId, jobType, status])
 }
 
 model ProductSourceConfiguration {
-  id              String              @id @default(uuid())
-  workspaceId     String              @default("00000000-0000-0000-0000-000000000001")
+  id              String               @id @default(uuid())
+  workspaceId     String               @default("00000000-0000-0000-0000-000000000001")
   provider        AffiliateProviderKey
-  enabled         Boolean             @default(false)
-  mode            IntegrationMode     @default(MOCK)
+  enabled         Boolean              @default(false)
+  mode            IntegrationMode      @default(MOCK)
   credentialId    String?
   capabilities    Json?
   lastValidatedAt DateTime?
-  createdAt       DateTime            @default(now())
-  updatedAt       DateTime            @updatedAt
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
 
   @@unique([workspaceId, provider])
 }
@@ -2337,49 +2385,49 @@ enum ContentBriefStatus {
 }
 
 model ContentBrief {
-  id             String            @id @default(uuid())
-  workspaceId    String            @default("00000000-0000-0000-0000-000000000001")
-  campaignId     String?
-  campaign       Campaign?         @relation(fields: [campaignId], references: [id])
-  objective      String
-  targetAudience String?
-  platform       String?
-  hookAngle      String?
-  notes          String?
-  status         ContentBriefStatus @default(DRAFT)
-  createdBy      String?
+  id                          String             @id @default(uuid())
+  workspaceId                 String             @default("00000000-0000-0000-0000-000000000001")
+  campaignId                  String?
+  campaign                    Campaign?          @relation(fields: [campaignId], references: [id])
+  objective                   String
+  targetAudience              String?
+  platform                    String?
+  hookAngle                   String?
+  notes                       String?
+  status                      ContentBriefStatus @default(DRAFT)
+  createdBy                   String?
   // --- Phase 8: Campaign Creative Brief extension (no parallel model) ---
-  campaignStrategyId String?
-  creativeAngleId    String?
-  productId          String?
-  affiliateOfferId   String?
-  affiliateLinkId    String?
-  title                    String?
-  targetAudienceSummary    String?
-  keyProblem               String?
-  desiredOutcome           String?
-  coreMessage              String?
-  valueProposition         String?
-  requiredClaims           String[] @default([])
-  prohibitedClaims         String[] @default([])
-  approvedProofPoints      String[] @default([])
-  requiredProductDetails   String[] @default([])
-  requiredVisualElements   String[] @default([])
-  prohibitedVisualElements String[] @default([])
-  contentFormat            PublishingFormat?
-  targetPlatforms          SocialPlatform[] @default([])
-  desiredDurationSeconds   Int?
-  languageCode             String @default("de")
-  targetCountryCodes       String[] @default([])
-  tone                     String?
-  pacing                   PacingType @default(medium)
-  callToActionType         CallToActionType?
-  affiliateDisclosureRequired Boolean @default(false)
-  affiliateDisclosureText  String?
-  version                  Int @default(1)
+  campaignStrategyId          String?
+  creativeAngleId             String?
+  productId                   String?
+  affiliateOfferId            String?
+  affiliateLinkId             String?
+  title                       String?
+  targetAudienceSummary       String?
+  keyProblem                  String?
+  desiredOutcome              String?
+  coreMessage                 String?
+  valueProposition            String?
+  requiredClaims              String[]           @default([])
+  prohibitedClaims            String[]           @default([])
+  approvedProofPoints         String[]           @default([])
+  requiredProductDetails      String[]           @default([])
+  requiredVisualElements      String[]           @default([])
+  prohibitedVisualElements    String[]           @default([])
+  contentFormat               PublishingFormat?
+  targetPlatforms             SocialPlatform[]   @default([])
+  desiredDurationSeconds      Int?
+  languageCode                String             @default("de")
+  targetCountryCodes          String[]           @default([])
+  tone                        String?
+  pacing                      PacingType         @default(medium)
+  callToActionType            CallToActionType?
+  affiliateDisclosureRequired Boolean            @default(false)
+  affiliateDisclosureText     String?
+  version                     Int                @default(1)
   // ---------------------------------------------------------------------------
-  createdAt      DateTime          @default(now())
-  updatedAt      DateTime          @updatedAt
+  createdAt                   DateTime           @default(now())
+  updatedAt                   DateTime           @updatedAt
 
   hooks ContentHook[]
 
@@ -2422,23 +2470,30 @@ enum WorkflowStatus {
 }
 
 model WorkflowDefinition {
-  id           String         @id @default(uuid())
-  workspaceId  String         @default("00000000-0000-0000-0000-000000000001")
-  name         String
-  description  String?
-  trigger      String         @default("manual")
-  scheduleCron String?
-  status       WorkflowStatus @default(DRAFT)
-  enabled      Boolean        @default(false)
-  ownerId      String?
-  config       Json?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
+  id             String         @id @default(uuid())
+  workspaceId    String         @default("00000000-0000-0000-0000-000000000001")
+  key            String
+  version        Int            @default(1)
+  name           String
+  description    String?
+  trigger        String         @default("manual")
+  scheduleCron   String?
+  status         WorkflowStatus @default(DRAFT)
+  enabled        Boolean        @default(false)
+  ownerId        String?
+  config         Json?
+  definitionHash String?
+  activatedAt    DateTime?
+  supersededAt   DateTime?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   steps WorkflowStepDefinition[]
   runs  WorkflowRun[]
 
+  @@unique([workspaceId, key, version])
   @@index([workspaceId, status])
+  @@index([workspaceId, key, status])
 }
 
 enum WorkflowStepType {
@@ -2453,13 +2508,17 @@ model WorkflowStepDefinition {
   workspaceId String             @default("00000000-0000-0000-0000-000000000001")
   workflowId  String
   workflow    WorkflowDefinition @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  key         String
   stepOrder   Int
   type        WorkflowStepType
   name        String
+  dependsOn   String[]           @default([])
   config      Json?
 
   runs WorkflowStepRun[]
 
+  @@unique([workflowId, key])
+  @@unique([workflowId, stepOrder])
   @@index([workspaceId, workflowId])
 }
 
@@ -2471,32 +2530,38 @@ enum WorkflowRunStatus {
 }
 
 model WorkflowRun {
-  id          String            @id @default(uuid())
-  workspaceId String            @default("00000000-0000-0000-0000-000000000001")
-  workflowId  String
-  workflow    WorkflowDefinition @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  triggeredBy String?
-  status      WorkflowRunStatus @default(RUNNING)
-  context     Json?
-  startedAt   DateTime          @default(now())
-  finishedAt  DateTime?
+  id                 String             @id @default(uuid())
+  workspaceId        String             @default("00000000-0000-0000-0000-000000000001")
+  workflowId         String
+  workflow           WorkflowDefinition @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflowVersion    Int                @default(1)
+  definitionSnapshot Json
+  definitionHash     String?
+  correlationId      String
+  idempotencyKey     String?
+  triggeredBy        String?
+  status             WorkflowRunStatus  @default(RUNNING)
+  context            Json?
+  startedAt          DateTime           @default(now())
+  finishedAt         DateTime?
 
   steps WorkflowStepRun[]
 
   @@index([workspaceId, workflowId, status])
+  @@index([workspaceId, correlationId])
 }
 
 model WorkflowStepRun {
-  id            String            @id @default(uuid())
-  workspaceId   String            @default("00000000-0000-0000-0000-000000000001")
+  id            String                 @id @default(uuid())
+  workspaceId   String                 @default("00000000-0000-0000-0000-000000000001")
   workflowRunId String
-  workflowRun   WorkflowRun       @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
+  workflowRun   WorkflowRun            @relation(fields: [workflowRunId], references: [id], onDelete: Cascade)
   stepId        String
   step          WorkflowStepDefinition @relation(fields: [stepId], references: [id])
-  status        WorkflowRunStatus @default(RUNNING)
+  status        WorkflowRunStatus      @default(RUNNING)
   output        Json?
   error         String?
-  startedAt     DateTime          @default(now())
+  startedAt     DateTime               @default(now())
   finishedAt    DateTime?
 
   @@index([workspaceId, workflowRunId])
@@ -2509,16 +2574,16 @@ enum AgentToolRiskLevel {
 }
 
 model AgentToolDefinition {
-  id          String              @id @default(uuid())
-  workspaceId String              @default("00000000-0000-0000-0000-000000000001")
-  name        String              @unique
+  id          String             @id @default(uuid())
+  workspaceId String             @default("00000000-0000-0000-0000-000000000001")
+  name        String             @unique
   description String?
   provider    String?
   riskLevel   AgentToolRiskLevel @default(LOW)
-  enabled     Boolean             @default(true)
+  enabled     Boolean            @default(true)
   schema      Json?
-  createdAt   DateTime            @default(now())
-  updatedAt   DateTime            @updatedAt
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
 
   policies AgentToolPolicy[]
   calls    AgentToolCall[]
@@ -2527,34 +2592,34 @@ model AgentToolDefinition {
 }
 
 model AgentToolPolicy {
-  id               String   @id @default(uuid())
-  workspaceId      String   @default("00000000-0000-0000-0000-000000000001")
+  id               String              @id @default(uuid())
+  workspaceId      String              @default("00000000-0000-0000-0000-000000000001")
   toolId           String
   tool             AgentToolDefinition @relation(fields: [toolId], references: [id], onDelete: Cascade)
-  requiresApproval Boolean  @default(false)
-  maxCostPerCall   Decimal? @db.Decimal(12, 2)
+  requiresApproval Boolean             @default(false)
+  maxCostPerCall   Decimal?            @db.Decimal(12, 2)
   rateLimitPerMin  Int?
-  allowedAgentKeys String[] @default([])
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  allowedAgentKeys String[]            @default([])
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
 
   @@index([workspaceId, toolId])
 }
 
 model AgentToolCall {
-  id          String   @id @default(uuid())
-  workspaceId String   @default("00000000-0000-0000-0000-000000000001")
+  id          String              @id @default(uuid())
+  workspaceId String              @default("00000000-0000-0000-0000-000000000001")
   agentRunId  String?
-  agentRun    AgentRun? @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
+  agentRun    AgentRun?           @relation(fields: [agentRunId], references: [id], onDelete: SetNull)
   toolId      String
   tool        AgentToolDefinition @relation(fields: [toolId], references: [id])
   input       Json?
   output      Json?
-  cost        Decimal? @db.Decimal(12, 2)
-  status      String   @default("SUCCESS")
+  cost        Decimal?            @db.Decimal(12, 2)
+  status      String              @default("SUCCESS")
   durationMs  Int?
   error       String?
-  createdAt   DateTime @default(now())
+  createdAt   DateTime            @default(now())
 
   @@index([workspaceId, agentRunId])
   @@index([workspaceId, toolId])
@@ -2587,19 +2652,21 @@ enum CostReservationStatus {
 }
 
 model CostReservation {
-  id          String               @id @default(uuid())
-  workspaceId String               @default("00000000-0000-0000-0000-000000000001")
-  policyId    String?
-  policy      BudgetPolicy?        @relation(fields: [policyId], references: [id], onDelete: SetNull)
-  ownerType   String
-  ownerId     String
-  amount      Decimal              @db.Decimal(12, 2)
-  currency    String               @default("EUR")
-  status      CostReservationStatus @default(RESERVED)
-  expiresAt   DateTime?
-  createdAt   DateTime             @default(now())
-  updatedAt   DateTime             @updatedAt
+  id             String                @id @default(uuid())
+  workspaceId    String                @default("00000000-0000-0000-0000-000000000001")
+  policyId       String?
+  policy         BudgetPolicy?         @relation(fields: [policyId], references: [id], onDelete: SetNull)
+  ownerType      String
+  ownerId        String
+  amount         Decimal               @db.Decimal(12, 2)
+  currency       String                @default("EUR")
+  status         CostReservationStatus @default(RESERVED)
+  expiresAt      DateTime?
+  idempotencyKey String
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
 
+  @@unique([workspaceId, idempotencyKey])
   @@index([workspaceId, ownerType, ownerId])
   @@index([workspaceId, status])
 }
@@ -2859,86 +2926,86 @@ enum ProductionCapacityStatus {
 }
 
 model CampaignCandidate {
-  id                      String                 @id @default(uuid())
-  workspaceId             String                 @default("00000000-0000-0000-0000-000000000001")
-  productOpportunityId    String
-  productId               String
-  affiliateOfferId        String
-  affiliateProgramId      String
-  brandId                 String?
-  nicheId                 String?
-  status                  CampaignCandidateStatus @default(new)
-  opportunityScore        Int                    @default(0)
-  opportunityConfidence   Decimal?               @db.Decimal(4, 3)
-  proposedObjective       CampaignObjective?
-  targetPlatformCandidates SocialPlatform[]      @default([])
-  targetCountryCodes      String[]               @default([])
-  languageCode            String                 @default("de")
-  estimatedCampaignCost   Decimal?               @db.Decimal(12, 2)
-  estimatedRevenuePerPost Decimal?               @db.Decimal(12, 2)
-  currency                String?
-  sourceScoreVersion      String?
-  evidenceReferences      String[]               @default([])
-  expiresAt               DateTime?
-  createdAt               DateTime               @default(now())
-  updatedAt               DateTime               @updatedAt
+  id                       String                  @id @default(uuid())
+  workspaceId              String                  @default("00000000-0000-0000-0000-000000000001")
+  productOpportunityId     String
+  productId                String
+  affiliateOfferId         String
+  affiliateProgramId       String
+  brandId                  String?
+  nicheId                  String?
+  status                   CampaignCandidateStatus @default(new)
+  opportunityScore         Int                     @default(0)
+  opportunityConfidence    Decimal?                @db.Decimal(4, 3)
+  proposedObjective        CampaignObjective?
+  targetPlatformCandidates SocialPlatform[]        @default([])
+  targetCountryCodes       String[]                @default([])
+  languageCode             String                  @default("de")
+  estimatedCampaignCost    Decimal?                @db.Decimal(12, 2)
+  estimatedRevenuePerPost  Decimal?                @db.Decimal(12, 2)
+  currency                 String?
+  sourceScoreVersion       String?
+  evidenceReferences       String[]                @default([])
+  expiresAt                DateTime?
+  createdAt                DateTime                @default(now())
+  updatedAt                DateTime                @updatedAt
 
   @@index([workspaceId, status])
   @@index([workspaceId, productOpportunityId])
 }
 
 model CampaignStrategy {
-  id                       String                 @id @default(uuid())
-  workspaceId              String                 @default("00000000-0000-0000-0000-000000000001")
-  campaignCandidateId      String
-  campaignId               String?
-  name                     String
-  description              String?
-  objective                CampaignObjective
-  primarySuccessMetric     CampaignPrimaryMetric
-  secondarySuccessMetrics  String[]               @default([])
-  targetPlatforms          SocialPlatform[]       @default([])
-  targetCountryCodes       String[]               @default([])
-  languageCode             String                 @default("de")
-  targetAudienceProfileId  String?
-  campaignDurationDays     Int?
-  plannedContentCount      Int                    @default(1)
-  estimatedBudget          Decimal?               @db.Decimal(12, 2)
-  currency                 String?
-  riskLevel                CampaignRiskLevel      @default(low)
-  version                  Int                    @default(1)
-  status                   CampaignStrategyStatus @default(draft)
-  approvedById             String?
-  approvedAt               DateTime?
-  rejectedReason           String?
-  supersededById           String?
-  supersededAt             DateTime?
-  createdAt                DateTime               @default(now())
-  updatedAt                DateTime               @updatedAt
+  id                      String                 @id @default(uuid())
+  workspaceId             String                 @default("00000000-0000-0000-0000-000000000001")
+  campaignCandidateId     String
+  campaignId              String?
+  name                    String
+  description             String?
+  objective               CampaignObjective
+  primarySuccessMetric    CampaignPrimaryMetric
+  secondarySuccessMetrics String[]               @default([])
+  targetPlatforms         SocialPlatform[]       @default([])
+  targetCountryCodes      String[]               @default([])
+  languageCode            String                 @default("de")
+  targetAudienceProfileId String?
+  campaignDurationDays    Int?
+  plannedContentCount     Int                    @default(1)
+  estimatedBudget         Decimal?               @db.Decimal(12, 2)
+  currency                String?
+  riskLevel               CampaignRiskLevel      @default(low)
+  version                 Int                    @default(1)
+  status                  CampaignStrategyStatus @default(draft)
+  approvedById            String?
+  approvedAt              DateTime?
+  rejectedReason          String?
+  supersededById          String?
+  supersededAt            DateTime?
+  createdAt               DateTime               @default(now())
+  updatedAt               DateTime               @updatedAt
 
   @@index([workspaceId, status])
   @@index([workspaceId, campaignCandidateId])
 }
 
 model CampaignAudienceProfile {
-  id                          String                @id @default(uuid())
-  workspaceId                 String                @default("00000000-0000-0000-0000-000000000001")
-  name                        String
-  description                 String
-  brandId                     String?
-  nicheId                     String?
-  languageCodes               String[]              @default([])
-  countryCodes                String[]              @default([])
-  demographicNotes            String[]              @default([])
-  interestTags                String[]              @default([])
-  problemStatements           String[]              @default([])
-  desiredOutcomes             String[]              @default([])
-  objections                  String[]              @default([])
-  trustSignals                String[]              @default([])
-  prohibitedTargetingAttributes String[]            @default([])
-  status                      CampaignAudienceStatus @default(draft)
-  createdAt                   DateTime              @default(now())
-  updatedAt                   DateTime              @updatedAt
+  id                            String                 @id @default(uuid())
+  workspaceId                   String                 @default("00000000-0000-0000-0000-000000000001")
+  name                          String
+  description                   String
+  brandId                       String?
+  nicheId                       String?
+  languageCodes                 String[]               @default([])
+  countryCodes                  String[]               @default([])
+  demographicNotes              String[]               @default([])
+  interestTags                  String[]               @default([])
+  problemStatements             String[]               @default([])
+  desiredOutcomes               String[]               @default([])
+  objections                    String[]               @default([])
+  trustSignals                  String[]               @default([])
+  prohibitedTargetingAttributes String[]               @default([])
+  status                        CampaignAudienceStatus @default(draft)
+  createdAt                     DateTime               @default(now())
+  updatedAt                     DateTime               @updatedAt
 
   @@index([workspaceId, status])
 }
@@ -2970,103 +3037,103 @@ model CreativeAngle {
 }
 
 model CampaignHookPlan {
-  id                 String                @id @default(uuid())
-  workspaceId        String                @default("00000000-0000-0000-0000-000000000001")
+  id                 String                 @id @default(uuid())
+  workspaceId        String                 @default("00000000-0000-0000-0000-000000000001")
   creativeBriefId    String
   creativeAngleId    String
-  requiredHookCount  Int                   @default(1)
-  selectedHookTypes  HookType[]            @default([])
-  hookObjectives     String[]              @default([])
-  prohibitedPatterns String[]              @default([])
+  requiredHookCount  Int                    @default(1)
+  selectedHookTypes  HookType[]             @default([])
+  hookObjectives     String[]               @default([])
+  prohibitedPatterns String[]               @default([])
   status             CampaignHookPlanStatus @default(draft)
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
+  createdAt          DateTime               @default(now())
+  updatedAt          DateTime               @updatedAt
 
   @@index([workspaceId, creativeBriefId])
 }
 
 model CampaignScriptPlan {
-  id                    String                 @id @default(uuid())
-  workspaceId           String                 @default("00000000-0000-0000-0000-000000000001")
+  id                    String                   @id @default(uuid())
+  workspaceId           String                   @default("00000000-0000-0000-0000-000000000001")
   creativeBriefId       String
   creativeAngleId       String
   selectedStructure     ScriptStructureType
-  requiredScriptCount   Int                    @default(1)
+  requiredScriptCount   Int                      @default(1)
   targetDurationSeconds Int?
-  requiredSections      String[]               @default([])
-  prohibitedClaims      String[]               @default([])
-  requiredDisclosure    Boolean                @default(false)
+  requiredSections      String[]                 @default([])
+  prohibitedClaims      String[]                 @default([])
+  requiredDisclosure    Boolean                  @default(false)
   status                CampaignScriptPlanStatus @default(draft)
-  createdAt             DateTime               @default(now())
-  updatedAt             DateTime               @updatedAt
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
 
   @@index([workspaceId, creativeBriefId])
 }
 
 model CampaignCallToActionPlan {
-  id                       String                       @id @default(uuid())
-  workspaceId              String                       @default("00000000-0000-0000-0000-000000000001")
-  creativeBriefId          String
-  primaryCtaType           CallToActionType
-  secondaryCtaTypes        CallToActionType[]           @default([])
-  requiredText             String?
-  prohibitedTextPatterns   String[]                     @default([])
-  affiliateLinkRequired     Boolean                      @default(false)
-  status                    CampaignCallToActionPlanStatus @default(draft)
-  createdAt                 DateTime                     @default(now())
-  updatedAt                 DateTime                     @updatedAt
+  id                     String                         @id @default(uuid())
+  workspaceId            String                         @default("00000000-0000-0000-0000-000000000001")
+  creativeBriefId        String
+  primaryCtaType         CallToActionType
+  secondaryCtaTypes      CallToActionType[]             @default([])
+  requiredText           String?
+  prohibitedTextPatterns String[]                       @default([])
+  affiliateLinkRequired  Boolean                        @default(false)
+  status                 CampaignCallToActionPlanStatus @default(draft)
+  createdAt              DateTime                       @default(now())
+  updatedAt              DateTime                       @updatedAt
 
   @@index([workspaceId, creativeBriefId])
 }
 
 model ContentBatch {
-  id                String             @id @default(uuid())
-  workspaceId       String             @default("00000000-0000-0000-0000-000000000001")
-  campaignId        String
+  id                 String               @id @default(uuid())
+  workspaceId        String               @default("00000000-0000-0000-0000-000000000001")
+  campaignId         String
   campaignStrategyId String
-  name              String
-  description       String?
-  targetPlatforms   SocialPlatform[]   @default([])
-  plannedAssetCount Int                @default(1)
-  status            ContentBatchStatus @default(draft)
-  approvalStatus    ApprovalStatus     @default(DRAFT)
-  estimatedCost     Decimal?           @db.Decimal(12, 2)
-  actualCost        Decimal?           @db.Decimal(12, 2)
-  currency          String?
-  priority          ContentBatchPriority @default(normal)
-  dueAt             DateTime?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  completedAt       DateTime?
+  name               String
+  description        String?
+  targetPlatforms    SocialPlatform[]     @default([])
+  plannedAssetCount  Int                  @default(1)
+  status             ContentBatchStatus   @default(draft)
+  approvalStatus     ApprovalStatus       @default(DRAFT)
+  estimatedCost      Decimal?             @db.Decimal(12, 2)
+  actualCost         Decimal?             @db.Decimal(12, 2)
+  currency           String?
+  priority           ContentBatchPriority @default(normal)
+  dueAt              DateTime?
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  completedAt        DateTime?
 
   @@index([workspaceId, status])
   @@index([workspaceId, campaignId])
 }
 
 model ContentBatchItem {
-  id                String                @id @default(uuid())
-  workspaceId       String                @default("00000000-0000-0000-0000-000000000001")
-  contentBatchId    String
-  creativeBriefId   String
-  creativeAngleId   String
-  targetPlatform    SocialPlatform
-  publishingFormat  PublishingFormat
-  hookId            String?
-  scriptId          String?
-  contentVariantId  String?
-  contentAssetId    String?
-  status            ContentBatchItemStatus @default(planned)
-  orderIndex        Int                   @default(0)
-  createdAt         DateTime              @default(now())
-  updatedAt         DateTime              @updatedAt
+  id               String                 @id @default(uuid())
+  workspaceId      String                 @default("00000000-0000-0000-0000-000000000001")
+  contentBatchId   String
+  creativeBriefId  String
+  creativeAngleId  String
+  targetPlatform   SocialPlatform
+  publishingFormat PublishingFormat
+  hookId           String?
+  scriptId         String?
+  contentVariantId String?
+  contentAssetId   String?
+  status           ContentBatchItemStatus @default(planned)
+  orderIndex       Int                    @default(0)
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
 
   @@unique([contentBatchId, orderIndex])
   @@index([workspaceId, contentBatchId])
 }
 
 model ProductionTask {
-  id                        String              @id @default(uuid())
-  workspaceId               String              @default("00000000-0000-0000-0000-000000000001")
+  id                        String               @id @default(uuid())
+  workspaceId               String               @default("00000000-0000-0000-0000-000000000001")
   contentBatchId            String
   contentBatchItemId        String?
   taskType                  ProductionTaskType
@@ -3075,21 +3142,21 @@ model ProductionTask {
   status                    ProductionTaskStatus @default(pending)
   assignedAgentDefinitionId String?
   assignedUserId            String?
-  dependsOnTaskIds          String[]            @default([])
+  dependsOnTaskIds          String[]             @default([])
   requiredPermission        String?
-  requiresApproval          Boolean             @default(false)
-  estimatedCost             Decimal?            @db.Decimal(12, 2)
-  actualCost                Decimal?            @db.Decimal(12, 2)
+  requiresApproval          Boolean              @default(false)
+  estimatedCost             Decimal?             @db.Decimal(12, 2)
+  actualCost                Decimal?             @db.Decimal(12, 2)
   currency                  String?
-  estimatedDurationMinutes Int?
+  estimatedDurationMinutes  Int?
   dueAt                     DateTime?
-  attemptCount              Int                 @default(0)
-  maxAttempts               Int                 @default(3)
+  attemptCount              Int                  @default(0)
+  maxAttempts               Int                  @default(3)
   outputReferenceId         String?
   failureCode               String?
   failureReason             String?
-  createdAt                 DateTime            @default(now())
-  updatedAt                 DateTime            @updatedAt
+  createdAt                 DateTime             @default(now())
+  updatedAt                 DateTime             @updatedAt
   completedAt               DateTime?
 
   @@index([workspaceId, status])
@@ -3097,132 +3164,132 @@ model ProductionTask {
 }
 
 model ProductionScheduleEntry {
-  id                        String                  @id @default(uuid())
-  workspaceId               String                  @default("00000000-0000-0000-0000-000000000001")
+  id                        String                   @id @default(uuid())
+  workspaceId               String                   @default("00000000-0000-0000-0000-000000000001")
   productionTaskId          String
   assignedAgentDefinitionId String?
   assignedUserId            String?
   scheduledStartAt          DateTime
   scheduledEndAt            DateTime
-  timezone                  String                  @default("UTC")
+  timezone                  String                   @default("UTC")
   status                    ProductionScheduleStatus @default(planned)
   overrideReason            String?
-  createdAt                 DateTime                @default(now())
-  updatedAt                 DateTime                @updatedAt
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
 
   @@index([workspaceId, productionTaskId])
 }
 
 model CampaignFactoryTemplate {
-  id                          String                  @id @default(uuid())
-  workspaceId                 String                  @default("00000000-0000-0000-0000-000000000001")
-  name                        String
-  description                 String?
-  nicheId                     String?
-  brandId                     String?
-  objective                   CampaignObjective
-  defaultPlatforms            SocialPlatform[]        @default([])
-  defaultFormats              PublishingFormat[]      @default([])
-  defaultCreativeAngleTypes   CreativeAngleType[]     @default([])
-  plannedContentCount         Int                     @default(1)
-  taskTemplateDefinition      Json                    @default("{}")
-  status                      CampaignFactoryTemplateStatus @default(draft)
-  version                     Int                     @default(1)
-  createdAt                   DateTime                @default(now())
-  updatedAt                   DateTime                @updatedAt
+  id                        String                        @id @default(uuid())
+  workspaceId               String                        @default("00000000-0000-0000-0000-000000000001")
+  name                      String
+  description               String?
+  nicheId                   String?
+  brandId                   String?
+  objective                 CampaignObjective
+  defaultPlatforms          SocialPlatform[]              @default([])
+  defaultFormats            PublishingFormat[]            @default([])
+  defaultCreativeAngleTypes CreativeAngleType[]            @default([])
+  plannedContentCount       Int                           @default(1)
+  taskTemplateDefinition    Json                          @default("{}")
+  status                    CampaignFactoryTemplateStatus @default(draft)
+  version                   Int                           @default(1)
+  createdAt                 DateTime                      @default(now())
+  updatedAt                 DateTime                      @updatedAt
 
   @@index([workspaceId, status])
 }
 
 model CampaignFactoryRun {
-  id                 String                 @id @default(uuid())
-  workspaceId        String                 @default("00000000-0000-0000-0000-000000000001")
-  templateId         String?
+  id                  String                   @id @default(uuid())
+  workspaceId         String                   @default("00000000-0000-0000-0000-000000000001")
+  templateId          String?
   campaignCandidateId String
-  status             CampaignFactoryRunStatus @default(queued)
-  campaignId         String?
-  campaignStrategyId String?
-  contentBatchId     String?
-  correlationId      String
-  idempotencyKey     String                 @unique
-  startedAt          DateTime?
-  completedAt        DateTime?
-  failureCode        String?
-  failureReason      String?
-  createdAt          DateTime               @default(now())
+  status              CampaignFactoryRunStatus @default(queued)
+  campaignId          String?
+  campaignStrategyId  String?
+  contentBatchId      String?
+  correlationId       String
+  idempotencyKey      String                   @unique
+  startedAt           DateTime?
+  completedAt         DateTime?
+  failureCode         String?
+  failureReason       String?
+  createdAt           DateTime                 @default(now())
 
   @@index([workspaceId, status])
   @@index([workspaceId, campaignCandidateId])
 }
 
 model CampaignQualityPolicy {
-  id                           String                   @id @default(uuid())
-  workspaceId                  String                   @default("00000000-0000-0000-0000-000000000001")
-  scopeType                    CampaignQualityScopeType @default(workspace)
-  scopeId                      String
-  minimumStrategyScore         Decimal                  @db.Decimal(3, 2) @default(0.6)
-  minimumAudienceScore         Decimal                  @db.Decimal(3, 2) @default(0.6)
-  minimumCreativeScore         Decimal                  @db.Decimal(3, 2) @default(0.6)
-  minimumCommercialScore       Decimal                  @db.Decimal(3, 2) @default(0.6)
-  minimumComplianceScore       Decimal                  @db.Decimal(3, 2) @default(0.6)
-  minimumDataQualityScore      Decimal                  @db.Decimal(3, 2) @default(0.6)
-  minimumProductionReadinessScore Decimal               @db.Decimal(3, 2) @default(0.6)
-  minimumOverallScore          Decimal                  @db.Decimal(3, 2) @default(0.6)
-  criticalIssueBlocksApproval  Boolean                  @default(true)
-  createdAt                    DateTime                 @default(now())
-  updatedAt                    DateTime                 @updatedAt
+  id                              String                   @id @default(uuid())
+  workspaceId                     String                   @default("00000000-0000-0000-0000-000000000001")
+  scopeType                       CampaignQualityScopeType @default(workspace)
+  scopeId                         String
+  minimumStrategyScore            Decimal                  @default(0.6) @db.Decimal(3, 2)
+  minimumAudienceScore            Decimal                  @default(0.6) @db.Decimal(3, 2)
+  minimumCreativeScore            Decimal                  @default(0.6) @db.Decimal(3, 2)
+  minimumCommercialScore          Decimal                  @default(0.6) @db.Decimal(3, 2)
+  minimumComplianceScore          Decimal                  @default(0.6) @db.Decimal(3, 2)
+  minimumDataQualityScore         Decimal                  @default(0.6) @db.Decimal(3, 2)
+  minimumProductionReadinessScore Decimal                  @default(0.6) @db.Decimal(3, 2)
+  minimumOverallScore             Decimal                  @default(0.6) @db.Decimal(3, 2)
+  criticalIssueBlocksApproval     Boolean                  @default(true)
+  createdAt                       DateTime                 @default(now())
+  updatedAt                       DateTime                 @updatedAt
 
   @@index([workspaceId, scopeType, scopeId])
 }
 
 model CampaignQualityReport {
-  id                      String                    @id @default(uuid())
-  workspaceId             String                    @default("00000000-0000-0000-0000-000000000001")
-  campaignId              String
-  campaignStrategyId      String
-  status                  CampaignQualityReportStatus @default(pending)
-  strategyScore           Decimal                   @db.Decimal(3, 2) @default(0)
-  audienceScore           Decimal                   @db.Decimal(3, 2) @default(0)
-  creativeScore           Decimal                   @db.Decimal(3, 2) @default(0)
-  commercialScore         Decimal                   @db.Decimal(3, 2) @default(0)
-  complianceScore         Decimal                    @db.Decimal(3, 2) @default(0)
-  dataQualityScore        Decimal                    @db.Decimal(3, 2) @default(0)
-  productionReadinessScore Decimal                   @db.Decimal(3, 2) @default(0)
-  overallScore            Decimal                    @db.Decimal(3, 2) @default(0)
-  generatedAt             DateTime                   @default(now())
-  qualityVersion          String                    @default("1")
+  id                       String                      @id @default(uuid())
+  workspaceId              String                      @default("00000000-0000-0000-0000-000000000001")
+  campaignId               String
+  campaignStrategyId       String
+  status                   CampaignQualityReportStatus @default(pending)
+  strategyScore            Decimal                     @default(0) @db.Decimal(3, 2)
+  audienceScore            Decimal                     @default(0) @db.Decimal(3, 2)
+  creativeScore            Decimal                     @default(0) @db.Decimal(3, 2)
+  commercialScore          Decimal                     @default(0) @db.Decimal(3, 2)
+  complianceScore          Decimal                     @default(0) @db.Decimal(3, 2)
+  dataQualityScore         Decimal                     @default(0) @db.Decimal(3, 2)
+  productionReadinessScore Decimal                     @default(0) @db.Decimal(3, 2)
+  overallScore             Decimal                     @default(0) @db.Decimal(3, 2)
+  generatedAt              DateTime                    @default(now())
+  qualityVersion           String                      @default("1")
 
   @@index([workspaceId, campaignId])
 }
 
 model CampaignQualityIssue {
-  id                  String                        @id @default(uuid())
-  workspaceId         String                        @default("00000000-0000-0000-0000-000000000001")
-  reportId            String
-  code                String
-  severity            CampaignQualityIssueSeverity
-  message             String
-  resourceType        String?
-  resourceId          String?
-  evidenceReferences  String[]                      @default([])
-  createdAt           DateTime                      @default(now())
+  id                 String                       @id @default(uuid())
+  workspaceId        String                       @default("00000000-0000-0000-0000-000000000001")
+  reportId           String
+  code               String
+  severity           CampaignQualityIssueSeverity
+  message            String
+  resourceType       String?
+  resourceId         String?
+  evidenceReferences String[]                     @default([])
+  createdAt          DateTime                     @default(now())
 
   @@index([workspaceId, reportId])
 }
 
 model ProductionCapacityProfile {
-  id                        String                     @id @default(uuid())
-  workspaceId               String                     @default("00000000-0000-0000-0000-000000000001")
-  name                      String
-  scopeType                 ProductionCapacityScopeType @default(workspace)
-  scopeId                   String
-  maximumConcurrentTasks    Int                        @default(1)
-  maximumTasksPerDay        Int?
+  id                            String                      @id @default(uuid())
+  workspaceId                   String                      @default("00000000-0000-0000-0000-000000000001")
+  name                          String
+  scopeType                     ProductionCapacityScopeType @default(workspace)
+  scopeId                       String
+  maximumConcurrentTasks        Int                         @default(1)
+  maximumTasksPerDay            Int?
   maximumEstimatedMinutesPerDay Int?
-  allowedTaskTypes          ProductionTaskType[]        @default([])
-  status                    ProductionCapacityStatus    @default(active)
-  createdAt                 DateTime                   @default(now())
-  updatedAt                 DateTime                   @updatedAt
+  allowedTaskTypes              ProductionTaskType[]        @default([])
+  status                        ProductionCapacityStatus    @default(active)
+  createdAt                     DateTime                    @default(now())
+  updatedAt                     DateTime                    @updatedAt
 
   @@index([workspaceId, scopeType, scopeId])
 }
@@ -3233,20 +3300,20 @@ model CampaignProductionEstimate {
   campaignId                String
   contentBatchId            String?
   currency                  String   @default("EUR")
-  researchCost              Decimal  @db.Decimal(12, 2) @default(0)
-  scriptCost                Decimal  @db.Decimal(12, 2) @default(0)
-  mediaGenerationCost       Decimal  @db.Decimal(12, 2) @default(0)
-  editingCost               Decimal  @db.Decimal(12, 2) @default(0)
-  voiceCost                 Decimal  @db.Decimal(12, 2) @default(0)
-  subtitleCost              Decimal  @db.Decimal(12, 2) @default(0)
-  thumbnailCost             Decimal  @db.Decimal(12, 2) @default(0)
-  qualityAssuranceCost      Decimal  @db.Decimal(12, 2) @default(0)
-  publishingPreparationCost Decimal  @db.Decimal(12, 2) @default(0)
-  totalEstimatedCost        Decimal  @db.Decimal(12, 2) @default(0)
+  researchCost              Decimal  @default(0) @db.Decimal(12, 2)
+  scriptCost                Decimal  @default(0) @db.Decimal(12, 2)
+  mediaGenerationCost       Decimal  @default(0) @db.Decimal(12, 2)
+  editingCost               Decimal  @default(0) @db.Decimal(12, 2)
+  voiceCost                 Decimal  @default(0) @db.Decimal(12, 2)
+  subtitleCost              Decimal  @default(0) @db.Decimal(12, 2)
+  thumbnailCost             Decimal  @default(0) @db.Decimal(12, 2)
+  qualityAssuranceCost      Decimal  @default(0) @db.Decimal(12, 2)
+  publishingPreparationCost Decimal  @default(0) @db.Decimal(12, 2)
+  totalEstimatedCost        Decimal  @default(0) @db.Decimal(12, 2)
   lowerBound                Decimal? @db.Decimal(12, 2)
   upperBound                Decimal? @db.Decimal(12, 2)
   assumptions               String[] @default([])
-  confidenceScore           Decimal  @db.Decimal(3, 2) @default(0.5)
+  confidenceScore           Decimal  @default(0.5) @db.Decimal(3, 2)
   estimationVersion         String   @default("1")
   createdAt                 DateTime @default(now())
 
@@ -3579,70 +3646,70 @@ enum MediaAudioAssetType {
 }
 
 model MediaProviderConfiguration {
-  id                        String             @id @default(uuid())
-  workspaceId               String             @default("00000000-0000-0000-0000-000000000001")
-  provider                  MediaProviderType
-  displayName               String
-  credentialReferenceId     String?
-  status                    MediaProviderStatus @default(draft)
-  enabledCapabilities       MediaCapability[]
-  defaultModelId            String?
+  id                              String              @id @default(uuid())
+  workspaceId                     String              @default("00000000-0000-0000-0000-000000000001")
+  provider                        MediaProviderType
+  displayName                     String
+  credentialReferenceId           String?
+  status                          MediaProviderStatus @default(draft)
+  enabledCapabilities             MediaCapability[]
+  defaultModelId                  String?
   fallbackProviderConfigurationId String?
-  priority                  Int                @default(100)
-  monthlySpendLimit         Decimal?           @db.Decimal(12, 2)
-  currency                  String?
-  createdAt                 DateTime           @default(now())
-  updatedAt                 DateTime           @updatedAt
+  priority                        Int                 @default(100)
+  monthlySpendLimit               Decimal?            @db.Decimal(12, 2)
+  currency                        String?
+  createdAt                       DateTime            @default(now())
+  updatedAt                       DateTime            @updatedAt
 
   @@index([workspaceId, provider])
   @@index([workspaceId, status])
 }
 
 model MediaModelDefinition {
-  id                  String           @id @default(uuid())
-  workspaceId         String           @default("00000000-0000-0000-0000-000000000001")
+  id                      String           @id @default(uuid())
+  workspaceId             String           @default("00000000-0000-0000-0000-000000000001")
   providerConfigurationId String
-  externalModelId     String
-  displayName         String
-  capability          MediaCapability
-  status              MediaModelStatus @default(active)
-  inputSchemaVersion  String           @default("1")
-  outputSchemaVersion String           @default("1")
-  estimatedCostPerUnit Decimal?        @db.Decimal(12, 4)
-  billingUnit         MediaBillingUnit @default(unknown)
-  currency            String?
-  commercialUseAllowed Boolean?
-  modelTermsReferenceId String?
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
+  externalModelId         String
+  displayName             String
+  capability              MediaCapability
+  status                  MediaModelStatus @default(active)
+  inputSchemaVersion      String           @default("1")
+  outputSchemaVersion     String           @default("1")
+  estimatedCostPerUnit    Decimal?         @db.Decimal(12, 4)
+  billingUnit             MediaBillingUnit @default(unknown)
+  currency                String?
+  commercialUseAllowed    Boolean?
+  modelTermsReferenceId   String?
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
 
   @@index([workspaceId, capability])
   @@index([workspaceId, providerConfigurationId])
 }
 
 model MediaProductionProject {
-  id                  String               @id @default(uuid())
-  workspaceId         String               @default("00000000-0000-0000-0000-000000000001")
-  campaignId          String
-  productId           String
-  opportunityId       String?
-  contentBriefId      String
-  contentScriptId     String
-  name                String
-  description         String?
-  targetPlatforms     SocialPlatform[]
-  targetFormats       PublishingFormat[]
-  languageCode        String               @default("de")
-  targetCountryCodes  String[]             @default([])
-  status              MediaProductionStatus @default(draft)
-  approvalStatus      ApprovalStatus       @default(DRAFT)
-  productionPlanId    String?
-  estimatedCost       Decimal?             @db.Decimal(12, 2)
-  actualCost          Decimal?             @db.Decimal(12, 2)
-  currency            String?
-  completedAt         DateTime?
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  id                 String                @id @default(uuid())
+  workspaceId        String                @default("00000000-0000-0000-0000-000000000001")
+  campaignId         String
+  productId          String
+  opportunityId      String?
+  contentBriefId     String
+  contentScriptId    String
+  name               String
+  description        String?
+  targetPlatforms    SocialPlatform[]
+  targetFormats      PublishingFormat[]
+  languageCode       String                @default("de")
+  targetCountryCodes String[]              @default([])
+  status             MediaProductionStatus @default(draft)
+  approvalStatus     ApprovalStatus        @default(DRAFT)
+  productionPlanId   String?
+  estimatedCost      Decimal?              @db.Decimal(12, 2)
+  actualCost         Decimal?              @db.Decimal(12, 2)
+  currency           String?
+  completedAt        DateTime?
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
 
   @@index([workspaceId, status])
   @@index([workspaceId, campaignId])
@@ -3650,160 +3717,160 @@ model MediaProductionProject {
 }
 
 model MediaProductionPlan {
-  id                  String    @id @default(uuid())
-  workspaceId         String    @default("00000000-0000-0000-0000-000000000001")
+  id                       String                @id @default(uuid())
+  workspaceId              String                @default("00000000-0000-0000-0000-000000000001")
   mediaProductionProjectId String
-  name                String
-  version             Int       @default(1)
-  visualStrategy      MediaVisualStrategy        @default(generated_video)
-  voiceStrategy       MediaVoiceStrategy         @default(generated_voice)
-  subtitleStrategy    MediaSubtitleStrategy      @default(burned_in)
-  musicStrategy       MediaMusicStrategy         @default(no_music)
+  name                     String
+  version                  Int                   @default(1)
+  visualStrategy           MediaVisualStrategy   @default(generated_video)
+  voiceStrategy            MediaVoiceStrategy    @default(generated_voice)
+  subtitleStrategy         MediaSubtitleStrategy @default(burned_in)
+  musicStrategy            MediaMusicStrategy    @default(no_music)
   estimatedDurationSeconds Int
-  sceneCount          Int
-  targetAspectRatios  String[]  @default([])
-  targetResolutions   String[]  @default([])
-  status              MediaProductionStatus @default(draft)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  sceneCount               Int
+  targetAspectRatios       String[]              @default([])
+  targetResolutions        String[]              @default([])
+  status                   MediaProductionStatus @default(draft)
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
 
   @@index([workspaceId, mediaProductionProjectId])
 }
 
 model MediaScene {
-  id                  String         @id @default(uuid())
-  workspaceId         String         @default("00000000-0000-0000-0000-000000000001")
+  id                    String           @id @default(uuid())
+  workspaceId           String           @default("00000000-0000-0000-0000-000000000001")
   mediaProductionPlanId String
-  orderIndex          Int
-  name                String
-  description         String
-  scriptSegment       String?
-  voiceText           String?
-  durationSeconds     Decimal        @db.Decimal(10, 3)
-  sceneType           MediaSceneType @default(other)
-  visualSourceType    String         @default("generated_video")
-  sourceAssetId       String?
-  generatedAssetId    String?
-  voiceProfileId      String?
-  avatarProfileId     String?
-  promptTemplateId    String?
-  promptVersion       Int?
-  status              MediaSceneStatus @default(draft)
-  createdAt           DateTime       @default(now())
-  updatedAt           DateTime       @updatedAt
+  orderIndex            Int
+  name                  String
+  description           String
+  scriptSegment         String?
+  voiceText             String?
+  durationSeconds       Decimal          @db.Decimal(10, 3)
+  sceneType             MediaSceneType   @default(other)
+  visualSourceType      String           @default("generated_video")
+  sourceAssetId         String?
+  generatedAssetId      String?
+  voiceProfileId        String?
+  avatarProfileId       String?
+  promptTemplateId      String?
+  promptVersion         Int?
+  status                MediaSceneStatus @default(draft)
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
 
   @@index([workspaceId, mediaProductionPlanId])
   @@index([workspaceId, status])
 }
 
 model MediaPromptTemplate {
-  id               String                   @id @default(uuid())
-  workspaceId      String                   @default("00000000-0000-0000-0000-000000000001")
-  name             String
-  description      String?
-  capability       MediaCapability
-  providerType     MediaProviderType?
-  templateText     String
+  id                     String                    @id @default(uuid())
+  workspaceId            String                    @default("00000000-0000-0000-0000-000000000001")
+  name                   String
+  description            String?
+  capability             MediaCapability
+  providerType           MediaProviderType?
+  templateText           String
   negativePromptTemplate String?
-  inputSchema      Json                    @default("{}")
-  outputSchema     Json                    @default("{}")
-  version          Int                     @default(1)
-  status           MediaPromptTemplateStatus @default(draft)
-  createdAt        DateTime                 @default(now())
-  updatedAt        DateTime                 @updatedAt
+  inputSchema            Json                      @default("{}")
+  outputSchema           Json                      @default("{}")
+  version                Int                       @default(1)
+  status                 MediaPromptTemplateStatus @default(draft)
+  createdAt              DateTime                  @default(now())
+  updatedAt              DateTime                  @updatedAt
 
   @@index([workspaceId, capability])
 }
 
 model VoiceProfile {
-  id                  String               @id @default(uuid())
-  workspaceId         String               @default("00000000-0000-0000-0000-000000000001")
-  name                String
-  description         String?
-  profileType         MediaVoiceProfileType
+  id                      String                  @id @default(uuid())
+  workspaceId             String                  @default("00000000-0000-0000-0000-000000000001")
+  name                    String
+  description             String?
+  profileType             MediaVoiceProfileType
   providerConfigurationId String?
-  externalVoiceId     String?
-  languageCodes       String[]             @default([])
-  genderPresentation  MediaGenderPresentation @default(unspecified)
-  styleTags           String[]             @default([])
-  consentRecordId     String?
-  sourceAssetId       String?
-  commercialUseAllowed Boolean?
-  status              MediaProviderStatus  @default(draft)
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  externalVoiceId         String?
+  languageCodes           String[]                @default([])
+  genderPresentation      MediaGenderPresentation @default(unspecified)
+  styleTags               String[]                @default([])
+  consentRecordId         String?
+  sourceAssetId           String?
+  commercialUseAllowed    Boolean?
+  status                  MediaProviderStatus     @default(draft)
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
 
   @@index([workspaceId, status])
 }
 
 model AvatarProfile {
-  id                  String               @id @default(uuid())
-  workspaceId         String               @default("00000000-0000-0000-0000-000000000001")
-  name                String
-  description         String?
-  avatarType          MediaAvatarType
+  id                      String              @id @default(uuid())
+  workspaceId             String              @default("00000000-0000-0000-0000-000000000001")
+  name                    String
+  description             String?
+  avatarType              MediaAvatarType
   providerConfigurationId String?
-  externalAvatarId    String?
-  sourceAssetId       String?
-  consentRecordId     String?
-  licenseReferenceId  String?
-  languageCodes       String[]             @default([])
-  styleTags           String[]             @default([])
-  commercialUseAllowed Boolean?
-  status              MediaProviderStatus  @default(draft)
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  externalAvatarId        String?
+  sourceAssetId           String?
+  consentRecordId         String?
+  licenseReferenceId      String?
+  languageCodes           String[]            @default([])
+  styleTags               String[]            @default([])
+  commercialUseAllowed    Boolean?
+  status                  MediaProviderStatus @default(draft)
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
 
   @@index([workspaceId, status])
 }
 
 model MediaConsentRecord {
-  id                String                 @id @default(uuid())
-  workspaceId       String                 @default("00000000-0000-0000-0000-000000000001")
-  subjectType       MediaConsentSubjectType
-  subjectReference  String
-  consentScope      String[]
-  allowedUseCases   String[]
-  prohibitedUseCases String[]
+  id                   String                  @id @default(uuid())
+  workspaceId          String                  @default("00000000-0000-0000-0000-000000000001")
+  subjectType          MediaConsentSubjectType
+  subjectReference     String
+  consentScope         String[]
+  allowedUseCases      String[]
+  prohibitedUseCases   String[]
   commercialUseAllowed Boolean
-  validFrom         DateTime
-  validUntil        DateTime?
-  evidenceAssetId   String?
-  evidenceReference String?
-  status            MediaConsentStatus     @default(active)
-  createdAt         DateTime               @default(now())
-  updatedAt         DateTime               @updatedAt
+  validFrom            DateTime
+  validUntil           DateTime?
+  evidenceAssetId      String?
+  evidenceReference    String?
+  status               MediaConsentStatus      @default(active)
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
 
   @@index([workspaceId, status])
   @@index([workspaceId, subjectReference])
 }
 
 model MediaGenerationJob {
-  id                  String                 @id @default(uuid())
-  workspaceId         String                 @default("00000000-0000-0000-0000-000000000001")
+  id                       String                      @id @default(uuid())
+  workspaceId              String                      @default("00000000-0000-0000-0000-000000000001")
   mediaProductionProjectId String
-  mediaSceneId        String?
-  capability          MediaCapability
-  providerConfigurationId String
-  modelDefinitionId   String
-  requestReferenceId  String
-  status              MediaGenerationJobStatus @default(draft)
-  approvalStatus      ApprovalStatus         @default(DRAFT)
-  idempotencyKey      String                 @unique
-  externalJobId       String?
-  estimatedCost       Decimal?               @db.Decimal(12, 2)
-  reservedCost        Decimal?               @db.Decimal(12, 2)
-  actualCost          Decimal?               @db.Decimal(12, 2)
-  currency            String?
-  attemptCount        Int                    @default(0)
-  maxAttempts         Int                    @default(3)
-  progressPercent     Int?
-  failureCode         MediaGenerationFailureCode?
-  failureReason       String?
-  submittedAt         DateTime?
-  completedAt         DateTime?
-  createdAt           DateTime               @default(now())
-  updatedAt           DateTime               @updatedAt
+  mediaSceneId             String?
+  capability               MediaCapability
+  providerConfigurationId  String
+  modelDefinitionId        String
+  requestReferenceId       String
+  status                   MediaGenerationJobStatus    @default(draft)
+  approvalStatus           ApprovalStatus              @default(DRAFT)
+  idempotencyKey           String                      @unique
+  externalJobId            String?
+  estimatedCost            Decimal?                    @db.Decimal(12, 2)
+  reservedCost             Decimal?                    @db.Decimal(12, 2)
+  actualCost               Decimal?                    @db.Decimal(12, 2)
+  currency                 String?
+  attemptCount             Int                         @default(0)
+  maxAttempts              Int                         @default(3)
+  progressPercent          Int?
+  failureCode              MediaGenerationFailureCode?
+  failureReason            String?
+  submittedAt              DateTime?
+  completedAt              DateTime?
+  createdAt                DateTime                    @default(now())
+  updatedAt                DateTime                    @updatedAt
 
   @@index([workspaceId, status])
   @@index([workspaceId, mediaProductionProjectId])
@@ -3812,152 +3879,152 @@ model MediaGenerationJob {
 }
 
 model MediaGenerationAttempt {
-  id                  String           @id @default(uuid())
-  workspaceId         String           @default("00000000-0000-0000-0000-000000000001")
-  mediaGenerationJobId String
-  attemptNumber       Int
+  id                      String                      @id @default(uuid())
+  workspaceId             String                      @default("00000000-0000-0000-0000-000000000001")
+  mediaGenerationJobId    String
+  attemptNumber           Int
   providerConfigurationId String
-  modelDefinitionId   String
-  externalJobId       String?
-  status              MediaAttemptStatus @default(submitted)
-  estimatedCost       Decimal?         @db.Decimal(12, 2)
-  actualCost          Decimal?         @db.Decimal(12, 2)
-  currency            String?
-  startedAt           DateTime         @default(now())
-  completedAt         DateTime?
-  failureCode         MediaGenerationFailureCode?
-  failureReason       String?
-  outputAssetIds      String[]         @default([])
-  createdAt           DateTime         @default(now())
-  updatedAt           DateTime         @updatedAt
+  modelDefinitionId       String
+  externalJobId           String?
+  status                  MediaAttemptStatus          @default(submitted)
+  estimatedCost           Decimal?                    @db.Decimal(12, 2)
+  actualCost              Decimal?                    @db.Decimal(12, 2)
+  currency                String?
+  startedAt               DateTime                    @default(now())
+  completedAt             DateTime?
+  failureCode             MediaGenerationFailureCode?
+  failureReason           String?
+  outputAssetIds          String[]                    @default([])
+  createdAt               DateTime                    @default(now())
+  updatedAt               DateTime                    @updatedAt
 
   @@index([workspaceId, mediaGenerationJobId])
 }
 
 model MediaAssetMetadata {
-  id                String             @id @default(uuid())
-  workspaceId       String             @default("00000000-0000-0000-0000-000000000001")
-  mediaAssetId      String
-  origin            MediaAssetOrigin   @default(generated)
-  status            MediaAssetStatus   @default(draft)
-  qaStatus          MediaAssetQaStatus @default(pending)
-  parentAssetId     String?
+  id                      String               @id @default(uuid())
+  workspaceId             String               @default("00000000-0000-0000-0000-000000000001")
+  mediaAssetId            String
+  origin                  MediaAssetOrigin     @default(generated)
+  status                  MediaAssetStatus     @default(draft)
+  qaStatus                MediaAssetQaStatus   @default(pending)
+  parentAssetId           String?
   providerConfigurationId String?
-  modelDefinitionId String?
-  promptTemplateId  String?
-  promptVersion     Int?
-  consentRecordId   String?
-  licenseReferenceId String?
-  checksum          String?
-  version           Int                @default(1)
-  width             Int?
-  height            Int?
-  durationSeconds   Decimal?           @db.Decimal(10, 3)
-  frameRate         Decimal?           @db.Decimal(6, 3)
-  bitrate           BigInt?
-  sampleRate        Int?
-  channels          Int?
-  codec             String?
-  aspectRatio       String?
-  languageCode      String?
-  audioAssetType    MediaAudioAssetType?
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
+  modelDefinitionId       String?
+  promptTemplateId        String?
+  promptVersion           Int?
+  consentRecordId         String?
+  licenseReferenceId      String?
+  checksum                String?
+  version                 Int                  @default(1)
+  width                   Int?
+  height                  Int?
+  durationSeconds         Decimal?             @db.Decimal(10, 3)
+  frameRate               Decimal?             @db.Decimal(6, 3)
+  bitrate                 BigInt?
+  sampleRate              Int?
+  channels                Int?
+  codec                   String?
+  aspectRatio             String?
+  languageCode            String?
+  audioAssetType          MediaAudioAssetType?
+  createdAt               DateTime             @default(now())
+  updatedAt               DateTime             @updatedAt
 
   @@index([workspaceId, mediaAssetId])
   @@index([workspaceId, status])
 }
 
 model RenderSpecification {
-  id                  String    @id @default(uuid())
-  workspaceId         String    @default("00000000-0000-0000-0000-000000000001")
+  id                       String                @id @default(uuid())
+  workspaceId              String                @default("00000000-0000-0000-0000-000000000001")
   mediaProductionProjectId String
-  name                String
-  version             Int       @default(1)
-  width               Int
-  height              Int
-  frameRate           Decimal   @db.Decimal(6, 3)
-  durationSeconds     Decimal   @db.Decimal(10, 3)
-  videoCodec          String
-  audioCodec          String
-  containerFormat     String
-  backgroundColor     String?
-  subtitleMode        MediaSubtitleStrategy @default(burned_in)
-  loudnessTargetLufs Decimal?  @db.Decimal(6, 2)
-  status              MediaProductionStatus @default(draft)
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  name                     String
+  version                  Int                   @default(1)
+  width                    Int
+  height                   Int
+  frameRate                Decimal               @db.Decimal(6, 3)
+  durationSeconds          Decimal               @db.Decimal(10, 3)
+  videoCodec               String
+  audioCodec               String
+  containerFormat          String
+  backgroundColor          String?
+  subtitleMode             MediaSubtitleStrategy @default(burned_in)
+  loudnessTargetLufs       Decimal?              @db.Decimal(6, 2)
+  status                   MediaProductionStatus @default(draft)
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
 
   @@index([workspaceId, mediaProductionProjectId])
 }
 
 model MediaTimeline {
-  id                  String             @id @default(uuid())
-  workspaceId         String             @default("00000000-0000-0000-0000-000000000001")
+  id                       String              @id @default(uuid())
+  workspaceId              String              @default("00000000-0000-0000-0000-000000000001")
   mediaProductionProjectId String
-  renderSpecificationId String
-  name                String
-  version             Int                @default(1)
-  durationSeconds     Decimal            @db.Decimal(10, 3)
-  status              MediaTimelineStatus @default(draft)
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
+  renderSpecificationId    String
+  name                     String
+  version                  Int                 @default(1)
+  durationSeconds          Decimal             @db.Decimal(10, 3)
+  status                   MediaTimelineStatus @default(draft)
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
 
   @@index([workspaceId, mediaProductionProjectId])
 }
 
 model MediaTimelineTrack {
-  id                String                 @id @default(uuid())
-  workspaceId       String                 @default("00000000-0000-0000-0000-000000000001")
-  mediaTimelineId   String
-  trackType         MediaTimelineTrackType
-  orderIndex        Int
-  createdAt         DateTime               @default(now())
+  id              String                 @id @default(uuid())
+  workspaceId     String                 @default("00000000-0000-0000-0000-000000000001")
+  mediaTimelineId String
+  trackType       MediaTimelineTrackType
+  orderIndex      Int
+  createdAt       DateTime               @default(now())
 
   @@index([workspaceId, mediaTimelineId])
 }
 
 model MediaTimelineClip {
-  id                String    @id @default(uuid())
-  workspaceId       String    @default("00000000-0000-0000-0000-000000000001")
+  id                   String   @id @default(uuid())
+  workspaceId          String   @default("00000000-0000-0000-0000-000000000001")
   mediaTimelineTrackId String
-  assetId           String
-  startTimeSeconds  Decimal   @db.Decimal(10, 3)
-  endTimeSeconds    Decimal   @db.Decimal(10, 3)
-  sourceStartSeconds Decimal? @db.Decimal(10, 3)
-  sourceEndSeconds  Decimal? @db.Decimal(10, 3)
-  volume            Decimal?  @db.Decimal(4, 2)
-  opacity           Decimal?  @db.Decimal(4, 2)
-  transform         Json?
-  effects           String[]  @default([])
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  assetId              String
+  startTimeSeconds     Decimal  @db.Decimal(10, 3)
+  endTimeSeconds       Decimal  @db.Decimal(10, 3)
+  sourceStartSeconds   Decimal? @db.Decimal(10, 3)
+  sourceEndSeconds     Decimal? @db.Decimal(10, 3)
+  volume               Decimal? @db.Decimal(4, 2)
+  opacity              Decimal? @db.Decimal(4, 2)
+  transform            Json?
+  effects              String[] @default([])
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   @@index([workspaceId, mediaTimelineTrackId])
 }
 
 model RenderJob {
-  id                  String             @id @default(uuid())
-  workspaceId         String             @default("00000000-0000-0000-0000-000000000001")
+  id                       String            @id @default(uuid())
+  workspaceId              String            @default("00000000-0000-0000-0000-000000000001")
   mediaProductionProjectId String
-  mediaTimelineId     String
-  renderSpecificationId String
-  status              MediaRenderStatus   @default(draft)
-  approvalStatus      ApprovalStatus      @default(DRAFT)
-  idempotencyKey      String              @unique
-  externalRenderId    String?
-  estimatedCost       Decimal?            @db.Decimal(12, 2)
-  actualCost          Decimal?            @db.Decimal(12, 2)
-  currency            String?
-  progressPercent     Int?
-  outputAssetId       String?
-  attemptCount        Int                 @default(0)
-  maxAttempts         Int                 @default(3)
-  failureCode         String?
-  failureReason       String?
-  completedAt         DateTime?
-  createdAt           DateTime            @default(now())
-  updatedAt           DateTime            @updatedAt
+  mediaTimelineId          String
+  renderSpecificationId    String
+  status                   MediaRenderStatus @default(draft)
+  approvalStatus           ApprovalStatus    @default(DRAFT)
+  idempotencyKey           String            @unique
+  externalRenderId         String?
+  estimatedCost            Decimal?          @db.Decimal(12, 2)
+  actualCost               Decimal?          @db.Decimal(12, 2)
+  currency                 String?
+  progressPercent          Int?
+  outputAssetId            String?
+  attemptCount             Int               @default(0)
+  maxAttempts              Int               @default(3)
+  failureCode              String?
+  failureReason            String?
+  completedAt              DateTime?
+  createdAt                DateTime          @default(now())
+  updatedAt                DateTime          @updatedAt
 
   @@index([workspaceId, status])
   @@index([workspaceId, mediaProductionProjectId])
@@ -3965,129 +4032,129 @@ model RenderJob {
 }
 
 model SubtitleTrack {
-  id                  String               @id @default(uuid())
-  workspaceId         String               @default("00000000-0000-0000-0000-000000000001")
+  id                       String              @id @default(uuid())
+  workspaceId              String              @default("00000000-0000-0000-0000-000000000001")
   mediaProductionProjectId String
-  languageCode        String
-  source              MediaSubtitleSource  @default(manual)
-  status              MediaSubtitleStatus  @default(draft)
-  version             Int                  @default(1)
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  languageCode             String
+  source                   MediaSubtitleSource @default(manual)
+  status                   MediaSubtitleStatus @default(draft)
+  version                  Int                 @default(1)
+  createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
 
   @@index([workspaceId, mediaProductionProjectId])
 }
 
 model SubtitleCue {
-  id                String    @id @default(uuid())
-  workspaceId       String    @default("00000000-0000-0000-0000-000000000001")
-  subtitleTrackId   String
-  orderIndex        Int
-  startTimeSeconds  Decimal   @db.Decimal(10, 3)
-  endTimeSeconds    Decimal   @db.Decimal(10, 3)
-  text              String
-  confidenceScore   Decimal?  @db.Decimal(4, 3)
-  createdAt         DateTime  @default(now())
-  updatedAt         DateTime  @updatedAt
+  id               String   @id @default(uuid())
+  workspaceId      String   @default("00000000-0000-0000-0000-000000000001")
+  subtitleTrackId  String
+  orderIndex       Int
+  startTimeSeconds Decimal  @db.Decimal(10, 3)
+  endTimeSeconds   Decimal  @db.Decimal(10, 3)
+  text             String
+  confidenceScore  Decimal? @db.Decimal(4, 3)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@index([workspaceId, subtitleTrackId])
 }
 
 model MediaVariant {
-  id                String               @id @default(uuid())
-  workspaceId       String               @default("00000000-0000-0000-0000-000000000001")
-  parentAssetId     String
-  platform          SocialPlatform?
-  format            PublishingFormat?
-  aspectRatio       String
-  resolution        String
-  durationSeconds   Decimal              @db.Decimal(10, 3)
-  cropStrategy      MediaVariantCropStrategy @default(center)
-  subtitleMode      MediaSubtitleStrategy   @default(none)
-  outputAssetId     String
-  createdAt         DateTime             @default(now())
+  id              String                   @id @default(uuid())
+  workspaceId     String                   @default("00000000-0000-0000-0000-000000000001")
+  parentAssetId   String
+  platform        SocialPlatform?
+  format          PublishingFormat?
+  aspectRatio     String
+  resolution      String
+  durationSeconds Decimal                  @db.Decimal(10, 3)
+  cropStrategy    MediaVariantCropStrategy @default(center)
+  subtitleMode    MediaSubtitleStrategy    @default(none)
+  outputAssetId   String
+  createdAt       DateTime                 @default(now())
 
   @@index([workspaceId, parentAssetId])
 }
 
 model MediaQualityPolicy {
-  id                       String                 @id @default(uuid())
-  workspaceId              String                 @default("00000000-0000-0000-0000-000000000001")
-  scopeType                MediaQualityScopeType  @default(workspace)
-  scopeId                  String                 @default("global")
-  minimumTechnicalScore    Decimal                @db.Decimal(4, 3) @default(0)
-  minimumAudioScore        Decimal                @db.Decimal(4, 3) @default(0)
-  minimumVisualScore       Decimal                @db.Decimal(4, 3) @default(0)
-  minimumContentScore      Decimal                @db.Decimal(4, 3) @default(0)
-  minimumComplianceScore   Decimal                @db.Decimal(4, 3) @default(0)
-  minimumOverallScore      Decimal                @db.Decimal(4, 3) @default(0)
-  criticalIssueBlocksApproval Boolean            @default(true)
-  createdAt                DateTime               @default(now())
-  updatedAt                DateTime               @updatedAt
+  id                          String                @id @default(uuid())
+  workspaceId                 String                @default("00000000-0000-0000-0000-000000000001")
+  scopeType                   MediaQualityScopeType @default(workspace)
+  scopeId                     String                @default("global")
+  minimumTechnicalScore       Decimal               @default(0) @db.Decimal(4, 3)
+  minimumAudioScore           Decimal               @default(0) @db.Decimal(4, 3)
+  minimumVisualScore          Decimal               @default(0) @db.Decimal(4, 3)
+  minimumContentScore         Decimal               @default(0) @db.Decimal(4, 3)
+  minimumComplianceScore      Decimal               @default(0) @db.Decimal(4, 3)
+  minimumOverallScore         Decimal               @default(0) @db.Decimal(4, 3)
+  criticalIssueBlocksApproval Boolean               @default(true)
+  createdAt                   DateTime              @default(now())
+  updatedAt                   DateTime              @updatedAt
 
   @@index([workspaceId, scopeType, scopeId])
 }
 
 model MediaQualityReport {
-  id                String             @id @default(uuid())
-  workspaceId       String             @default("00000000-0000-0000-0000-000000000001")
-  assetId           String
-  status            MediaQualityStatus @default(pending)
-  technicalScore    Decimal            @db.Decimal(4, 3) @default(0)
-  audioScore        Decimal            @db.Decimal(4, 3) @default(0)
-  visualScore       Decimal            @db.Decimal(4, 3) @default(0)
-  contentScore      Decimal            @db.Decimal(4, 3) @default(0)
-  complianceScore   Decimal            @db.Decimal(4, 3) @default(0)
-  overallScore      Decimal            @db.Decimal(4, 3) @default(0)
-  generatedAt       DateTime           @default(now())
-  qualityVersion    String             @default("1")
-  createdAt         DateTime           @default(now())
+  id              String             @id @default(uuid())
+  workspaceId     String             @default("00000000-0000-0000-0000-000000000001")
+  assetId         String
+  status          MediaQualityStatus @default(pending)
+  technicalScore  Decimal            @default(0) @db.Decimal(4, 3)
+  audioScore      Decimal            @default(0) @db.Decimal(4, 3)
+  visualScore     Decimal            @default(0) @db.Decimal(4, 3)
+  contentScore    Decimal            @default(0) @db.Decimal(4, 3)
+  complianceScore Decimal            @default(0) @db.Decimal(4, 3)
+  overallScore    Decimal            @default(0) @db.Decimal(4, 3)
+  generatedAt     DateTime           @default(now())
+  qualityVersion  String             @default("1")
+  createdAt       DateTime           @default(now())
 
   @@index([workspaceId, assetId])
   @@index([workspaceId, status])
 }
 
 model MediaQualityIssue {
-  id                String                     @id @default(uuid())
-  workspaceId       String                     @default("00000000-0000-0000-0000-000000000001")
+  id                   String                    @id @default(uuid())
+  workspaceId          String                    @default("00000000-0000-0000-0000-000000000001")
   mediaQualityReportId String
-  code              String
-  severity          MediaQualityIssueSeverity  @default(warning)
-  message           String
-  timestampSeconds  Decimal?                   @db.Decimal(10, 3)
-  evidenceReference String?
-  createdAt         DateTime                   @default(now())
+  code                 String
+  severity             MediaQualityIssueSeverity @default(warning)
+  message              String
+  timestampSeconds     Decimal?                  @db.Decimal(10, 3)
+  evidenceReference    String?
+  createdAt            DateTime                  @default(now())
 
   @@index([workspaceId, mediaQualityReportId])
 }
 
 model MediaRoutingDecision {
-  id                  String             @id @default(uuid())
-  workspaceId         String             @default("00000000-0000-0000-0000-000000000001")
-  capability          MediaCapability
-  selectedProviderConfigurationId String
-  selectedModelDefinitionId String
-  fallbackProviderConfigurationIds String[] @default([])
-  explanation        String
-  evidenceReferences String[] @default([])
-  estimatedCost       Decimal?           @db.Decimal(12, 2)
-  currency            String?
-  createdAt           DateTime           @default(now())
+  id                               String          @id @default(uuid())
+  workspaceId                      String          @default("00000000-0000-0000-0000-000000000001")
+  capability                       MediaCapability
+  selectedProviderConfigurationId  String
+  selectedModelDefinitionId        String
+  fallbackProviderConfigurationIds String[]        @default([])
+  explanation                      String
+  evidenceReferences               String[]        @default([])
+  estimatedCost                    Decimal?        @db.Decimal(12, 2)
+  currency                         String?
+  createdAt                        DateTime        @default(now())
 
   @@index([workspaceId, capability])
 }
 
 model MediaLicenseReference {
-  id                String   @id @default(uuid())
-  workspaceId       String   @default("00000000-0000-0000-0000-000000000001")
-  name              String
-  licenseType       String
-  referenceUrl      String?
-  validFrom         DateTime @default(now())
-  validUntil        DateTime?
-  status            MediaConsentStatus @default(active)
-  createdAt         DateTime @default(now())
-  updatedAt         DateTime @updatedAt
+  id           String             @id @default(uuid())
+  workspaceId  String             @default("00000000-0000-0000-0000-000000000001")
+  name         String
+  licenseType  String
+  referenceUrl String?
+  validFrom    DateTime           @default(now())
+  validUntil   DateTime?
+  status       MediaConsentStatus @default(active)
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
 
   @@index([workspaceId, status])
 }

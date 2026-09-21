@@ -1,9 +1,9 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
+import { tenantPrismaForWorkspace } from "@/lib/db/tenant-client";
 import type { WorkflowStatus, WorkflowRunStatus } from "@/generated/prisma/client";
 
 export async function listWorkflows(workspaceId: string, filters?: { status?: string }) {
-  return prisma.workflowDefinition.findMany({
+  return tenantPrismaForWorkspace(workspaceId).workflowDefinition.findMany({
     where: {
       workspaceId,
       ...(filters?.status ? { status: filters.status as WorkflowStatus } : {}),
@@ -18,7 +18,7 @@ export async function listWorkflows(workspaceId: string, filters?: { status?: st
 }
 
 export async function getWorkflow(id: string, workspaceId: string) {
-  return prisma.workflowDefinition.findFirst({
+  return tenantPrismaForWorkspace(workspaceId).workflowDefinition.findFirst({
     where: { id, workspaceId },
     include: {
       steps: { orderBy: { stepOrder: "asc" } },
@@ -28,7 +28,7 @@ export async function getWorkflow(id: string, workspaceId: string) {
 }
 
 export async function listWorkflowRuns(workspaceId: string, filters?: { workflowId?: string; status?: string }) {
-  return prisma.workflowRun.findMany({
+  return tenantPrismaForWorkspace(workspaceId).workflowRun.findMany({
     where: {
       workspaceId,
       ...(filters?.workflowId ? { workflowId: filters.workflowId } : {}),
@@ -43,7 +43,7 @@ export async function listWorkflowRuns(workspaceId: string, filters?: { workflow
 }
 
 export async function getWorkflowRun(id: string, workspaceId: string) {
-  return prisma.workflowRun.findFirst({
+  return tenantPrismaForWorkspace(workspaceId).workflowRun.findFirst({
     where: { id, workspaceId },
     include: {
       workflow: { select: { id: true, name: true } },

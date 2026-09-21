@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { prisma } from "@/lib/db/client";
+import { tenantPrismaForWorkspace } from "@/lib/db/tenant-client";
 import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { PRODUCT_STATUS_LABELS, RISK_LABELS, AFFILIATE_PROVIDER_LABELS } from "@/lib/status-labels";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,7 +59,7 @@ export default async function ProductDetailPage({ params }: DetailPageProps) {
   const { id } = await params;
   const workspaceId = await resolveWorkspaceId();
 
-  const product = await prisma.product.findFirst({
+  const product = await tenantPrismaForWorkspace(workspaceId).product.findFirst({
     where: { id, workspaceId },
     include: {
       category: true,

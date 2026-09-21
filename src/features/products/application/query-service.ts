@@ -4,7 +4,7 @@
  * CRUD for `ProductDiscoveryQuery` plus versioned snapshots on update. All reads
  * are scoped by `workspaceId` (default `DEFAULT_WORKSPACE_ID`).
  */
-import { prisma } from "@/lib/db/client";
+import { tenantPrismaForWorkspace } from "@/lib/db/tenant-client";
 import { Prisma } from "@/generated/prisma/client";
 import { Decimal, type DecimalValue } from "@/lib/shared/decimal";
 import { DEFAULT_WORKSPACE_ID } from "@/lib/config/workspace";
@@ -70,7 +70,7 @@ function toCreateData(
 export async function listQueries(
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<unknown[]> {
-  return prisma.productDiscoveryQuery.findMany({
+  return tenantPrismaForWorkspace(workspaceId).productDiscoveryQuery.findMany({
     where: { workspaceId },
     orderBy: { createdAt: "desc" },
   });
@@ -80,7 +80,7 @@ export async function getQuery(
   id: string,
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<unknown | null> {
-  return prisma.productDiscoveryQuery.findFirst({
+  return tenantPrismaForWorkspace(workspaceId).productDiscoveryQuery.findFirst({
     where: { id, workspaceId },
     include: { versions: { orderBy: { version: "desc" } }, runs: { orderBy: { createdAt: "desc" } } },
   });
@@ -91,11 +91,11 @@ export async function createQuery(
   actor: string,
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<unknown> {
-  const query = await prisma.productDiscoveryQuery.create({
+  const query = await tenantPrismaForWorkspace(workspaceId).productDiscoveryQuery.create({
     data: toCreateData(input, workspaceId),
   });
 
-  await prisma.productDiscoveryQueryVersion.create({
+  await tenantPrismaForWorkspace(workspaceId).productDiscoveryQueryVersion.create({
     data: {
       workspaceId,
       queryId: query.id,
@@ -121,14 +121,14 @@ export async function updateQuery(
   actor: string,
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<unknown> {
-  const existing = await prisma.productDiscoveryQuery.findFirst({
+  const existing = await tenantPrismaForWorkspace(workspaceId).productDiscoveryQuery.findFirst({
     where: { id, workspaceId },
     select: { currentVersion: true },
   });
   if (!existing) throw new Error(`ProductDiscoveryQuery not found: ${id}`);
 
   const nextVersion = existing.currentVersion + 1;
-  const query = await prisma.productDiscoveryQuery.update({
+  const query = await tenantPrismaForWorkspace(workspaceId).productDiscoveryQuery.update({
     where: { id },
     data: {
       ...toCreateData(input, workspaceId),
@@ -137,7 +137,7 @@ export async function updateQuery(
     },
   });
 
-  await prisma.productDiscoveryQueryVersion.create({
+  await tenantPrismaForWorkspace(workspaceId).productDiscoveryQueryVersion.create({
     data: {
       workspaceId,
       queryId: id,
@@ -160,7 +160,7 @@ export async function updateQuery(
 export async function listRuns(
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<unknown[]> {
-  return prisma.productDiscoveryRun.findMany({
+  return tenantPrismaForWorkspace(workspaceId).productDiscoveryRun.findMany({
     where: { workspaceId },
     orderBy: { createdAt: "desc" },
     include: { providerRuns: true },
@@ -171,7 +171,7 @@ export async function getRun(
   id: string,
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<unknown | null> {
-  return prisma.productDiscoveryRun.findFirst({
+  return tenantPrismaForWorkspace(workspaceId).productDiscoveryRun.findFirst({
     where: { id, workspaceId },
     include: { providerRuns: true, query: true },
   });

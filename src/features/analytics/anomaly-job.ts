@@ -1,6 +1,6 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
-import { DEFAULT_WORKSPACE_ID } from "@/lib/config/workspace";
+import { tenantPrismaForWorkspace } from "@/lib/db/tenant-client";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
 import { detectAnomalies, type AnomalyContext, type AnomalyScope } from "@/lib/anomaly/rules";
@@ -19,8 +19,8 @@ function big(v: { toString(): string } | null | undefined): bigint {
  * open anomalies of the same scope+type are not duplicated. Never auto-blocks.
  */
 export async function runAnomalyDetection(actor: string) {
-  const workspaceId = DEFAULT_WORKSPACE_ID;
-  const snapshots = await prisma.contentPerformanceSnapshot.findMany({
+  const workspaceId = await resolveWorkspaceId();
+  const snapshots = await tenantPrismaForWorkspace(workspaceId).contentPerformanceSnapshot.findMany({
     where: { workspaceId },
     select: {
       contentAssetId: true,
@@ -71,7 +71,7 @@ export async function runAnomalyDetection(actor: string) {
     const drafts = detectAnomalies(ctx, scope);
 
     for (const d of drafts) {
-      const existing = await prisma.analyticsAnomaly.findFirst({
+      const existing = await tenantPrismaForWorkspace(workspaceId).analyticsAnomaly.findFirst({
         where: {
           workspaceId,
           scopeType: d.scopeType,
@@ -81,7 +81,7 @@ export async function runAnomalyDetection(actor: string) {
         },
       });
       if (existing) continue;
-      await prisma.analyticsAnomaly.create({
+      await tenantPrismaForWorkspace(workspaceId).analyticsAnomaly.create({
         data: {
           workspaceId,
           anomalyType: d.anomalyType,

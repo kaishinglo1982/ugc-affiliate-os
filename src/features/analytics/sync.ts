@@ -1,5 +1,6 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
+import { tenantPrismaForWorkspace } from "@/lib/db/tenant-client";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { featureFlags } from "@/lib/config/feature-flags";
 import { AnalyticsSyncError, classifyProviderError } from "@/lib/analytics/provider/failure";
 import {
@@ -49,7 +50,8 @@ function newIdempotencyKey(prefix: string): string {
 export async function requestSyncJob(request: SyncJobRequest): Promise<{ id: string }> {
   requireAnalyticsEnabled();
   if (request.jobType === "POST_BACKFILL") requireBackfillEnabled();
-  const job = await prisma.analyticsSyncJob.create({
+  const db = tenantPrismaForWorkspace(request.workspaceId);
+  const job = await db.analyticsSyncJob.create({
     data: {
       workspaceId: request.workspaceId,
       jobType: request.jobType,
@@ -85,17 +87,18 @@ export async function importAnalyticsEvents(
   }
 
   const { unique, duplicates } = deduplicateEvents(validated);
+  const db = tenantPrismaForWorkspace(workspaceId);
 
   let inserted = 0;
   if (unique.length > 0) {
-    const existing = await prisma.analyticsEvent.findMany({
+    const existing = await db.analyticsEvent.findMany({
       where: { idempotencyKey: { in: unique.map((e) => e.idempotencyKey) } },
       select: { idempotencyKey: true },
     });
     const existingKeys = new Set(existing.map((e) => e.idempotencyKey));
     const toInsert = unique.filter((e) => !existingKeys.has(e.idempotencyKey));
     if (toInsert.length > 0) {
-      await prisma.analyticsEvent.createMany({
+      await db.analyticsEvent.createMany({
         data: toInsert.map((e) => ({
           workspaceId,
           eventType: e.eventType,
@@ -149,11 +152,14 @@ export interface SyncReport {
   deadLettered: number;
 }
 
-export async function processSyncQueue(limit = 10): Promise<SyncReport> {
+export async function processSyncQueue(limit = 10, workspaceId?: string): Promise<SyncReport> {
   requireAnalyticsEnabled();
   const now = new Date();
-  const jobs = await prisma.analyticsSyncJob.findMany({
+  const activeWorkspaceId = workspaceId ?? (await resolveWorkspaceId());
+  const db = tenantPrismaForWorkspace(activeWorkspaceId);
+  const jobs = await db.analyticsSyncJob.findMany({
     where: {
+      workspaceId: activeWorkspaceId,
       OR: [{ status: "PENDING" }, { status: "FAILED", nextAttemptAt: { lte: now } }],
     },
     orderBy: { createdAt: "asc" },
@@ -163,16 +169,16 @@ export async function processSyncQueue(limit = 10): Promise<SyncReport> {
   const report: SyncReport = { processed: 0, succeeded: 0, failed: 0, deadLettered: 0 };
   for (const job of jobs) {
     report.processed += 1;
-    await prisma.analyticsSyncJob.update({ where: { id: job.id }, data: { status: "PROCESSING" } });
+    await db.analyticsSyncJob.update({ where: { id: job.id }, data: { status: "PROCESSING" } });
     try {
       await runJob(job);
-      await prisma.analyticsSyncJob.update({ where: { id: job.id }, data: { status: "SUCCEEDED", attempts: { increment: 1 }, failureCode: null, lastError: null, nextAttemptAt: null } });
+      await db.analyticsSyncJob.update({ where: { id: job.id }, data: { status: "SUCCEEDED", attempts: { increment: 1 }, failureCode: null, lastError: null, nextAttemptAt: null } });
       report.succeeded += 1;
     } catch (error) {
       const syncErr = error instanceof AnalyticsSyncError ? error : classifyProviderError(error);
       const decision = syncRetryPolicy(syncErr.code, job.attempts, job.maxAttempts, new Date());
       const nextStatus = decision.kind === "dead" ? "DEAD" : "FAILED";
-      await prisma.analyticsSyncJob.update({
+      await db.analyticsSyncJob.update({
         where: { id: job.id },
         data: {
           status: nextStatus,
@@ -207,7 +213,8 @@ async function runJob(job: {
 }): Promise<void> {
   if (job.jobType === "ACCOUNT_SYNC" || job.jobType === "POST_SYNC") {
     if (!job.socialAccountId) throw new SyncJobError("Social-Account erforderlich.");
-    const account = await prisma.socialAccount.findUnique({ where: { id: job.socialAccountId } });
+    const db = tenantPrismaForWorkspace(job.workspaceId);
+    const account = await db.socialAccount.findUnique({ where: { id: job.socialAccountId } });
     if (!account) throw new AnalyticsSyncError("POST_NOT_FOUND", "Social-Account nicht gefunden.");
     if (!isAnalyticsPlatform(account.platform)) {
       throw new AnalyticsSyncError("UNSUPPORTED_METRIC", `Plattform ${account.platform} wird nicht unterstützt.`);
@@ -224,7 +231,7 @@ async function runJob(job: {
         : await provider.getPostMetrics({ workspaceId: job.workspaceId, socialAccountId: account.id, platform, externalPostId: job.externalPostId ?? "", periodStart, periodEnd });
 
     const m = result.metrics;
-    await prisma.platformMetricSnapshot.create({
+    await db.platformMetricSnapshot.create({
       data: {
         workspaceId: job.workspaceId,
         platform,

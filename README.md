@@ -23,7 +23,7 @@ Copy `.env.example` to `.env.local` for local development and set at least:
 - `CREDENTIAL_ENCRYPTION_KEY` as 64 hex characters from `openssl rand -hex 32`
 - `APP_URL`, for example `http://localhost:3000`
 
-Set `ADMIN_EMAIL` plus either `ADMIN_PASSWORD_HASH` for production or `ADMIN_PASSWORD` for local/CI seeding. Set `WORKER_SECRET` in deployed environments before wiring cron jobs.
+Set `ADMIN_EMAIL` plus either `ADMIN_PASSWORD_HASH` for production or `ADMIN_PASSWORD` for local/CI seeding. Set `WORKER_SECRET` and `CRON_SECRET` in deployed environments before wiring cron jobs.
 
 ## Database
 

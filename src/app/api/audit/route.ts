@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 
 export const dynamic = "force-dynamic";
 
@@ -40,10 +40,12 @@ export async function GET(request: Request) {
       : {}),
   };
 
-  const [items, total] = await Promise.all([
-    prisma.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, take: limit, skip: offset }),
-    prisma.auditLog.count({ where }),
-  ]);
+  const [items, total] = await withWorkspaceDb((tx) =>
+    Promise.all([
+      tx.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, take: limit, skip: offset }),
+      tx.auditLog.count({ where }),
+    ]),
+  );
 
   return NextResponse.json({ items, total, limit, offset });
 }

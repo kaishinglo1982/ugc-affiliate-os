@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 import { listScripts } from "@/server/services/scripts";
 import { listProductsForSelect } from "@/server/services/affiliate";
 import { LLM_PROVIDER_KEYS, isLlmProviderConfigured, type LlmProviderKey } from "@/lib/providers/llm/registry";
@@ -10,11 +10,21 @@ import type { ScriptDetailData } from "@/components/scripts/script-detail-sheet"
 export const metadata: Metadata = { title: "UGC-Skriptgenerator" };
 
 export default async function ScriptsPage() {
-  const [scripts, products, campaigns] = await Promise.all([
+  const [scripts, products] = await Promise.all([
     listScripts(),
     listProductsForSelect(),
-    prisma.campaign.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
+
+  const workspaceData = await withWorkspaceDb(async (tx) => {
+    const [campaigns, fullScripts] = await Promise.all([
+      tx.campaign.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+      tx.script.findMany({
+        where: { id: { in: scripts.map((script) => script.id) } },
+        include: { versions: { orderBy: { versionNumber: "desc" } } },
+      }),
+    ]);
+    return { campaigns, fullScripts };
+  });
 
   const rows: ScriptRow[] = scripts.map((s) => ({
     id: s.id,
@@ -27,13 +37,8 @@ export default async function ScriptsPage() {
   }));
 
   const scriptDetails: Record<string, ScriptDetailData> = {};
-  for (const s of scripts) {
-    const full = await prisma.script.findUnique({
-      where: { id: s.id },
-      include: { versions: { orderBy: { versionNumber: "desc" } } },
-    });
-    if (!full) continue;
-    scriptDetails[s.id] = {
+  for (const full of workspaceData.fullScripts) {
+    scriptDetails[full.id] = {
       id: full.id,
       title: full.title,
       status: full.status,
@@ -73,7 +78,7 @@ export default async function ScriptsPage() {
       scripts={rows}
       scriptDetails={scriptDetails}
       products={products.map((p) => ({ id: p.id, label: p.name }))}
-      campaigns={campaigns.map((c) => ({ id: c.id, label: c.name }))}
+      campaigns={workspaceData.campaigns.map((c) => ({ id: c.id, label: c.name }))}
       providerAvailability={providerAvailability}
     />
   );

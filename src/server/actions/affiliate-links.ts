@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 import { runMutation } from "@/server/actions/action-helpers";
 import { affiliateLinkSchema, idSchema } from "@/lib/validation/affiliate";
 import { buildTrackedUrl, generateShortSlug } from "@/features/affiliate/link-builder";
@@ -18,8 +18,7 @@ export async function saveAffiliateLinkAction(
   const user = await getCurrentUser();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
-  const raw = Object.fromEntries(formData.entries());
-  const parsed = affiliateLinkSchema.safeParse(raw);
+  const parsed = affiliateLinkSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
     return fail("Eingabe ungültig.", requestId, parsed.error.flatten().fieldErrors);
   }
@@ -51,11 +50,18 @@ export async function saveAffiliateLinkAction(
     utmTerm: parsed.data.utmTerm || null,
   };
 
-  const link = linkId
-    ? await prisma.affiliateLink.update({ where: { id: linkId }, data })
-    : await prisma.affiliateLink.create({
-        data: { ...data, shortSlug: generateShortSlug() },
-      });
+  const link = await withWorkspaceDb(async (tx) => {
+    if (linkId) {
+      const visible = await tx.affiliateLink.findUnique({ where: { id: linkId }, select: { id: true } });
+      if (!visible) return null;
+      return tx.affiliateLink.update({ where: { id: linkId }, data });
+    }
+    return tx.affiliateLink.create({
+      data: { ...data, shortSlug: generateShortSlug() },
+    });
+  });
+
+  if (!link) return fail("Affiliate-Link nicht gefunden.", requestId);
 
   await writeAuditLog({
     action: linkId ? "affiliate_link.update" : "affiliate_link.create",
@@ -75,10 +81,11 @@ export async function deleteAffiliateLinkAction(id: string) {
     input: { id },
     auditAction: "affiliate_link.delete",
     entityType: "AffiliateLink",
-    handler: async (input) => {
-      await prisma.affiliateLink.delete({ where: { id: input.id } });
-      return { id: input.id };
-    },
+    handler: async (input) =>
+      withWorkspaceDb(async (tx) => {
+        await tx.affiliateLink.delete({ where: { id: input.id } });
+        return { id: input.id };
+      }),
     entityId: (output) => output.id,
   });
   revalidatePath("/app/affiliate-links");
@@ -94,15 +101,24 @@ export async function testAffiliateLinkAction(id: string) {
     auditAction: "affiliate_link.test",
     entityType: "AffiliateLink",
     handler: async (input) => {
-      const link = await prisma.affiliateLink.findUniqueOrThrow({ where: { id: input.id } });
+      const link = await withWorkspaceDb((tx) =>
+        tx.affiliateLink.findUnique({
+          where: { id: input.id },
+          select: { id: true, deepLink: true, destinationUrl: true },
+        }),
+      );
+      if (!link) throw new Error("AFFILIATE_LINK_NOT_VISIBLE");
+
       const target = link.deepLink || link.destinationUrl;
       const url = new URL(target);
 
       if (PRIVATE_HOST_PATTERN.test(url.hostname)) {
-        return prisma.affiliateLink.update({
-          where: { id: input.id },
-          data: { lastCheckedAt: new Date(), lastCheckStatus: "BLOCKED" },
-        });
+        return withWorkspaceDb((tx) =>
+          tx.affiliateLink.update({
+            where: { id: input.id },
+            data: { lastCheckedAt: new Date(), lastCheckStatus: "BLOCKED" },
+          }),
+        );
       }
 
       let status: string;
@@ -121,10 +137,12 @@ export async function testAffiliateLinkAction(id: string) {
         status = "UNREACHABLE";
       }
 
-      return prisma.affiliateLink.update({
-        where: { id: input.id },
-        data: { lastCheckedAt: new Date(), lastCheckStatus: status },
-      });
+      return withWorkspaceDb((tx) =>
+        tx.affiliateLink.update({
+          where: { id: input.id },
+          data: { lastCheckedAt: new Date(), lastCheckStatus: status },
+        }),
+      );
     },
     entityId: (output) => output.id,
   });

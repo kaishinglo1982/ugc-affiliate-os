@@ -1,7 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 import { runMutation } from "@/server/actions/action-helpers";
 import {
   ALLOWED_MIME_TYPES,
@@ -25,6 +25,16 @@ export interface UploadedAssetSummary {
   fileName: string;
 }
 
+async function referencesVisible(productId?: string, campaignId?: string): Promise<boolean> {
+  return withWorkspaceDb(async (tx) => {
+    const [product, campaign] = await Promise.all([
+      productId ? tx.product.findUnique({ where: { id: productId }, select: { id: true } }) : null,
+      campaignId ? tx.campaign.findUnique({ where: { id: campaignId }, select: { id: true } }) : null,
+    ]);
+    return (!productId || Boolean(product)) && (!campaignId || Boolean(campaign));
+  });
+}
+
 export async function uploadMediaAction(
   _prevState: Result<{ uploaded: UploadedAssetSummary[] }> | null,
   formData: FormData,
@@ -40,6 +50,12 @@ export async function uploadMediaAction(
   });
   if (!metaParsed.success) {
     return fail("Metadaten ungültig.", requestId, metaParsed.error.flatten().fieldErrors);
+  }
+
+  const productId = metaParsed.data.productId || undefined;
+  const campaignId = metaParsed.data.campaignId || undefined;
+  if (!(await referencesVisible(productId, campaignId))) {
+    return fail("Produkt oder Kampagne ist in diesem Workspace nicht verfügbar.", requestId);
   }
 
   const files = formData.getAll("files").filter((f): f is File => f instanceof File && f.size > 0);
@@ -61,21 +77,27 @@ export async function uploadMediaAction(
     const buffer = Buffer.from(await file.arrayBuffer());
     const stored = await storage.put(file.name, buffer, file.type);
 
-    const asset = await prisma.mediaAsset.create({
-      data: {
-        kind: mimeToKind(file.type),
-        fileName: file.name,
-        storageKey: stored.storageKey,
-        url: stored.url,
-        mimeType: file.type,
-        sizeBytes: stored.sizeBytes,
-        tags: splitTags(metaParsed.data.tags),
-        productId: metaParsed.data.productId || null,
-        campaignId: metaParsed.data.campaignId || null,
-      },
-    });
-
-    uploaded.push({ id: asset.id, fileName: asset.fileName });
+    try {
+      const asset = await withWorkspaceDb((tx) =>
+        tx.mediaAsset.create({
+          data: {
+            kind: mimeToKind(file.type),
+            fileName: file.name,
+            storageKey: stored.storageKey,
+            url: stored.url,
+            mimeType: file.type,
+            sizeBytes: stored.sizeBytes,
+            tags: splitTags(metaParsed.data.tags),
+            productId: productId ?? null,
+            campaignId: campaignId ?? null,
+          },
+        }),
+      );
+      uploaded.push({ id: asset.id, fileName: asset.fileName });
+    } catch (error) {
+      await storage.remove(stored.storageKey).catch(() => undefined);
+      throw error;
+    }
   }
 
   await writeAuditLog({
@@ -109,14 +131,26 @@ export async function updateMediaAction(
   });
   if (!parsed.success) return fail("Eingabe ungültig.", requestId);
 
-  const asset = await prisma.mediaAsset.update({
-    where: { id },
-    data: {
-      tags: splitTags(parsed.data.tags),
-      productId: parsed.data.productId || null,
-      campaignId: parsed.data.campaignId || null,
-    },
+  const productId = parsed.data.productId || undefined;
+  const campaignId = parsed.data.campaignId || undefined;
+  if (!(await referencesVisible(productId, campaignId))) {
+    return fail("Produkt oder Kampagne ist in diesem Workspace nicht verfügbar.", requestId);
+  }
+
+  const asset = await withWorkspaceDb(async (tx) => {
+    const visible = await tx.mediaAsset.findUnique({ where: { id }, select: { id: true } });
+    if (!visible) return null;
+    return tx.mediaAsset.update({
+      where: { id: visible.id },
+      data: {
+        tags: splitTags(parsed.data.tags),
+        productId: productId ?? null,
+        campaignId: campaignId ?? null,
+      },
+    });
   });
+
+  if (!asset) return fail("Media-Asset nicht gefunden.", requestId);
 
   await writeAuditLog({
     action: "media.update",
@@ -137,7 +171,11 @@ export async function archiveMediaAction(id: string) {
     auditAction: "media.archive",
     entityType: "MediaAsset",
     handler: async (input) =>
-      prisma.mediaAsset.update({ where: { id: input.id }, data: { archivedAt: new Date() } }),
+      withWorkspaceDb(async (tx) => {
+        const visible = await tx.mediaAsset.findUnique({ where: { id: input.id }, select: { id: true } });
+        if (!visible) throw new Error("MEDIA_ASSET_NOT_FOUND");
+        return tx.mediaAsset.update({ where: { id: visible.id }, data: { archivedAt: new Date() } });
+      }),
     entityId: (output) => output.id,
   });
   revalidatePath("/app/media");
@@ -151,11 +189,15 @@ export async function deleteMediaAction(id: string) {
     auditAction: "media.delete",
     entityType: "MediaAsset",
     handler: async (input) => {
-      const asset = await prisma.mediaAsset.findUniqueOrThrow({ where: { id: input.id } });
+      const asset = await withWorkspaceDb((tx) =>
+        tx.mediaAsset.findUnique({ where: { id: input.id }, select: { id: true, storageKey: true } }),
+      );
+      if (!asset) throw new Error("MEDIA_ASSET_NOT_FOUND");
+
       const storage = await resolveStorageProvider();
       await storage.remove(asset.storageKey).catch(() => undefined);
-      await prisma.mediaAsset.delete({ where: { id: input.id } });
-      return { id: input.id };
+      await withWorkspaceDb((tx) => tx.mediaAsset.delete({ where: { id: asset.id } }));
+      return { id: asset.id };
     },
     entityId: (output) => output.id,
   });

@@ -20,7 +20,7 @@ async function runPublishWorker(request: Request, allowUserFallback: boolean) {
   if ("response" in auth) return auth.response;
   try {
     const workspaceId = await resolveWorkspaceId();
-    const report = await processPublishQueue();
+    const report = await processPublishQueue(10, workspaceId);
     return ok({ report, workspaceId });
   } catch (error) {
     if (error instanceof InvalidTenantTokenError) {

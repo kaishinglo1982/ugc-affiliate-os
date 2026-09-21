@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
 import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
-import { prisma } from "@/lib/db/client";
+import { tenantPrisma as prisma } from "@/lib/db/tenant-client";
 import { analyzeContent } from "@/features/content-intelligence/service";
 
 export async function POST(request: Request) {

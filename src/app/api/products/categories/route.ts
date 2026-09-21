@@ -4,7 +4,7 @@ import { requireApiPermission } from "@/lib/api/guard";
 import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
-import { prisma } from "@/lib/db/client";
+import { tenantPrisma as prisma } from "@/lib/db/tenant-client";
 import type { RiskLevel } from "@/generated/prisma/client";
 
 export async function GET(_request: Request) {

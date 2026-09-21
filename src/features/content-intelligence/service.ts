@@ -1,5 +1,5 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
+import { tenantPrismaForWorkspace } from "@/lib/db/tenant-client";
 import { Decimal } from "@/lib/shared/decimal";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
@@ -28,7 +28,7 @@ export async function analyzeContent(input: unknown, workspaceId: string) {
   }
   const data = parsed.data;
 
-  const latest = await prisma.contentIntelligenceProfile.findFirst({
+  const latest = await tenantPrismaForWorkspace(workspaceId).contentIntelligenceProfile.findFirst({
     where: { workspaceId, contentAssetId: data.contentAssetId },
     orderBy: { analyzedAt: "desc" },
   });
@@ -36,7 +36,7 @@ export async function analyzeContent(input: unknown, workspaceId: string) {
     throw new ContentIntelligenceError("Manuelles Profil wird nicht automatisch überschrieben.");
   }
 
-  const profile = await prisma.contentIntelligenceProfile.create({
+  const profile = await tenantPrismaForWorkspace(workspaceId).contentIntelligenceProfile.create({
     data: {
       workspaceId,
       contentAssetId: data.contentAssetId,
@@ -65,7 +65,7 @@ export async function analyzeContent(input: unknown, workspaceId: string) {
   });
 
   if (latest) {
-    await prisma.contentIntelligenceProfile.update({
+    await tenantPrismaForWorkspace(workspaceId).contentIntelligenceProfile.update({
       where: { id: latest.id },
       data: { supersededByProfileId: profile.id },
     });
@@ -76,7 +76,7 @@ export async function analyzeContent(input: unknown, workspaceId: string) {
 }
 
 export async function listVariants(contentAssetId: string, workspaceId: string) {
-  return prisma.contentVariant.findMany({
+  return tenantPrismaForWorkspace(workspaceId).contentVariant.findMany({
     where: { workspaceId, parentContentAssetId: contentAssetId },
     orderBy: { version: "desc" },
   });
@@ -88,13 +88,13 @@ export async function createVariant(input: unknown, workspaceId: string) {
     throw new ContentIntelligenceError("Ungültige Varianten-Eingabe.");
   }
   const data = parsed.data;
-  const existing = await prisma.contentVariant.findMany({
+  const existing = await tenantPrismaForWorkspace(workspaceId).contentVariant.findMany({
     where: { parentContentAssetId: data.parentContentAssetId },
     select: { version: true },
   });
   const version = nextVersion(existing.map((v) => v.version));
 
-  const variant = await prisma.contentVariant.create({
+  const variant = await tenantPrismaForWorkspace(workspaceId).contentVariant.create({
     data: {
       workspaceId,
       parentContentAssetId: data.parentContentAssetId,

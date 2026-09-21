@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db/client";
+import { tenantPrismaForWorkspace } from "@/lib/db/tenant-client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
 import { createApprovalRequest } from "@/server/services/approvals";
@@ -18,7 +18,7 @@ export async function listStrategies(
   workspaceId: string,
   opts: { campaignCandidateId?: string; status?: CampaignStrategyStatus } = {},
 ) {
-  return prisma.campaignStrategy.findMany({
+  return tenantPrismaForWorkspace(workspaceId).campaignStrategy.findMany({
     where: {
       workspaceId,
       ...(opts.campaignCandidateId ? { campaignCandidateId: opts.campaignCandidateId } : {}),
@@ -29,24 +29,24 @@ export async function listStrategies(
 }
 
 export async function getStrategy(id: string, workspaceId: string) {
-  return prisma.campaignStrategy.findFirst({ where: { id, workspaceId } });
+  return tenantPrismaForWorkspace(workspaceId).campaignStrategy.findFirst({ where: { id, workspaceId } });
 }
 
 export async function createStrategy(input: CreateStrategyInput, workspaceId: string) {
   const parsed = createStrategySchema.parse(input);
-  const candidate = await prisma.campaignCandidate.findFirst({
+  const candidate = await tenantPrismaForWorkspace(workspaceId).campaignCandidate.findFirst({
     where: { id: parsed.campaignCandidateId, workspaceId },
   });
   if (!candidate) throw new Error("Kampagnen-Kandidat nicht gefunden.");
   if (candidate.status !== "approved") {
     throw new Error("Nur ein freigegebener Kandidat kann eine Strategie erhalten.");
   }
-  const existing = await prisma.campaignStrategy.findFirst({
+  const existing = await tenantPrismaForWorkspace(workspaceId).campaignStrategy.findFirst({
     where: { campaignCandidateId: parsed.campaignCandidateId, workspaceId },
   });
   if (existing) throw new Error("Für diesen Kandidaten existiert bereits eine Strategie.");
 
-  const strategy = await prisma.campaignStrategy.create({
+  const strategy = await tenantPrismaForWorkspace(workspaceId).campaignStrategy.create({
     data: {
       workspaceId,
       campaignCandidateId: parsed.campaignCandidateId,
@@ -89,7 +89,7 @@ export async function updateStrategy(id: string, input: UpdateStrategyInput, wor
   if (parsed.estimatedBudget != null) {
     data.estimatedBudget = new Prisma.Decimal(Number(parsed.estimatedBudget));
   }
-  const updated = await prisma.campaignStrategy.update({ where: { id }, data });
+  const updated = await tenantPrismaForWorkspace(workspaceId).campaignStrategy.update({ where: { id }, data });
   const actor = (await getCurrentUser())?.id ?? "owner";
   await writeAuditLog({
     action: "campaign_strategy.updated",
@@ -106,7 +106,7 @@ export async function requestStrategyApproval(id: string, body: unknown, workspa
   if (!strategy) throw new Error("Strategie nicht gefunden.");
   const transition = canTransitionStrategy(strategy.status, "under_review");
   if (!transition.ok) throw new Error(transition.reason);
-  const updated = await prisma.campaignStrategy.update({
+  const updated = await tenantPrismaForWorkspace(workspaceId).campaignStrategy.update({
     where: { id },
     data: { status: "under_review" },
   });
@@ -136,7 +136,7 @@ export async function decideStrategy(id: string, body: unknown, workspaceId: str
   const transition = canTransitionStrategy(strategy.status, parsed.decision);
   if (!transition.ok) throw new Error(transition.reason);
   const actor = (await getCurrentUser())?.id ?? "owner";
-  const updated = await prisma.campaignStrategy.update({
+  const updated = await tenantPrismaForWorkspace(workspaceId).campaignStrategy.update({
     where: { id },
     data:
       parsed.decision === "approved"

@@ -1,24 +1,28 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceDb } from "@/lib/db/workspace-context";
 
 export async function listScripts() {
-  return prisma.script.findMany({
-    include: {
-      product: { select: { id: true, name: true } },
-      campaign: { select: { id: true, name: true } },
-      _count: { select: { versions: true } },
-    },
-    orderBy: { updatedAt: "desc" },
-  });
+  return withWorkspaceDb((tx) =>
+    tx.script.findMany({
+      include: {
+        product: { select: { id: true, name: true } },
+        campaign: { select: { id: true, name: true } },
+        _count: { select: { versions: true } },
+      },
+      orderBy: { updatedAt: "desc" },
+    }),
+  );
 }
 
 export async function getScriptById(id: string) {
-  return prisma.script.findUnique({
-    where: { id },
-    include: {
-      product: true,
-      campaign: true,
-      versions: { orderBy: { versionNumber: "desc" } },
-    },
-  });
+  return withWorkspaceDb((tx) =>
+    tx.script.findUnique({
+      where: { id },
+      include: {
+        product: true,
+        campaign: true,
+        versions: { orderBy: { versionNumber: "desc" } },
+      },
+    }),
+  );
 }

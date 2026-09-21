@@ -1,5 +1,5 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
+import { tenantPrismaForWorkspace } from "@/lib/db/tenant-client";
 import { Decimal } from "@/lib/shared/decimal";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
@@ -14,7 +14,7 @@ function big(v: { toString(): string } | null | undefined): bigint {
 }
 
 async function buildContext(workspaceId: string): Promise<RecommendationContext> {
-  const content = await prisma.contentPerformanceSnapshot.findMany({
+  const content = await tenantPrismaForWorkspace(workspaceId).contentPerformanceSnapshot.findMany({
     where: { workspaceId },
     orderBy: { commissionRevenue: "desc" },
     take: 200,
@@ -36,7 +36,7 @@ async function buildContext(workspaceId: string): Promise<RecommendationContext>
     attributionErrors: 0,
   }));
 
-  const products = await prisma.productPerformanceSnapshot.findMany({ where: { workspaceId }, take: 200 });
+  const products = await tenantPrismaForWorkspace(workspaceId).productPerformanceSnapshot.findMany({ where: { workspaceId }, take: 200 });
   const productPerf = products.map((p) => ({
     productId: p.productId,
     views: big(p.views),
@@ -57,7 +57,7 @@ export async function generateRecommendations(actor: string, workspaceId: string
 
   let created = 0;
   for (const d of drafts) {
-    const existing = await prisma.optimizationRecommendation.findFirst({
+    const existing = await tenantPrismaForWorkspace(workspaceId).optimizationRecommendation.findFirst({
       where: {
         workspaceId,
         recommendationType: d.recommendationType,
@@ -67,7 +67,7 @@ export async function generateRecommendations(actor: string, workspaceId: string
       },
     });
     if (existing) continue;
-    await prisma.optimizationRecommendation.create({
+    await tenantPrismaForWorkspace(workspaceId).optimizationRecommendation.create({
       data: {
         workspaceId,
         recommendationType: d.recommendationType,
@@ -91,7 +91,7 @@ export async function generateRecommendations(actor: string, workspaceId: string
 }
 
 export async function listRecommendations(workspaceId: string, status?: string) {
-  return prisma.optimizationRecommendation.findMany({
+  return tenantPrismaForWorkspace(workspaceId).optimizationRecommendation.findMany({
     where: { workspaceId, ...(status ? { status: status as RecommendationStatus } : {}) },
     orderBy: { generatedAt: "desc" },
     take: 100,
@@ -99,9 +99,9 @@ export async function listRecommendations(workspaceId: string, status?: string) 
 }
 
 export async function reviewRecommendation(id: string, actor: string, status: "REVIEWED" | "ACCEPTED" | "REJECTED", workspaceId: string, note?: string) {
-  const rec = await prisma.optimizationRecommendation.findFirst({ where: { id, workspaceId } });
+  const rec = await tenantPrismaForWorkspace(workspaceId).optimizationRecommendation.findFirst({ where: { id, workspaceId } });
   if (!rec) throw new RecommendationError("Empfehlung nicht gefunden.");
-  const updated = await prisma.optimizationRecommendation.update({
+  const updated = await tenantPrismaForWorkspace(workspaceId).optimizationRecommendation.update({
     where: { id },
     data: { status, reviewedAt: new Date(), reviewedBy: actor },
   });
@@ -110,13 +110,13 @@ export async function reviewRecommendation(id: string, actor: string, status: "R
 }
 
 export async function createVariantDraftFromRecommendation(id: string, actor: string, workspaceId: string) {
-  const rec = await prisma.optimizationRecommendation.findFirst({ where: { id, workspaceId } });
+  const rec = await tenantPrismaForWorkspace(workspaceId).optimizationRecommendation.findFirst({ where: { id, workspaceId } });
   if (!rec) throw new RecommendationError("Empfehlung nicht gefunden.");
-  const asset = await prisma.contentAsset.findFirst({ where: { workspaceId } });
+  const asset = await tenantPrismaForWorkspace(workspaceId).contentAsset.findFirst({ where: { workspaceId } });
   if (!asset) throw new RecommendationError("Kein Content-Asset für den Entwurf vorhanden.");
 
-  const version = (await prisma.contentVariant.count({ where: { parentContentAssetId: asset.id } })) + 1;
-  const variant = await prisma.contentVariant.create({
+  const version = (await tenantPrismaForWorkspace(workspaceId).contentVariant.count({ where: { parentContentAssetId: asset.id } })) + 1;
+  const variant = await tenantPrismaForWorkspace(workspaceId).contentVariant.create({
     data: {
       workspaceId,
       parentContentAssetId: asset.id,
@@ -132,12 +132,12 @@ export async function createVariantDraftFromRecommendation(id: string, actor: st
 }
 
 export async function createExperimentDraftFromRecommendation(id: string, actor: string, workspaceId: string) {
-  const rec = await prisma.optimizationRecommendation.findFirst({ where: { id, workspaceId } });
+  const rec = await tenantPrismaForWorkspace(workspaceId).optimizationRecommendation.findFirst({ where: { id, workspaceId } });
   if (!rec) throw new RecommendationError("Empfehlung nicht gefunden.");
-  const brand = await prisma.brand.findFirst({ where: { workspaceId } });
+  const brand = await tenantPrismaForWorkspace(workspaceId).brand.findFirst({ where: { workspaceId } });
   if (!brand) throw new RecommendationError("Keine Marke für das Experiment vorhanden.");
 
-  const experiment = await prisma.contentExperiment.create({
+  const experiment = await tenantPrismaForWorkspace(workspaceId).contentExperiment.create({
     data: {
       workspaceId,
       brandId: brand.id,

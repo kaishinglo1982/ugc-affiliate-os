@@ -1,5 +1,5 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
+import { tenantPrismaForWorkspace } from "@/lib/db/tenant-client";
 import { Decimal } from "@/lib/shared/decimal";
 import { safeRatio } from "@/lib/analytics/metrics";
 
@@ -58,7 +58,7 @@ export async function getAnalyticsOverview(workspaceId: string, range: DateRange
   const period = rangeFilter(range);
   const where = { workspaceId, periodStart: period };
 
-  const agg = await prisma.contentPerformanceSnapshot.aggregate({
+  const agg = await tenantPrismaForWorkspace(workspaceId).contentPerformanceSnapshot.aggregate({
     where,
     _sum: {
       impressions: true,
@@ -95,7 +95,7 @@ export async function getAnalyticsOverview(workspaceId: string, range: DateRange
     sampleSize: big(s.sampleSize).toString(),
   };
 
-  const byPlatform = await prisma.contentPerformanceSnapshot.groupBy({
+  const byPlatform = await tenantPrismaForWorkspace(workspaceId).contentPerformanceSnapshot.groupBy({
     by: ["platform"],
     where,
     _sum: {
@@ -148,7 +148,7 @@ export async function getContentPerformance(
   limit = 20,
 ): Promise<ContentPerformanceRow[]> {
   const period = rangeFilter(range);
-  const rows = await prisma.contentPerformanceSnapshot.findMany({
+  const rows = await tenantPrismaForWorkspace(workspaceId).contentPerformanceSnapshot.findMany({
     where: { workspaceId, periodStart: period },
     orderBy: { commissionRevenue: "desc" },
     take: limit,
@@ -170,7 +170,7 @@ export async function getContentPerformance(
 
 export async function getProductPerformance(workspaceId: string, range: DateRange) {
   const period = rangeFilter(range);
-  return prisma.productPerformanceSnapshot.findMany({
+  return tenantPrismaForWorkspace(workspaceId).productPerformanceSnapshot.findMany({
     where: { workspaceId, periodStart: period },
     orderBy: { commissionRevenue: "desc" },
     take: 20,
@@ -178,14 +178,14 @@ export async function getProductPerformance(workspaceId: string, range: DateRang
 }
 
 export async function getPostingTimePerformance(workspaceId: string, socialAccountId?: string) {
-  return prisma.postingTimePerformance.findMany({
+  return tenantPrismaForWorkspace(workspaceId).postingTimePerformance.findMany({
     where: { workspaceId, ...(socialAccountId ? { socialAccountId } : {}) },
     orderBy: [{ weekday: "asc" }, { hourOfDay: "asc" }],
   });
 }
 
 export async function getDataQualityReports(workspaceId: string, limit = 20) {
-  return prisma.dataQualityReport.findMany({
+  return tenantPrismaForWorkspace(workspaceId).dataQualityReport.findMany({
     where: { workspaceId },
     orderBy: { generatedAt: "desc" },
     take: limit,
@@ -193,7 +193,7 @@ export async function getDataQualityReports(workspaceId: string, limit = 20) {
 }
 
 export async function getAnomalies(workspaceId: string, unresolvedOnly = false) {
-  return prisma.analyticsAnomaly.findMany({
+  return tenantPrismaForWorkspace(workspaceId).analyticsAnomaly.findMany({
     where: { workspaceId, ...(unresolvedOnly ? { status: { not: "RESOLVED" } } : {}) },
     orderBy: { detectedAt: "desc" },
     take: 50,

@@ -3,7 +3,6 @@ import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
 import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
 import { generateRecommendations, listRecommendations } from "@/features/recommendation/service";
 
 export async function GET(request: Request) {

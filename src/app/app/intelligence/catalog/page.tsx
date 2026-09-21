@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { prisma } from "@/lib/db/client";
+import { tenantPrismaForWorkspace } from "@/lib/db/tenant-client";
 import { Prisma, type $Enums } from "@/generated/prisma/client";
 import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,7 +25,7 @@ export default async function CatalogPage({ searchParams }: CatalogPageProps) {
     ];
   }
 
-  const products = await prisma.product.findMany({
+  const products = await tenantPrismaForWorkspace(workspaceId).product.findMany({
     where,
     include: {
       complianceProfiles: { orderBy: { evaluatedAt: "desc" }, take: 1 },

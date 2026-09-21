@@ -7,7 +7,7 @@
  * NEVER auto-approved (the auto-approval flag is false by design).
  */
 import { randomUUID } from "node:crypto";
-import { prisma } from "@/lib/db/client";
+import { tenantPrismaForWorkspace } from "@/lib/db/tenant-client";
 import { Prisma } from "@/generated/prisma/client";
 import { DEFAULT_WORKSPACE_ID } from "@/lib/config/workspace";
 import { featureFlags } from "@/lib/config/feature-flags";
@@ -52,7 +52,7 @@ async function runStep(
   const jobId = randomUUID();
   const jobType = RESEARCH_JOB_TYPE_TO_PRISMA[STEP_JOB_TYPE[name]];
   const idempotencyKey = `${correlationId}:${name}`;
-  await prisma.productResearchJob.create({
+  await tenantPrismaForWorkspace(workspaceId).productResearchJob.create({
     data: {
       id: jobId,
       workspaceId,
@@ -66,14 +66,14 @@ async function runStep(
 
   try {
     await fn();
-    await prisma.productResearchJob.update({
+    await tenantPrismaForWorkspace(workspaceId).productResearchJob.update({
       where: { id: jobId },
       data: { status: "COMPLETED", completedAt: new Date() },
     });
     return { name, status: "completed" };
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown_error";
-    await prisma.productResearchJob.update({
+    await tenantPrismaForWorkspace(workspaceId).productResearchJob.update({
       where: { id: jobId },
       data: { status: "FAILED", errorMessage: message.slice(0, 500), completedAt: new Date() },
     });
@@ -104,7 +104,7 @@ export async function runAll(
 
   // (2) Discovery for each ACTIVE query (skipped if discovery disabled)
   if (featureFlags.productDiscoveryEnabled) {
-    const queries = await prisma.productDiscoveryQuery.findMany({
+    const queries = await tenantPrismaForWorkspace(workspaceId).productDiscoveryQuery.findMany({
       where: { workspaceId, status: "ACTIVE" },
       select: { id: true },
     });
@@ -127,7 +127,7 @@ export async function runAll(
   );
 
   // (4) Compliance for DISCOVERED / UNDER_REVIEW products
-  const complianceProducts = await prisma.product.findMany({
+  const complianceProducts = await tenantPrismaForWorkspace(workspaceId).product.findMany({
     where: { workspaceId, status: { in: [...statusFilter] } },
     select: { id: true },
   });
@@ -140,7 +140,7 @@ export async function runAll(
   }
 
   // (5) Content fit for all products
-  const fitProducts = await prisma.product.findMany({
+  const fitProducts = await tenantPrismaForWorkspace(workspaceId).product.findMany({
     where: { workspaceId },
     select: { id: true },
   });
@@ -153,7 +153,7 @@ export async function runAll(
   }
 
   // (6) Profitability for all active offers
-  const activeOffers = await prisma.affiliateOffer.findMany({
+  const activeOffers = await tenantPrismaForWorkspace(workspaceId).affiliateOffer.findMany({
     where: { workspaceId, status: { in: ["ACTIVE", "PAUSED"] } },
     select: { id: true },
   });
