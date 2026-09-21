@@ -192,4 +192,22 @@ describe.runIf(runDatabaseTest)("legacy workspace PostgreSQL RLS", () => {
     expect(result.rows[0]?.workspaceId).toBe(workspaceA);
     await rollback();
   });
+
+  it("blocks cross-workspace UPDATE and DELETE attempts", async () => {
+    await beginWorkspace(workspaceA);
+
+    const updated = await restricted.query<{ id: string }>(
+      `UPDATE "Campaign" SET name = 'should-not-change' WHERE id = $1 RETURNING id`,
+      [campaignB],
+    );
+    const deleted = await restricted.query<{ id: string }>(
+      `DELETE FROM "SocialPost" WHERE id = $1 RETURNING id`,
+      [postB],
+    );
+
+    expect(updated.rows).toEqual([]);
+    expect(deleted.rows).toEqual([]);
+    await rollback();
+  });
+
 });
