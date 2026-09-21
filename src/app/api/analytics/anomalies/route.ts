@@ -3,8 +3,6 @@ import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
 import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
 import { getAnomalies } from "@/features/analytics/queries";
-import { writeAuditLog } from "@/lib/audit/log";
-import { prisma } from "@/lib/db/client";
 
 export async function GET(request: Request) {
   const guard = await requireApiPermission(Permission.VIEW_ANALYTICS);
