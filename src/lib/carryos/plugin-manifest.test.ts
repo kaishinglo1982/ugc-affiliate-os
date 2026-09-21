@@ -15,6 +15,8 @@ describe("CarryOS plugin manifest", () => {
     expect(manifest.kind).toBe("industry");
     expect(manifest.manifestVersion).toBe("2");
     expect(manifest.entrypoints.runtime).toBe("/api/v1/plugins/ugc/execute");
+    expect(manifest.companyOS.departments.length).toBeGreaterThan(0);
+    expect(manifest.companyOS.businessObjects.every((object) => object.owner === "PLUGIN")).toBe(true);
   });
 
   it("declares the governed execution contract", () => {
