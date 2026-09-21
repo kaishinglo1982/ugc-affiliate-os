@@ -93,6 +93,7 @@ describe.runIf(runDatabaseTest)("finance, secret vault and control-plane Postgre
        "TaxSetting", "Integration", "EncryptedCredential", "Agent", "AgentRun", "AuditLog", "Notification"
        TO "${roleName}"`,
     );
+    await admin.query(`GRANT SELECT ON TABLE "Campaign" TO "${roleName}"`);
 
     await admin.query(
       `INSERT INTO "Product" (id, "workspaceId", "canonicalName", name, "createdAt", "updatedAt")
