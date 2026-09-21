@@ -9,10 +9,10 @@ test.describe("Content Studio", () => {
   test("Briefs-Seite lädt und erlaubt Erstellung", async ({ page }) => {
     await page.goto("/app/content/briefs");
     await expect(page.getByRole("heading", { name: /briefs/i })).toBeVisible();
-    await page.getByRole("button", { name: /neuer brief/i }).click();
-    await expect(page.getByRole("heading", { name: /neuer content-brief/i })).toBeVisible();
-    await page.getByLabel(/ziel|objective/i).fill("E2E Test Brief");
-    await page.getByRole("button", { name: /speichern/i }).click();
+    await page.getByRole("button", { name: /^brief erstellen$/i }).click();
+    await expect(page.getByRole("heading", { name: /neuer content[- ]brief/i })).toBeVisible();
+    await page.getByRole("textbox", { name: /^Ziel \(Objective\)\*$/i }).fill("E2E Test Brief");
+    await page.getByRole("button", { name: /^speichern$/i }).click();
     await expect(page.getByText("Brief erstellt")).toBeVisible();
   });
 

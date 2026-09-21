@@ -1,23 +1,26 @@
 import "server-only";
 import { headers } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
+import { z } from "zod";
 import { DEFAULT_WORKSPACE_ID } from "@/lib/config/workspace";
 
 /**
- * Tenant resolution for CarryOS integration (BAND-60). When CarryOS routes a
- * request to this app on behalf of a tenant, it sets a short-lived JWT in
- * this header, signed with a secret shared out-of-band with CarryOS
- * (CARRYOS_TENANT_SECRET) — never the same key as AUTH_SECRET, which signs
- * this app's own user sessions.
- *
- * No header at all = standalone/dev mode, unchanged single-workspace
- * behavior (DEFAULT_WORKSPACE_ID). A header that IS present but fails
- * verification is rejected outright, not silently downgraded to the
- * default — a bad signature means someone is trying to assert a tenant
- * identity, and falling back would risk running their request under the
- * wrong (or a more privileged) workspace instead of refusing it.
+ * CarryOS tenant assertions are external identity. UGC workspace ids are local
+ * domain ids. They are deliberately mapped instead of being treated as the
+ * same identifier.
  */
 const TENANT_HEADER = "x-carryos-tenant-token";
+const TOKEN_ISSUER = "carryos-core";
+const TOKEN_AUDIENCE = "ugc-affiliate-os";
+const coreTenantIdSchema = z.string().uuid();
+const workspaceIdSchema = z.string().uuid();
+const bindingSchema = z.record(coreTenantIdSchema, workspaceIdSchema);
+
+type CarryOsIntegrationMode = "STANDALONE" | "CORE_BOUND";
+
+function integrationMode(): CarryOsIntegrationMode {
+  return process.env.CARRYOS_INTEGRATION_MODE === "CORE_BOUND" ? "CORE_BOUND" : "STANDALONE";
+}
 
 function getTenantSecretKey(): Uint8Array | null {
   const secret = process.env.CARRYOS_TENANT_SECRET;
@@ -25,13 +28,46 @@ function getTenantSecretKey(): Uint8Array | null {
   return new TextEncoder().encode(secret);
 }
 
-export class InvalidTenantTokenError extends Error {}
+function workspaceBindings(): Readonly<Record<string, string>> {
+  const raw = process.env.CARRYOS_TENANT_WORKSPACE_BINDINGS_JSON?.trim();
+  if (!raw) return {};
 
+  let parsedJson: unknown;
+  try {
+    parsedJson = JSON.parse(raw);
+  } catch {
+    throw new TenantWorkspaceBindingError("CARRYOS_TENANT_WORKSPACE_BINDINGS_INVALID");
+  }
+
+  const parsed = bindingSchema.safeParse(parsedJson);
+  if (!parsed.success) {
+    throw new TenantWorkspaceBindingError("CARRYOS_TENANT_WORKSPACE_BINDINGS_INVALID");
+  }
+
+  return parsed.data;
+}
+
+export class InvalidTenantTokenError extends Error {}
+export class TenantWorkspaceBindingError extends Error {}
+
+/**
+ * Test/dev helper for the current shared-secret contract. Production CarryOS
+ * must mint the assertion; the UGC application is verification-only in prod.
+ */
 export async function signTenantToken(tenantId: string): Promise<string> {
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("UGC must not mint CarryOS tenant assertions in production");
+  }
+
+  const parsedTenantId = coreTenantIdSchema.safeParse(tenantId);
+  if (!parsedTenantId.success) throw new Error("CarryOS tenantId must be a UUID");
+
   const key = getTenantSecretKey();
   if (!key) throw new Error("CARRYOS_TENANT_SECRET must be set to a string of at least 32 characters");
-  return new SignJWT({ tenantId })
+  return new SignJWT({ tenantId: parsedTenantId.data })
     .setProtectedHeader({ alg: "HS256" })
+    .setIssuer(TOKEN_ISSUER)
+    .setAudience(TOKEN_AUDIENCE)
     .setIssuedAt()
     .setExpirationTime("5m")
     .sign(key);
@@ -40,19 +76,38 @@ export async function signTenantToken(tenantId: string): Promise<string> {
 export async function resolveWorkspaceId(): Promise<string> {
   const store = await headers();
   const token = store.get(TENANT_HEADER);
-  if (!token) return DEFAULT_WORKSPACE_ID;
+  const mode = integrationMode();
+
+  if (!token) {
+    if (mode === "CORE_BOUND") {
+      throw new InvalidTenantTokenError("CarryOS tenant assertion required in CORE_BOUND mode");
+    }
+    return DEFAULT_WORKSPACE_ID;
+  }
 
   const key = getTenantSecretKey();
   if (!key) throw new InvalidTenantTokenError("CARRYOS_TENANT_SECRET is not configured");
 
+  let coreTenantId: string;
   try {
-    const { payload } = await jwtVerify(token, key);
-    if (typeof payload.tenantId !== "string" || !payload.tenantId) {
-      throw new InvalidTenantTokenError("Tenant token missing tenantId claim");
+    const { payload } = await jwtVerify(token, key, {
+      issuer: TOKEN_ISSUER,
+      audience: TOKEN_AUDIENCE,
+    });
+    const parsedTenantId = coreTenantIdSchema.safeParse(payload.tenantId);
+    if (!parsedTenantId.success) {
+      throw new InvalidTenantTokenError("Tenant token missing valid CarryOS tenant UUID");
     }
-    return payload.tenantId;
-  } catch (e) {
-    if (e instanceof InvalidTenantTokenError) throw e;
+    coreTenantId = parsedTenantId.data;
+  } catch (error) {
+    if (error instanceof InvalidTenantTokenError) throw error;
     throw new InvalidTenantTokenError("Tenant token verification failed");
   }
+
+  const bindings = workspaceBindings();
+  const workspaceId = bindings[coreTenantId];
+  if (!workspaceId) {
+    throw new TenantWorkspaceBindingError("CARRYOS_TENANT_WORKSPACE_BINDING_NOT_CONFIGURED");
+  }
+  return workspaceId;
 }
