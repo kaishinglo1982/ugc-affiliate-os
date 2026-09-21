@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { authorizeCreatorRevenueService } from "@/lib/api/creator-revenue-service-auth";
-import { prisma } from "@/lib/db/client";
+import { tenantPrisma as prisma } from "@/lib/db/tenant-client";
 import { newRequestId } from "@/types/result";
 
 export const dynamic = "force-dynamic";
