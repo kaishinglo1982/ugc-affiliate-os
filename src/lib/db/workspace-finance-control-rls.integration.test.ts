@@ -89,7 +89,7 @@ describe.runIf(runDatabaseTest)("finance, secret vault and control-plane Postgre
     await admin.query(`GRANT USAGE ON SCHEMA public TO "${roleName}"`);
     await admin.query(
       `GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
-       "Product", "AffiliateProgram", "AffiliateLink", "LinkClick", "Revenue", "Expense",
+       "Product", "Campaign", "AffiliateProgram", "AffiliateLink", "LinkClick", "Revenue", "Expense",
        "TaxSetting", "Integration", "EncryptedCredential", "Agent", "AgentRun", "AuditLog", "Notification"
        TO "${roleName}"`,
     );
