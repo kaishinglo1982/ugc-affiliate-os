@@ -8,9 +8,12 @@ vi.mock("next/headers", () => ({
 }));
 
 const SECRET = "a".repeat(48);
+const findUnique = vi.fn();
+vi.mock("@/lib/db/client", () => ({ prisma: { carryOSTenantBinding: { findUnique } } }));
 
 describe("resolveWorkspaceId", () => {
   beforeEach(() => {
+    findUnique.mockReset();
     mockHeaders.clear();
     process.env.CARRYOS_TENANT_SECRET = SECRET;
     vi.resetModules();
@@ -22,17 +25,34 @@ describe("resolveWorkspaceId", () => {
     await expect(resolveWorkspaceId()).resolves.toBe(DEFAULT_WORKSPACE_ID);
   });
 
-  it("returns the tenantId from a validly signed token", async () => {
+  it("resolves a valid tenant token through an active workspace binding", async () => {
     const { resolveWorkspaceId, signTenantToken } = await import("./tenant");
     const token = await signTenantToken("tenant-123");
     mockHeaders.set("x-carryos-tenant-token", token);
-    await expect(resolveWorkspaceId()).resolves.toBe("tenant-123");
+    findUnique.mockResolvedValue({ workspaceId: "workspace-123", active: true });
+    await expect(resolveWorkspaceId()).resolves.toBe("workspace-123");
+  });
+
+  it("rejects a valid tenant token without an active workspace binding", async () => {
+    const { resolveWorkspaceId, signTenantToken, TenantWorkspaceBindingError } = await import("./tenant");
+    const token = await signTenantToken("tenant-unbound");
+    mockHeaders.set("x-carryos-tenant-token", token);
+    findUnique.mockResolvedValue(null);
+    await expect(resolveWorkspaceId()).rejects.toBeInstanceOf(TenantWorkspaceBindingError);
   });
 
   it("rejects instead of falling back when the header is present but invalid", async () => {
     const { resolveWorkspaceId, InvalidTenantTokenError } = await import("./tenant");
     mockHeaders.set("x-carryos-tenant-token", "not-a-valid-jwt");
     await expect(resolveWorkspaceId()).rejects.toBeInstanceOf(InvalidTenantTokenError);
+  });
+
+  it("rejects an inactive workspace binding", async () => {
+    const { resolveWorkspaceId, signTenantToken, TenantWorkspaceBindingError } = await import("./tenant");
+    const token = await signTenantToken("tenant-inactive");
+    mockHeaders.set("x-carryos-tenant-token", token);
+    findUnique.mockResolvedValue({ workspaceId: "workspace-inactive", active: false });
+    await expect(resolveWorkspaceId()).rejects.toBeInstanceOf(TenantWorkspaceBindingError);
   });
 
   it("rejects a token signed with a different secret", async () => {
