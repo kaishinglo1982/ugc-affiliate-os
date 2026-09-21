@@ -1026,24 +1026,52 @@ enum ApprovalResourceType {
 /// Phase 5/7 approval workflow. One row per approval request; the resource's
 /// own `status` (Product.status / ProductOpportunity.status) mirrors the outcome.
 model Approval {
-  id             String               @id @default(uuid())
-  workspaceId    String               @default("00000000-0000-0000-0000-000000000001")
-  resourceType   ApprovalResourceType
-  resourceId     String
-  status         ApprovalStatus       @default(PENDING)
-  requestedBy    String?
-  decidedBy      String?
-  decisionReason String?
-  decidedAt      DateTime?
-  cost           Decimal?             @db.Decimal(12, 2)
-  currency       String?
-  expiresAt      DateTime?
-  payload        Json?
-  createdAt      DateTime             @default(now())
-  updatedAt      DateTime             @updatedAt
+  id                    String               @id @default(uuid())
+  workspaceId           String               @default("00000000-0000-0000-0000-000000000001")
+  resourceType          ApprovalResourceType
+  resourceId            String
+  status                ApprovalStatus       @default(PENDING)
+  requestedBy           String?
+  decidedBy             String?
+  decisionReason        String?
+  decidedAt             DateTime?
+  cost                  Decimal?             @db.Decimal(12, 2)
+  currency              String?
+  expiresAt             DateTime?
+  escalationAt          DateTime?
+  escalatedAt           DateTime?
+  requiredApproverCount Int                  @default(1)
+  consumedAt            DateTime?
+  consumedBy            String?
+  payload               Json?
+  createdAt             DateTime             @default(now())
+  updatedAt             DateTime             @updatedAt
+
+  decisions ApprovalDecision[]
 
   @@index([workspaceId, resourceType, resourceId])
   @@index([resourceType, resourceId])
+  @@index([workspaceId, status, expiresAt])
+}
+
+enum ApprovalDecisionStatus {
+  APPROVED
+  REJECTED
+}
+
+model ApprovalDecision {
+  id            String                 @id @default(uuid())
+  approvalId    String
+  approval      Approval               @relation(fields: [approvalId], references: [id], onDelete: Cascade)
+  approverId    String
+  status        ApprovalDecisionStatus
+  reason        String?
+  signedAt      DateTime               @default(now())
+  signatureHash String
+  createdAt     DateTime               @default(now())
+
+  @@unique([approvalId, approverId])
+  @@index([approvalId, status])
 }
 
 enum ExperimentStatus {
