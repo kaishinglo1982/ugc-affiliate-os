@@ -8,6 +8,8 @@ const environmentSchema = z.object({
   AUTH_SECRET: z.string().min(32),
   CREDENTIAL_ENCRYPTION_KEY: z.string().regex(/^[a-fA-F0-9]{64}$/),
   WORKER_SECRET: z.string().min(32).optional(),
+  UGC_SERVICE_TOKEN: z.string().min(32).optional(),
+  UGC_CREATOR_REVENUE_WORKSPACE_ID: z.string().uuid().optional(),
   APP_URL: z.string().url().optional(),
   ADMIN_EMAIL: z.string().email().optional(),
   ADMIN_PASSWORD: z.string().min(12).optional(),
@@ -23,6 +25,7 @@ const forbiddenProductionValues = new Set([
   "ChangeMe123!",
   "ci-auth-secret-at-least-thirty-two-characters",
   "ci-worker-secret-at-least-thirty-two-characters",
+  "ci-ugc-service-token-at-least-thirty-two-characters",
   "0000000000000000000000000000000000000000000000000000000000000000",
 ]);
 
@@ -51,6 +54,7 @@ export function getServerEnvironment(): ServerEnvironment {
       parsed.AUTH_SECRET,
       parsed.CREDENTIAL_ENCRYPTION_KEY,
       parsed.WORKER_SECRET,
+      parsed.UGC_SERVICE_TOKEN,
       parsed.ADMIN_PASSWORD,
     ].filter((value): value is string => Boolean(value));
 
@@ -76,6 +80,8 @@ export function validateEnv(): EnvValidationResult {
   const warnings: string[] = [];
   if (!readVar("APP_URL")) warnings.push("APP_URL is not set; absolute URLs are best-effort.");
   if (!readVar("WORKER_SECRET")) warnings.push("WORKER_SECRET is not set; worker authentication is unavailable.");
+  if (!readVar("UGC_SERVICE_TOKEN")) warnings.push("UGC_SERVICE_TOKEN is not set; Creator Revenue OS service access is unavailable.");
+  if (process.env.CARRYOS_INTEGRATION_MODE === "CORE_BOUND" && !readVar("UGC_CREATOR_REVENUE_WORKSPACE_ID")) warnings.push("UGC_CREATOR_REVENUE_WORKSPACE_ID is not set; Creator Revenue OS service access is unavailable in CORE_BOUND mode.");
 
   const isProduction = (process.env.NODE_ENV ?? "development").toLowerCase() === "production";
   let ok = missing.length === 0;
@@ -122,6 +128,9 @@ export const env = {
   },
   workerSecret(): string | undefined {
     return getServerEnvironment().WORKER_SECRET;
+  },
+  ugcServiceToken(): string | undefined {
+    return getServerEnvironment().UGC_SERVICE_TOKEN;
   },
   appUrl(): string | undefined {
     return getServerEnvironment().APP_URL;
