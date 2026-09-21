@@ -546,6 +546,7 @@ enum PublishJobStatus {
  */
 model PublishJob {
   id              String           @id @default(uuid())
+  workspaceId     String           @default(dbgenerated("COALESCE(NULLIF(current_setting('app.workspace_id'::text, true), ''::text), '00000000-0000-0000-0000-000000000001'::text)"))
   postId          String
   post            SocialPost       @relation(fields: [postId], references: [id], onDelete: Cascade)
   status          PublishJobStatus @default(PENDING)
@@ -556,6 +557,8 @@ model PublishJob {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
+  @@index([workspaceId])
+  @@index([workspaceId, status, nextAttemptAt])
   @@index([status, nextAttemptAt])
 }
 
