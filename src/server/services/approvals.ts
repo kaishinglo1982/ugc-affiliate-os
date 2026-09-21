@@ -1,11 +1,11 @@
 import "server-only";
 import { Prisma } from "@/generated/prisma/client";
-import { prisma } from "@/lib/db/client";
+import { tenantPrismaForWorkspace } from "@/lib/db/tenant-client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import type { ApprovalResourceType, ApprovalStatus } from "@/generated/prisma/client";
 
 export async function listApprovals(workspaceId: string, filters?: { status?: string; resourceType?: string }) {
-  return prisma.approval.findMany({
+  return tenantPrismaForWorkspace(workspaceId).approval.findMany({
     where: {
       workspaceId,
       ...(filters?.status ? { status: filters.status as ApprovalStatus } : {}),
@@ -16,7 +16,7 @@ export async function listApprovals(workspaceId: string, filters?: { status?: st
 }
 
 export async function getApproval(id: string, workspaceId: string) {
-  return prisma.approval.findFirst({
+  return tenantPrismaForWorkspace(workspaceId).approval.findFirst({
     where: { id, workspaceId },
   });
 }
@@ -32,7 +32,7 @@ export interface CreateApprovalRequestInput {
 
 export async function createApprovalRequest(input: CreateApprovalRequestInput, workspaceId: string) {
   const actor = (await getCurrentUser())?.id ?? "owner";
-  const approval = await prisma.approval.create({
+  const approval = await tenantPrismaForWorkspace(workspaceId).approval.create({
     data: {
       workspaceId,
       resourceType: input.resourceType,
