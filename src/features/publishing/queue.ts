@@ -1,5 +1,6 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
+import { tenantPrismaForWorkspace } from "@/lib/db/tenant-client";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { resolveSocialProvider } from "@/lib/providers/social/mock-provider";
 import { featureFlags } from "@/lib/config/feature-flags";
 import { isValidPostTransition, type SocialPostStatus } from "@/features/publishing/status";
@@ -39,14 +40,16 @@ function resolvePublisher(account: SocialAccount) {
  * approving owner is recorded — this is what makes a later publication traceable
  * and is the single gate that stands between a draft and any external publish.
  */
-export async function approvePost(postId: string, actor: string): Promise<SocialPost> {
+export async function approvePost(postId: string, actor: string, workspaceId?: string): Promise<SocialPost> {
   await assertPublishingEnabled();
-  const post = await prisma.socialPost.findUnique({ where: { id: postId } });
+  const activeWorkspaceId = workspaceId ?? (await resolveWorkspaceId());
+  const db = tenantPrismaForWorkspace(activeWorkspaceId);
+  const post = await db.socialPost.findUnique({ where: { id: postId } });
   if (!post) throw new PublishError("Post nicht gefunden.");
   if (!isValidPostTransition(post.status as SocialPostStatus, "APPROVED")) {
     throw new PublishError(`Post kann aus Status "${post.status}" nicht freigegeben werden.`);
   }
-  const updated = await prisma.socialPost.update({
+  const updated = await db.socialPost.update({
     where: { id: postId },
     data: { status: "APPROVED", approvedBy: actor, approvedAt: new Date() },
   });
@@ -65,23 +68,30 @@ export async function approvePost(postId: string, actor: string): Promise<Social
  * moves the post to SCHEDULED. A post must be APPROVED first — there is no path
  * from DRAFT/READY directly to the queue. An already-active job blocks a new one.
  */
-export async function enqueuePublish(postId: string, actor: string): Promise<SocialPost> {
+export async function enqueuePublish(postId: string, actor: string, workspaceId?: string): Promise<SocialPost> {
   await assertPublishingEnabled();
-  const post = await prisma.socialPost.findUnique({ where: { id: postId } });
+  const activeWorkspaceId = workspaceId ?? (await resolveWorkspaceId());
+  const db = tenantPrismaForWorkspace(activeWorkspaceId);
+  const post = await db.socialPost.findUnique({ where: { id: postId } });
   if (!post) throw new PublishError("Post nicht gefunden.");
   if (post.status !== "APPROVED") {
     throw new PublishError("Nur freigegebene Posts können veröffentlicht werden.");
   }
-  const active = await prisma.publishJob.findFirst({
+  const active = await db.publishJob.findFirst({
     where: { postId, status: { in: ["PENDING", "PROCESSING"] } },
     select: { id: true },
   });
   if (active) throw new PublishError("Für diesen Post läuft bereits ein Publish-Job.");
 
-  await prisma.$transaction([
-    prisma.publishJob.create({ data: { postId, status: "PENDING" } }),
-    prisma.socialPost.update({ where: { id: postId }, data: { status: "SCHEDULED" } }),
-  ]);
+  await db.$transaction(async (tx) => {
+    await tx.publishJob.create({
+      data: { workspaceId: activeWorkspaceId, postId, status: "PENDING" },
+    });
+    await tx.socialPost.update({
+      where: { id: postId },
+      data: { status: "SCHEDULED" },
+    });
+  });
   await writeAuditLog({
     action: "social_post.enqueue",
     entityType: "SocialPost",
@@ -89,7 +99,7 @@ export async function enqueuePublish(postId: string, actor: string): Promise<Soc
     actor,
     metadata: { from: post.status },
   });
-  const refreshed = await prisma.socialPost.findUnique({ where: { id: postId } });
+  const refreshed = await db.socialPost.findUnique({ where: { id: postId } });
   if (!refreshed) throw new PublishError("Post nicht gefunden.");
   return refreshed;
 }
@@ -107,11 +117,14 @@ export interface PublishWorkerReport {
  * attempts are retried with exponential back-off until they are dead-lettered
  * (PUBLISH_MAX_ATTEMPTS), at which point a human must intervene manually.
  */
-export async function processPublishQueue(limit = 10): Promise<PublishWorkerReport> {
+export async function processPublishQueue(limit = 10, workspaceId?: string): Promise<PublishWorkerReport> {
   await assertPublishingEnabled();
+  const activeWorkspaceId = workspaceId ?? (await resolveWorkspaceId());
+  const db = tenantPrismaForWorkspace(activeWorkspaceId);
   const now = new Date();
-  const jobs = await prisma.publishJob.findMany({
+  const jobs = await db.publishJob.findMany({
     where: {
+      workspaceId: activeWorkspaceId,
       OR: [{ status: "PENDING" }, { status: "FAILED", nextAttemptAt: { lte: now } }],
     },
     orderBy: { createdAt: "asc" },
@@ -129,7 +142,7 @@ export async function processPublishQueue(limit = 10): Promise<PublishWorkerRepo
   for (const job of jobs) {
     report.processed += 1;
     const post = job.post;
-    await prisma.publishJob.update({ where: { id: job.id }, data: { status: "PROCESSING" } });
+    await db.publishJob.update({ where: { id: job.id }, data: { status: "PROCESSING" } });
 
     const publisher = resolvePublisher(post.account);
     let success = false;
@@ -155,8 +168,8 @@ export async function processPublishQueue(limit = 10): Promise<PublishWorkerRepo
     const outcome = classifyAttempt(success, job.attempts);
 
     if (outcome === "succeeded") {
-      await prisma.$transaction([
-        prisma.publishJob.update({
+      await db.$transaction(async (tx) => {
+        await tx.publishJob.update({
           where: { id: job.id },
           data: {
             status: "SUCCEEDED",
@@ -165,8 +178,8 @@ export async function processPublishQueue(limit = 10): Promise<PublishWorkerRepo
             lastError: null,
             nextAttemptAt: null,
           },
-        }),
-        prisma.socialPost.update({
+        });
+        await tx.socialPost.update({
           where: { id: post.id },
           data: {
             status: "PUBLISHED",
@@ -174,8 +187,8 @@ export async function processPublishQueue(limit = 10): Promise<PublishWorkerRepo
             errorMessage: null,
             attempts: { increment: 1 },
           },
-        }),
-      ]);
+        });
+      });
       await writeAuditLog({
         action: "social_post.publish",
         entityType: "SocialPost",
@@ -185,7 +198,7 @@ export async function processPublishQueue(limit = 10): Promise<PublishWorkerRepo
       report.succeeded += 1;
     } else if (outcome === "retryable") {
       const nextAttemptAt = nextRetryAt(job.attempts, new Date());
-      await prisma.publishJob.update({
+      await db.publishJob.update({
         where: { id: job.id },
         data: {
           status: "FAILED",
@@ -194,7 +207,7 @@ export async function processPublishQueue(limit = 10): Promise<PublishWorkerRepo
           nextAttemptAt,
         },
       });
-      await prisma.socialPost.update({
+      await db.socialPost.update({
         where: { id: post.id },
         data: { status: "FAILED", errorMessage: errorMessage ?? "Fehlgeschlagen", attempts: { increment: 1 } },
       });
@@ -206,7 +219,7 @@ export async function processPublishQueue(limit = 10): Promise<PublishWorkerRepo
       });
       report.failed += 1;
     } else {
-      await prisma.publishJob.update({
+      await db.publishJob.update({
         where: { id: job.id },
         data: {
           status: "DEAD",
@@ -215,7 +228,7 @@ export async function processPublishQueue(limit = 10): Promise<PublishWorkerRepo
           nextAttemptAt: null,
         },
       });
-      await prisma.socialPost.update({
+      await db.socialPost.update({
         where: { id: post.id },
         data: { status: "FAILED", errorMessage: errorMessage ?? "Endgültig fehlgeschlagen" },
       });
@@ -237,13 +250,15 @@ export async function processPublishQueue(limit = 10): Promise<PublishWorkerRepo
  * Dead-letter jobs are NEVER auto-retried — this explicit action is the only
  * way back, preserving the "human intervention required" guarantee.
  */
-export async function retryDeadLetterJob(jobId: string, actor: string): Promise<void> {
-  const job = await prisma.publishJob.findUnique({ where: { id: jobId } });
+export async function retryDeadLetterJob(jobId: string, actor: string, workspaceId?: string): Promise<void> {
+  const activeWorkspaceId = workspaceId ?? (await resolveWorkspaceId());
+  const db = tenantPrismaForWorkspace(activeWorkspaceId);
+  const job = await db.publishJob.findUnique({ where: { id: jobId } });
   if (!job) throw new PublishError("Job nicht gefunden.");
   if (job.status !== "DEAD") {
     throw new PublishError("Nur tote Jobs können manuell wiederholt werden.");
   }
-  await prisma.publishJob.update({
+  await db.publishJob.update({
     where: { id: jobId },
     data: { status: "PENDING", attempts: 0, lastError: null, nextAttemptAt: null },
   });
