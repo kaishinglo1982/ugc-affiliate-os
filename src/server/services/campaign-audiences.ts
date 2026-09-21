@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db/client";
+import { tenantPrismaForWorkspace } from "@/lib/db/tenant-client";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
 import {
@@ -14,7 +14,7 @@ export async function listAudiences(
   workspaceId: string,
   opts: { brandId?: string; nicheId?: string; status?: CampaignAudienceStatus } = {},
 ) {
-  return prisma.campaignAudienceProfile.findMany({
+  return tenantPrismaForWorkspace(workspaceId).campaignAudienceProfile.findMany({
     where: {
       workspaceId,
       ...(opts.brandId ? { brandId: opts.brandId } : {}),
@@ -26,14 +26,14 @@ export async function listAudiences(
 }
 
 export async function getAudience(id: string, workspaceId: string) {
-  return prisma.campaignAudienceProfile.findFirst({
+  return tenantPrismaForWorkspace(workspaceId).campaignAudienceProfile.findFirst({
     where: { id, workspaceId },
   });
 }
 
 export async function createAudience(input: CreateAudienceInput, workspaceId: string) {
   const parsed = createAudienceSchema.parse(input);
-  const audience = await prisma.campaignAudienceProfile.create({
+  const audience = await tenantPrismaForWorkspace(workspaceId).campaignAudienceProfile.create({
     data: {
       workspaceId,
       name: parsed.name,
@@ -67,7 +67,7 @@ export async function updateAudience(id: string, input: UpdateAudienceInput, wor
   const audience = await getAudience(id, workspaceId);
   if (!audience) throw new Error("Zielgruppe nicht gefunden.");
   if (parsed.status) assertAudienceTransition(audience.status, parsed.status);
-  const updated = await prisma.campaignAudienceProfile.update({ where: { id }, data: parsed });
+  const updated = await tenantPrismaForWorkspace(workspaceId).campaignAudienceProfile.update({ where: { id }, data: parsed });
   const actor = (await getCurrentUser())?.id ?? "owner";
   await writeAuditLog({
     action: "campaign_audience.updated",
@@ -84,7 +84,7 @@ export async function deleteAudience(id: string, workspaceId: string) {
   if (audience.status !== "draft") {
     throw new Error("Nur Entwürfe können gelöscht werden.");
   }
-  await prisma.campaignAudienceProfile.delete({ where: { id } });
+  await tenantPrismaForWorkspace(workspaceId).campaignAudienceProfile.delete({ where: { id } });
   const actor = (await getCurrentUser())?.id ?? "owner";
   await writeAuditLog({
     action: "campaign_audience.deleted",
