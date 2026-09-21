@@ -18,12 +18,6 @@ concurrency:
 
 env:
   PNPM_VERSION: 10.30.3
-  AUTH_SECRET: ci-auth-secret-at-least-thirty-two-characters
-  CREDENTIAL_ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
-  WORKER_SECRET: ci-worker-secret-at-least-thirty-two-characters
-  APP_URL: http://127.0.0.1:3000
-  ADMIN_EMAIL: owner@example.com
-  ADMIN_PASSWORD: ChangeMe123!
 
 jobs:
   validate:
@@ -47,20 +41,25 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ugc_affiliate_ci?schema=public
       DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/ugc_affiliate_ci?schema=public
+      AUTH_SECRET: ci-auth-secret-at-least-thirty-two-characters
+      CREDENTIAL_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      WORKER_SECRET: ci-worker-secret-at-least-thirty-two-characters
+      APP_URL: http://127.0.0.1:3000
+      ADMIN_EMAIL: owner@example.com
+      ADMIN_PASSWORD: ChangeMe123!
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: pnpm
+          node-version: 24
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@${PNPM_VERSION} --activate
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -107,23 +106,28 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ugc_affiliate_e2e?schema=public
       DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/ugc_affiliate_e2e?schema=public
+      AUTH_SECRET: ci-auth-secret-at-least-thirty-two-characters
+      CREDENTIAL_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
+      WORKER_SECRET: ci-worker-secret-at-least-thirty-two-characters
+      APP_URL: http://127.0.0.1:3000
       E2E_BASE_URL: http://127.0.0.1:3000
+      ADMIN_EMAIL: owner@example.com
+      ADMIN_PASSWORD: ChangeMe123!
       E2E_EMAIL: owner@example.com
       E2E_PASSWORD: ChangeMe123!
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: 22
-          cache: pnpm
+          node-version: 24
+
+      - name: Enable pnpm
+        run: |
+          corepack enable
+          corepack prepare pnpm@${PNPM_VERSION} --activate
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
