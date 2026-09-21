@@ -8,6 +8,7 @@ const allowedDirectClientImports = new Set([
   "src/lib/db/client.ts",
   "src/lib/db/workspace-context.ts",
   "src/lib/db/tenant-client.ts",
+  "src/lib/auth/current-user.ts", // global Session/User auth tables are intentionally not workspace-owned
   "src/app/api/health/database/route.ts",
   "src/server/actions/auth.ts",
   "src/server/actions/contact.ts",
