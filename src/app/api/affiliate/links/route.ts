@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
-import { prisma } from "@/lib/db/client";
+import { tenantPrisma as prisma } from "@/lib/db/tenant-client";
 
 export const dynamic = "force-dynamic";
 
