@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApiPermission } from "@/lib/api/guard";
 import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
-import { prisma } from "@/lib/db/client";
+import { tenantPrisma as prisma } from "@/lib/db/tenant-client";
 
 export async function GET(
   _request: Request,
