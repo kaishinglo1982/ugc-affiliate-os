@@ -152,11 +152,12 @@ export function canCrossModuleCall(input: ModuleBridgeRequest): boolean {
 export function isWorkflowGraphStructurallySafe(nodes: readonly { id: string; kind: WorkflowNodeKind }[]): boolean {
   if (nodes.length === 0) return false;
   const ids = new Set<string>();
-  let approvals = 0;
+  let triggers = 0;
   for (const node of nodes) {
     if (ids.has(node.id)) return false;
     ids.add(node.id);
-    if (node.kind === "APPROVAL") approvals += 1;
+    if (node.kind === "TRIGGER") triggers += 1;
+    if (node.kind === "LOOP" && nodes.length === 1) return false;
   }
-  return approvals >= 0;
+  return triggers === 1;
 }
