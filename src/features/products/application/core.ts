@@ -9,7 +9,7 @@
  * No `any` is used; all inputs are typed or narrowed with Zod/type guards.
  */
 import { randomUUID } from "node:crypto";
-import { prisma } from "@/lib/db/client";
+import { tenantPrismaForWorkspace } from "@/lib/db/tenant-client";
 import { Prisma } from "@/generated/prisma/client";
 import { Decimal, type DecimalValue } from "@/lib/shared/decimal";
 import { DEFAULT_WORKSPACE_ID } from "@/lib/config/workspace";
@@ -188,7 +188,7 @@ export async function runDiscoveryForQuery(
   discoveredOfferCount: number;
 }> {
   const correlationId = randomUUID();
-  const query = await prisma.productDiscoveryQuery.findFirst({
+  const query = await tenantPrismaForWorkspace(workspaceId).productDiscoveryQuery.findFirst({
     where: { id: queryId, workspaceId },
   });
   if (!query) throw new Error(`ProductDiscoveryQuery not found: ${queryId}`);
@@ -198,7 +198,7 @@ export async function runDiscoveryForQuery(
     : ALL_PROVIDERS) as AffiliateNetwork[];
 
   const runId = newId();
-  await prisma.productDiscoveryRun.create({
+  await tenantPrismaForWorkspace(workspaceId).productDiscoveryRun.create({
     data: {
       id: runId,
       workspaceId,
@@ -220,7 +220,7 @@ export async function runDiscoveryForQuery(
   };
 
   // Load products once for classification (with their offer external ids).
-  const products = await prisma.product.findMany({
+  const products = await tenantPrismaForWorkspace(workspaceId).product.findMany({
     where: { workspaceId },
     include: { offers: { select: { externalProductId: true } } },
   });
@@ -237,7 +237,7 @@ export async function runDiscoveryForQuery(
 
   for (const provider of providerIds) {
     const providerRunId = newId();
-    await prisma.productDiscoveryProviderRun.create({
+    await tenantPrismaForWorkspace(workspaceId).productDiscoveryProviderRun.create({
       data: {
         id: providerRunId,
         workspaceId,
@@ -288,7 +288,7 @@ export async function runDiscoveryForQuery(
           continue;
         }
 
-        const existingOffer = await prisma.affiliateOffer.findUnique({
+        const existingOffer = await tenantPrismaForWorkspace(workspaceId).affiliateOffer.findUnique({
           where: {
             provider_externalProductId_externalOfferId: {
               provider,
@@ -300,7 +300,7 @@ export async function runDiscoveryForQuery(
         });
         if (existingOffer) {
           counters.duplicateCount++;
-          await prisma.affiliateOffer.update({
+          await tenantPrismaForWorkspace(workspaceId).affiliateOffer.update({
             where: { id: existingOffer.id },
             data: { lastCheckedAt: new Date() },
           });
@@ -310,7 +310,7 @@ export async function runDiscoveryForQuery(
         const classification = classifyOffers([offer], existingProducts);
         if (classification.matched.length > 0) {
           const productId = classification.matched[0].productId;
-          await prisma.affiliateOffer.create({
+          await tenantPrismaForWorkspace(workspaceId).affiliateOffer.create({
             data: {
               workspaceId,
               productId,
@@ -339,19 +339,19 @@ export async function runDiscoveryForQuery(
               rawReferenceId: offer.rawReferenceId,
             },
           });
-          await prisma.product.update({
+          await tenantPrismaForWorkspace(workspaceId).product.update({
             where: { id: productId },
             data: { lastVerifiedAt: new Date() },
           });
           counters.updatedProductCount++;
         } else {
           const category = query.categoryIds.length
-            ? await prisma.productCategory.findFirst({
+            ? await tenantPrismaForWorkspace(workspaceId).productCategory.findFirst({
                 where: { id: query.categoryIds[0], workspaceId },
               })
             : null;
           const risk: RiskLevel = category ? RISK_LEVEL_FROM_PRISMA[category.riskLevel] : "medium";
-          const product = await prisma.product.create({
+          const product = await tenantPrismaForWorkspace(workspaceId).product.create({
             data: {
               workspaceId,
               canonicalName: offer.title,
@@ -367,7 +367,7 @@ export async function runDiscoveryForQuery(
               lastVerifiedAt: new Date(),
             },
           });
-          await prisma.affiliateOffer.create({
+          await tenantPrismaForWorkspace(workspaceId).affiliateOffer.create({
             data: {
               workspaceId,
               productId: product.id,
@@ -407,7 +407,7 @@ export async function runDiscoveryForQuery(
         }
       }
 
-      await prisma.productDiscoveryProviderRun.update({
+      await tenantPrismaForWorkspace(workspaceId).productDiscoveryProviderRun.update({
         where: { id: providerRunId },
         data: {
           status: "COMPLETED",
@@ -420,7 +420,7 @@ export async function runDiscoveryForQuery(
       failedProviders++;
       const reason = error instanceof Error ? error.message : "unknown_error";
       const rateLimited = /rate.?limit/i.test(reason);
-      await prisma.productDiscoveryProviderRun.update({
+      await tenantPrismaForWorkspace(workspaceId).productDiscoveryProviderRun.update({
         where: { id: providerRunId },
         data: {
           status: "FAILED",
@@ -441,7 +441,7 @@ export async function runDiscoveryForQuery(
         ? "FAILED"
         : "PARTIALLY_COMPLETED";
 
-  await prisma.productDiscoveryRun.update({
+  await tenantPrismaForWorkspace(workspaceId).productDiscoveryRun.update({
     where: { id: runId },
     data: {
       status: finalStatus,
@@ -488,7 +488,7 @@ export async function recomputeMatchesForPendingOffers(
   actor: string,
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<number> {
-  const offers = await prisma.affiliateOffer.findMany({
+  const offers = await tenantPrismaForWorkspace(workspaceId).affiliateOffer.findMany({
     where: { workspaceId },
     select: {
       id: true,
@@ -497,7 +497,7 @@ export async function recomputeMatchesForPendingOffers(
       productId: true,
     },
   });
-  const products = await prisma.product.findMany({
+  const products = await tenantPrismaForWorkspace(workspaceId).product.findMany({
     where: { workspaceId },
     include: { offers: { select: { externalProductId: true } } },
   });
@@ -511,7 +511,7 @@ export async function recomputeMatchesForPendingOffers(
   }));
 
   let created = 0;
-  await prisma.$transaction(async (tx: Tx) => {
+  await tenantPrismaForWorkspace(workspaceId).$transaction(async (tx: Tx) => {
     for (const offer of offers) {
       // Skip if a product already exists for the same external id.
       const alreadyMatched = existing.some(
@@ -597,7 +597,7 @@ export async function confirmMatch(
   actor: string,
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<void> {
-  await prisma.productMatchCandidate.update({
+  await tenantPrismaForWorkspace(workspaceId).productMatchCandidate.update({
     where: { id: candidateId },
     data: {
       status: "CONFIRMED",
@@ -619,7 +619,7 @@ export async function rejectMatch(
   actor: string,
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<void> {
-  await prisma.productMatchCandidate.update({
+  await tenantPrismaForWorkspace(workspaceId).productMatchCandidate.update({
     where: { id: candidateId },
     data: {
       status: "REJECTED",
@@ -645,7 +645,7 @@ export async function evaluateComplianceForProduct(
   actor: string,
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<unknown> {
-  const product = await prisma.product.findFirst({
+  const product = await tenantPrismaForWorkspace(workspaceId).product.findFirst({
     where: { id: productId, workspaceId },
     include: { category: true, offers: { include: { affiliateProgram: true } } },
   });
@@ -675,7 +675,7 @@ export async function evaluateComplianceForProduct(
     brandName: product.brandName,
   });
 
-  await prisma.$transaction(async (tx: Tx) => {
+  await tenantPrismaForWorkspace(workspaceId).$transaction(async (tx: Tx) => {
     await tx.productComplianceProfile.deleteMany({ where: { productId } });
     await tx.productComplianceProfile.create({
       data: {
@@ -724,12 +724,12 @@ export async function overrideCompliance(
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<unknown> {
   const newStatus = decision === "approve" ? "PASSED" : "FAILED";
-  const profile = await prisma.productComplianceProfile.update({
+  const profile = await tenantPrismaForWorkspace(workspaceId).productComplianceProfile.update({
     where: { id: profileId },
     data: { status: COMPLIANCE_STATUS_TO_PRISMA[newStatus === "PASSED" ? "passed" : "failed"] },
   });
 
-  await prisma.approval.create({
+  await tenantPrismaForWorkspace(workspaceId).approval.create({
     data: {
       workspaceId,
       resourceType: "product",
@@ -761,7 +761,7 @@ export async function analyzeContentFitForProduct(
   actor: string,
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<unknown> {
-  const product = await prisma.product.findFirst({
+  const product = await tenantPrismaForWorkspace(workspaceId).product.findFirst({
     where: { id: productId, workspaceId },
     include: { category: true },
   });
@@ -776,7 +776,7 @@ export async function analyzeContentFitForProduct(
     evidence: ["heuristic"],
   });
 
-  await prisma.$transaction(async (tx: Tx) => {
+  await tenantPrismaForWorkspace(workspaceId).$transaction(async (tx: Tx) => {
     await tx.productContentFitProfile.deleteMany({ where: { productId } });
     await tx.productContentFitProfile.create({
       data: {
@@ -816,7 +816,7 @@ export async function estimateProfitabilityForOffer(
   actor: string,
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<unknown> {
-  const offer = await prisma.affiliateOffer.findFirst({
+  const offer = await tenantPrismaForWorkspace(workspaceId).affiliateOffer.findFirst({
     where: { id: offerId, workspaceId },
   });
   if (!offer) throw new Error(`AffiliateOffer not found: ${offerId}`);
@@ -837,8 +837,8 @@ export async function estimateProfitabilityForOffer(
     evidence: ["heuristic"],
   });
 
-  await prisma.productProfitabilityEstimate.deleteMany({ where: { affiliateOfferId: offerId } });
-  const created = await prisma.productProfitabilityEstimate.create({
+  await tenantPrismaForWorkspace(workspaceId).productProfitabilityEstimate.deleteMany({ where: { affiliateOfferId: offerId } });
+  const created = await tenantPrismaForWorkspace(workspaceId).productProfitabilityEstimate.create({
     data: {
       workspaceId,
       productId: offer.productId,
@@ -875,7 +875,7 @@ export async function scoreProductOpportunities(
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<number> {
   const statusFilter = ["DISCOVERED", "UNDER_REVIEW", "APPROVED"] as const;
-  const products = await prisma.product.findMany({
+  const products = await tenantPrismaForWorkspace(workspaceId).product.findMany({
     where: {
       workspaceId,
       ...(productId ? { id: productId } : { status: { in: [...statusFilter] } }),
@@ -954,7 +954,7 @@ export async function scoreProductOpportunities(
 
     const scored = scoreOpportunity(input);
 
-    await prisma.$transaction(async (tx: Tx) => {
+    await tenantPrismaForWorkspace(workspaceId).$transaction(async (tx: Tx) => {
       await tx.productOpportunity.deleteMany({ where: { productId: product.id } });
       const opportunity = await tx.productOpportunity.create({
         data: {
@@ -1012,7 +1012,7 @@ export async function expireOpportunities(
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<number> {
   const now = new Date();
-  const result = await prisma.productOpportunity.updateMany({
+  const result = await tenantPrismaForWorkspace(workspaceId).productOpportunity.updateMany({
     where: {
       workspaceId,
       status: { in: ["NEW", "UNDER_REVIEW", "APPROVED"] },
@@ -1071,9 +1071,9 @@ async function applyProductDecision(
   const prismaStatus = PRODUCT_STATUS_TO_PRISMA[nextProductStatus(action)];
   const data: Prisma.ProductUncheckedUpdateInput = { status: prismaStatus };
   if (action === "archive") data.archivedAt = new Date();
-  const product = await prisma.product.update({ where: { id: productId }, data });
+  const product = await tenantPrismaForWorkspace(workspaceId).product.update({ where: { id: productId }, data });
 
-  await prisma.approval.create({
+  await tenantPrismaForWorkspace(workspaceId).approval.create({
     data: {
       workspaceId,
       resourceType: APPROVAL_RESOURCE_TO_PRISMA.product,
@@ -1119,12 +1119,12 @@ async function applyOpportunityDecision(
   workspaceId: string,
 ): Promise<unknown> {
   const prismaStatus = OPPORTUNITY_STATUS_TO_PRISMA[action === "approve" ? "approved" : "rejected"];
-  const opportunity = await prisma.productOpportunity.update({
+  const opportunity = await tenantPrismaForWorkspace(workspaceId).productOpportunity.update({
     where: { id: opportunityId },
     data: { status: prismaStatus },
   });
 
-  await prisma.approval.create({
+  await tenantPrismaForWorkspace(workspaceId).approval.create({
     data: {
       workspaceId,
       resourceType: "product_opportunity",
@@ -1153,13 +1153,13 @@ export async function convertOpportunityToCampaign(
   actor: string,
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<string> {
-  const opportunity = await prisma.productOpportunity.findFirst({
+  const opportunity = await tenantPrismaForWorkspace(workspaceId).productOpportunity.findFirst({
     where: { id: opportunityId, workspaceId },
     include: { product: true, offer: true },
   });
   if (!opportunity) throw new Error(`ProductOpportunity not found: ${opportunityId}`);
 
-  const campaign = await prisma.campaign.create({
+  const campaign = await tenantPrismaForWorkspace(workspaceId).campaign.create({
     data: {
       name: opportunity.product.canonicalName,
       productId: opportunity.productId,
@@ -1169,7 +1169,7 @@ export async function convertOpportunityToCampaign(
     },
   });
 
-  await prisma.productOpportunity.update({
+  await tenantPrismaForWorkspace(workspaceId).productOpportunity.update({
     where: { id: opportunityId },
     data: { status: "CONVERTED_TO_CAMPAIGN" },
   });
@@ -1201,7 +1201,7 @@ export async function previewImport(
   actor: string,
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<ImportPreview> {
-  const categories = await prisma.productCategory.findMany({
+  const categories = await tenantPrismaForWorkspace(workspaceId).productCategory.findMany({
     where: { workspaceId },
     select: { name: true },
   });
@@ -1211,7 +1211,7 @@ export async function previewImport(
   const preview = previewCsv(content, knownCategories, knownCurrencies);
 
   const previewToken = randomUUID();
-  const batch = await prisma.productImportBatch.create({
+  const batch = await tenantPrismaForWorkspace(workspaceId).productImportBatch.create({
     data: {
       workspaceId,
       source: "csv",
@@ -1246,7 +1246,7 @@ export async function previewImport(
     })),
   ];
 
-  await prisma.productImportRow.createMany({
+  await tenantPrismaForWorkspace(workspaceId).productImportRow.createMany({
     data: rows as Prisma.ProductImportRowCreateManyInput[],
   });
 
@@ -1300,14 +1300,14 @@ export async function commitImport(
   actor: string,
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<number> {
-  const batch = await prisma.productImportBatch.findFirst({
+  const batch = await tenantPrismaForWorkspace(workspaceId).productImportBatch.findFirst({
     where: { previewToken, workspaceId },
     include: { rows: { where: { status: "valid" } } },
   });
   if (!batch) throw new Error(`Import batch not found for token: ${previewToken}`);
 
   let committed = 0;
-  await prisma.$transaction(async (tx: Tx) => {
+  await tenantPrismaForWorkspace(workspaceId).$transaction(async (tx: Tx) => {
     for (const row of batch.rows) {
       const normalized = row.normalizedData as unknown as NormalizedOffer | null;
       if (!normalized) continue;
@@ -1389,7 +1389,7 @@ export async function scanDataQualityForProduct(
   actor: string,
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<unknown> {
-  const product = await prisma.product.findFirst({
+  const product = await tenantPrismaForWorkspace(workspaceId).product.findFirst({
     where: { id: productId, workspaceId },
     include: { offers: { include: { affiliateProgram: true } } },
   });
@@ -1432,7 +1432,7 @@ export async function scanDataQualityForProduct(
         },
   });
 
-  await prisma.$transaction(async (tx: Tx) => {
+  await tenantPrismaForWorkspace(workspaceId).$transaction(async (tx: Tx) => {
     await tx.productDataQualityReport.deleteMany({ where: { productId } });
     const report = await tx.productDataQualityReport.create({
       data: {
@@ -1482,7 +1482,7 @@ export async function refreshOffers(
   actor: string,
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<{ updated: number; unavailable: number }> {
-  const offers = await prisma.affiliateOffer.findMany({
+  const offers = await tenantPrismaForWorkspace(workspaceId).affiliateOffer.findMany({
     where: { workspaceId, status: { in: ["ACTIVE", "PAUSED"] } },
     select: {
       id: true,
@@ -1518,14 +1518,14 @@ export async function refreshOffers(
         if (!fresh) continue;
         const urlCheck = validateUrl(fresh.productUrl);
         if (!urlCheck.valid) {
-          await prisma.affiliateOffer.update({
+          await tenantPrismaForWorkspace(workspaceId).affiliateOffer.update({
             where: { id: o.id },
             data: { status: "UNAVAILABLE", lastCheckedAt: new Date() },
           });
           unavailable++;
           continue;
         }
-        await prisma.affiliateOffer.update({
+        await tenantPrismaForWorkspace(workspaceId).affiliateOffer.update({
           where: { id: o.id },
           data: {
             priceAmount: fresh.priceAmount,
