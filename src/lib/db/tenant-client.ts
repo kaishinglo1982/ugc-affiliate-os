@@ -45,9 +45,25 @@ function createTenantPrismaProxy(workspaceIdOverride?: string): PrismaClient {
         return Reflect.get(target, modelKey, receiver);
       }
 
+      if (modelKey === "$transaction") {
+        return async (callback: unknown) => {
+          if (typeof callback !== "function") {
+            throw new Error(
+              "TENANT_PRISMA_TRANSACTION_CALLBACK_REQUIRED: array transactions are not tenant-safe",
+            );
+          }
+
+          const workspaceId = workspaceIdOverride ?? (await resolveWorkspaceId());
+          return prisma.$transaction(async (tx) => {
+            await tx.$executeRaw`SELECT set_config('app.workspace_id', ${workspaceId}, true)`;
+            return Reflect.apply(callback as AnyFunction, undefined, [tx]);
+          });
+        };
+      }
+
       if (modelKey.startsWith("$")) {
         throw new Error(
-          `TENANT_PRISMA_CLIENT_OPERATION_FORBIDDEN: ${modelKey}. Use withWorkspaceDb() for transactional/raw operations.`,
+          `TENANT_PRISMA_CLIENT_OPERATION_FORBIDDEN: ${modelKey}. Raw/client operations require an explicit workspace-safe helper.`,
         );
       }
 
