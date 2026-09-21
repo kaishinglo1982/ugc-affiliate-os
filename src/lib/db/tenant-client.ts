@@ -6,12 +6,11 @@ import { prisma } from "@/lib/db/client";
 
 type AnyFunction = (...args: unknown[]) => unknown;
 
-const modelProxyCache = new Map<PropertyKey, object>();
-
 async function runTenantModelOperation(
   modelKey: PropertyKey,
   operationKey: PropertyKey,
   args: unknown[],
+  workspaceIdOverride?: string,
 ): Promise<unknown> {
   if (process.env.NODE_ENV === "test" && typeof prisma.$transaction !== "function") {
     const model = Reflect.get(prisma as unknown as object, modelKey) as object | undefined;
@@ -22,7 +21,7 @@ async function runTenantModelOperation(
     return Reflect.apply(operation as AnyFunction, model, args);
   }
 
-  const workspaceId = await resolveWorkspaceId();
+  const workspaceId = workspaceIdOverride ?? (await resolveWorkspaceId());
 
   return prisma.$transaction(async (tx) => {
     await tx.$executeRaw`SELECT set_config('app.workspace_id', ${workspaceId}, true)`;
@@ -37,46 +36,67 @@ async function runTenantModelOperation(
   });
 }
 
-const tenantPrismaProxy = new Proxy(prisma as unknown as object, {
-  get(target, modelKey, receiver) {
-    if (typeof modelKey === "symbol") {
-      return Reflect.get(target, modelKey, receiver);
-    }
+function createTenantPrismaProxy(workspaceIdOverride?: string): PrismaClient {
+  const modelProxyCache = new Map<PropertyKey, object>();
 
-    if (modelKey.startsWith("$")) {
-      throw new Error(
-        `TENANT_PRISMA_CLIENT_OPERATION_FORBIDDEN: ${modelKey}. Use withWorkspaceDb() for transactional/raw operations.`,
-      );
-    }
+  const proxy = new Proxy(prisma as unknown as object, {
+    get(target, modelKey, receiver) {
+      if (typeof modelKey === "symbol") {
+        return Reflect.get(target, modelKey, receiver);
+      }
 
-    const directModel = Reflect.get(target, modelKey, receiver);
-    if ((typeof directModel !== "object" || directModel === null) && typeof directModel !== "function") {
-      return directModel;
-    }
+      if (modelKey.startsWith("$")) {
+        throw new Error(
+          `TENANT_PRISMA_CLIENT_OPERATION_FORBIDDEN: ${modelKey}. Use withWorkspaceDb() for transactional/raw operations.`,
+        );
+      }
 
-    const cached = modelProxyCache.get(modelKey);
-    if (cached) return cached;
+      const directModel = Reflect.get(target, modelKey, receiver);
+      if (
+        (typeof directModel !== "object" || directModel === null) &&
+        typeof directModel !== "function"
+      ) {
+        return directModel;
+      }
 
-    const modelProxy = new Proxy(directModel as object, {
-      get(modelTarget, operationKey, modelReceiver) {
-        const member = Reflect.get(modelTarget, operationKey, modelReceiver);
-        if (typeof member !== "function") return member;
+      const cached = modelProxyCache.get(modelKey);
+      if (cached) return cached;
 
-        return (...args: unknown[]) => runTenantModelOperation(modelKey, operationKey, args);
-      },
-    });
+      const modelProxy = new Proxy(directModel as object, {
+        get(modelTarget, operationKey, modelReceiver) {
+          const member = Reflect.get(modelTarget, operationKey, modelReceiver);
+          if (typeof member !== "function") return member;
 
-    modelProxyCache.set(modelKey, modelProxy);
-    return modelProxy;
-  },
-});
+          return (...args: unknown[]) =>
+            runTenantModelOperation(modelKey, operationKey, args, workspaceIdOverride);
+        },
+      });
+
+      modelProxyCache.set(modelKey, modelProxy);
+      return modelProxy;
+    },
+  });
+
+  return proxy as unknown as PrismaClient;
+}
 
 /**
- * Compatibility adapter for legacy tenant-owned Prisma model calls.
+ * Compatibility adapter for request-bound legacy tenant-owned Prisma calls.
  *
  * Every model operation executes in its own transaction with the active
  * workspace bound through transaction-local app.workspace_id. New code should
  * prefer withWorkspaceDb() when multiple operations must share one atomic
  * transaction.
  */
-export const tenantPrisma = tenantPrismaProxy as unknown as PrismaClient;
+export const tenantPrisma = createTenantPrismaProxy();
+
+/**
+ * Internal adapter for trusted service/worker code that already resolved an
+ * authenticated workspace id. Never pass caller-controlled workspace ids here.
+ */
+export function tenantPrismaForWorkspace(workspaceId: string): PrismaClient {
+  if (!workspaceId.trim()) {
+    throw new Error("TENANT_PRISMA_WORKSPACE_ID_REQUIRED");
+  }
+  return createTenantPrismaProxy(workspaceId);
+}
