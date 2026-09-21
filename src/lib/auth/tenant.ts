@@ -32,14 +32,14 @@ export class TenantWorkspaceBindingError extends Error {}
 export async function signTenantToken(tenantId: string): Promise<string> {
   const key = getTenantSecretKey();
   if (!key) throw new Error("CARRYOS_TENANT_SECRET must be set to a string of at least 32 characters");
-  return new SignJWT({ tenantId })
+  return new SignJWT({ tenantId, scope: options?.scope, capabilities: options?.capabilities ?? [] })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
     .setExpirationTime("5m")
     .sign(key);
 }
 
-export async function resolveWorkspaceId(): Promise<string> {
+export async function resolveCarryOSTenantContext(): Promise<CarryOSTenantContext> {
   const store = await headers();
   const token = store.get(TENANT_HEADER);
   if (!token) return DEFAULT_WORKSPACE_ID;
