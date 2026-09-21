@@ -1,4 +1,4 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import type { OutboxEvent, RetryPolicy } from "./phases-21-30";
 
@@ -31,7 +31,7 @@ export function buildOutboxEvent(
 ): OutboxEvent {
   const event: OutboxEvent = {
     ...input,
-    eventId: input.eventId ?? crypto.randomUUID(),
+    eventId: input.eventId ?? randomUUID(),
     occurredAt: input.occurredAt ?? new Date(),
   };
   return eventEnvelopeSchema.parse(event) as OutboxEvent;
