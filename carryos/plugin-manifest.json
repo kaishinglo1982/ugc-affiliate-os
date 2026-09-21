@@ -1,0 +1,71 @@
+{
+  "manifestVersion": "2",
+  "id": "ugc-affiliate-os",
+  "name": "UGC Affiliate OS",
+  "version": "0.1.0",
+  "description": "UGC affiliate product research, content operations, analytics and affiliate-domain automation as a CarryOS industry plugin.",
+  "kind": "industry",
+  "publisher": {
+    "id": "kaishinglo1982",
+    "name": "Kai Shing Lo"
+  },
+  "compatibility": {
+    "carryos": ">=1.0.0",
+    "node": ">=20.9.0 <25"
+  },
+  "entrypoints": {
+    "runtime": "/api/v1/plugins/ugc/execute"
+  },
+  "permissions": [
+    "agents:register",
+    "events:publish",
+    "events:subscribe",
+    "http:outbound",
+    "storage:read",
+    "storage:write",
+    "tenant:read"
+  ],
+  "capabilities": [
+    "ugc:runtime:execute",
+    "ugc:affiliate:research",
+    "ugc:affiliate:attribution",
+    "ugc:content:operations",
+    "ugc:analytics:read",
+    "ugc:experimentation:manage",
+    "ugc:opportunities:manage"
+  ],
+  "eventContracts": [
+    {
+      "eventType": "ugc.product.opportunity.created",
+      "version": "1",
+      "direction": "publish",
+      "payload": {
+        "fields": {
+          "workspaceId": "string",
+          "opportunityId": "string",
+          "productId": "string",
+          "scoringVersion": "string"
+        },
+        "required": ["workspaceId", "opportunityId", "productId", "scoringVersion"],
+        "allowAdditionalProperties": false
+      }
+    },
+    {
+      "eventType": "ugc.content.performance.updated",
+      "version": "1",
+      "direction": "publish",
+      "payload": {
+        "fields": {
+          "workspaceId": "string",
+          "contentAssetId": "string",
+          "platform": "string",
+          "observedAt": "string"
+        },
+        "required": ["workspaceId", "contentAssetId", "platform", "observedAt"],
+        "allowAdditionalProperties": false
+      }
+    }
+  ],
+  "dependencies": {},
+  "lifecycle": "draft"
+}
