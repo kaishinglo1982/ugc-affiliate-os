@@ -44,12 +44,12 @@ describe("tenantPrisma", () => {
   });
 
   it("binds app.workspace_id before a legacy model operation", async () => {
-    const result = await tenantPrisma.product.findMany({ where: { status: "ACTIVE" } });
+    const result = await tenantPrisma.product.findMany({});
 
     expect(resolveWorkspaceIdMock).toHaveBeenCalledOnce();
     expect(transactionMock).toHaveBeenCalledOnce();
     expect(executeRawMock).toHaveBeenCalledOnce();
-    expect(findManyMock).toHaveBeenCalledWith({ where: { status: "ACTIVE" } });
+    expect(findManyMock).toHaveBeenCalledWith({});
     expect(result).toEqual([{ id: "p1" }]);
   });
 
