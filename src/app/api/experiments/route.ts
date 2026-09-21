@@ -4,7 +4,7 @@ import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
 import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
+import { tenantPrisma as prisma } from "@/lib/db/tenant-client";
 import { createExperiment, type CreateExperimentInput } from "@/features/experimentation/service";
 import type { ExperimentStatus } from "@/generated/prisma/client";
 
