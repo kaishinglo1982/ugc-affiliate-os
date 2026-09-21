@@ -319,4 +319,41 @@ describe.runIf(runDatabaseTest)("finance, secret vault and control-plane Postgre
     expect(notification.rows[0]?.workspaceId).toBe(workspaceA);
     await rollback();
   });
+
+  it("uses a non-superuser NOBYPASSRLS role that does not own protected tables", async () => {
+    const role = await admin.query<{ rolsuper: boolean; rolbypassrls: boolean }>(
+      `SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = $1`,
+      [roleName],
+    );
+    expect(role.rows).toEqual([{ rolsuper: false, rolbypassrls: false }]);
+
+    const owners = await admin.query<{ relname: string; owner: string }>(
+      `SELECT c.relname, pg_get_userbyid(c.relowner) AS owner
+       FROM pg_class c
+       JOIN pg_namespace n ON n.oid = c.relnamespace
+       WHERE n.nspname = 'public' AND c.relname = ANY($1::text[])`,
+      [protectedTables],
+    );
+
+    expect(owners.rows).toHaveLength(protectedTables.length);
+    expect(owners.rows.every((row) => row.owner !== roleName)).toBe(true);
+  });
+
+  it("blocks cross-workspace finance UPDATE and secret DELETE attempts", async () => {
+    await beginWorkspace(workspaceA);
+
+    const updated = await restricted.query<{ id: string }>(
+      `UPDATE "Revenue" SET "grossAmount" = 999 WHERE id = $1 RETURNING id`,
+      [ids.revenueB],
+    );
+    const deleted = await restricted.query<{ id: string }>(
+      `DELETE FROM "EncryptedCredential" WHERE id = $1 RETURNING id`,
+      [ids.credentialB],
+    );
+
+    expect(updated.rows).toEqual([]);
+    expect(deleted.rows).toEqual([]);
+    await rollback();
+  });
+
 });
