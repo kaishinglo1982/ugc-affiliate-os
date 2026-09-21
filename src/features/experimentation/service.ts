@@ -1,5 +1,5 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
+import { tenantPrismaForWorkspace } from "@/lib/db/tenant-client";
 import { featureFlags } from "@/lib/config/feature-flags";
 import { writeAuditLog } from "@/lib/audit/log";
 import { incrementMetric, METRICS, logStructured } from "@/lib/observability/metrics";
@@ -58,7 +58,7 @@ export async function createExperiment(input: CreateExperimentInput, actor: stri
     throw new ExperimentError(validation.errors.join(" "));
   }
 
-  const experiment = await prisma.contentExperiment.create({
+  const experiment = await tenantPrismaForWorkspace(workspaceId).contentExperiment.create({
     data: {
       workspaceId,
       brandId: input.brandId,
@@ -99,12 +99,12 @@ export async function createExperiment(input: CreateExperimentInput, actor: stri
 }
 
 async function transition(experimentId: string, to: ExperimentStatus, actor: string, workspaceId: string, extra?: Record<string, unknown>) {
-  const exp = await prisma.contentExperiment.findFirst({ where: { id: experimentId, workspaceId } });
+  const exp = await tenantPrismaForWorkspace(workspaceId).contentExperiment.findFirst({ where: { id: experimentId, workspaceId } });
   if (!exp) throw new ExperimentError("Experiment nicht gefunden.");
   if (!canTransitionExperiment(exp.status as ExperimentStatus, to)) {
     throw new ExperimentError(`Statuswechsel von ${exp.status} zu ${to} ist nicht erlaubt.`);
   }
-  const updated = await prisma.contentExperiment.update({ where: { id: experimentId }, data: { status: to, ...extra } });
+  const updated = await tenantPrismaForWorkspace(workspaceId).contentExperiment.update({ where: { id: experimentId }, data: { status: to, ...extra } });
   return updated;
 }
 
@@ -115,10 +115,10 @@ export async function requestExperimentApproval(experimentId: string, actor: str
 }
 
 export async function approveExperiment(experimentId: string, actor: string, workspaceId: string) {
-  const exp = await prisma.contentExperiment.findFirst({ where: { id: experimentId, workspaceId } });
+  const exp = await tenantPrismaForWorkspace(workspaceId).contentExperiment.findFirst({ where: { id: experimentId, workspaceId } });
   if (!exp) throw new ExperimentError("Experiment nicht gefunden.");
   if (exp.status !== "AWAITING_APPROVAL") throw new ExperimentError("Experiment ist nicht zur Freigabe vorliegend.");
-  const updated = await prisma.contentExperiment.update({
+  const updated = await tenantPrismaForWorkspace(workspaceId).contentExperiment.update({
     where: { id: experimentId },
     data: { approvalStatus: "APPROVED" as ApprovalStatus, status: "SCHEDULED" },
   });
@@ -127,7 +127,7 @@ export async function approveExperiment(experimentId: string, actor: string, wor
 }
 
 export async function startExperiment(experimentId: string, actor: string, workspaceId: string) {
-  const exp = await prisma.contentExperiment.findFirst({ where: { id: experimentId, workspaceId } });
+  const exp = await tenantPrismaForWorkspace(workspaceId).contentExperiment.findFirst({ where: { id: experimentId, workspaceId } });
   if (!exp) throw new ExperimentError("Experiment nicht gefunden.");
   if (exp.approvalStatus !== "APPROVED") throw new ExperimentError("Experiment benötigt Freigabe vor dem Start.");
   const updated = await transition(experimentId, "RUNNING", actor, workspaceId, { startedAt: new Date() });
@@ -157,7 +157,7 @@ export async function completeExperiment(experimentId: string, actor: string, wo
 
 /** Deterministically (re)creates assignments for a set of publishing jobs. */
 export async function assignExperimentJobs(experimentId: string, jobIds: string[], workspaceId: string) {
-  const exp = await prisma.contentExperiment.findFirst({
+  const exp = await tenantPrismaForWorkspace(workspaceId).contentExperiment.findFirst({
     where: { id: experimentId, workspaceId },
     include: { variants: { select: { id: true, isControl: true, trafficWeight: true } } },
   });
@@ -176,7 +176,7 @@ export async function assignExperimentJobs(experimentId: string, jobIds: string[
 
   // Idempotent: upsert by unique (experimentId, assignmentKey).
   for (const a of assignments) {
-    await prisma.experimentAssignment.upsert({
+    await tenantPrismaForWorkspace(workspaceId).experimentAssignment.upsert({
       where: { experimentId_assignmentKey: { experimentId: a.experimentId, assignmentKey: a.assignmentKey } },
       create: { ...a, workspaceId },
       update: { experimentVariantId: a.experimentVariantId, assignmentReferenceId: a.assignmentReferenceId },
@@ -189,7 +189,7 @@ export async function assignExperimentJobs(experimentId: string, jobIds: string[
  *  conservative analysis engine. Persists an ExperimentResult. Never auto-applies
  *  a winner to live configuration. */
 export async function analyzeExperimentById(experimentId: string, workspaceId: string) {
-  const exp = await prisma.contentExperiment.findFirst({
+  const exp = await tenantPrismaForWorkspace(workspaceId).contentExperiment.findFirst({
     where: { id: experimentId, workspaceId },
     include: { variants: { select: { id: true, isControl: true, contentVariantId: true } } },
   });
@@ -198,7 +198,7 @@ export async function analyzeExperimentById(experimentId: string, workspaceId: s
   const variants: VariantStat[] = [];
   for (const v of exp.variants) {
     const snapshot = v.contentVariantId
-      ? await prisma.contentPerformanceSnapshot.aggregate({
+      ? await tenantPrismaForWorkspace(workspaceId).contentPerformanceSnapshot.aggregate({
           where: { contentVariantId: v.contentVariantId },
           _sum: { impressions: true, linkClicks: true, conversions: true, views: true },
           _count: { _all: true },
@@ -249,7 +249,7 @@ export async function analyzeExperimentById(experimentId: string, workspaceId: s
     variants,
   });
 
-  const result = await prisma.experimentResult.create({
+  const result = await tenantPrismaForWorkspace(workspaceId).experimentResult.create({
     data: {
       experimentId,
       analyzedAt: new Date(),
