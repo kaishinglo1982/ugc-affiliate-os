@@ -1,7 +1,7 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
+import { tenantPrismaForWorkspace } from "@/lib/db/tenant-client";
 import { Decimal } from "@/lib/shared/decimal";
-import { DEFAULT_WORKSPACE_ID } from "@/lib/config/workspace";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
 import { computeDataQualityScores, detectDataQualityIssues, type DataQualityInput } from "@/lib/data-quality/engine";
@@ -20,16 +20,16 @@ function big(v: { toString(): string } | null | undefined): bigint {
  * the score rather than being assumed good. Never blocks anything directly.
  */
 export async function runDataQualityScan(actor: string) {
-  const workspaceId = DEFAULT_WORKSPACE_ID;
+  const workspaceId = await resolveWorkspaceId();
 
-  const snapshots = await prisma.contentPerformanceSnapshot.findMany({
+  const snapshots = await tenantPrismaForWorkspace(workspaceId).contentPerformanceSnapshot.findMany({
     where: { workspaceId },
     select: { periodEnd: true, impressions: true, views: true, engagements: true, linkClicks: true, conversions: true, grossRevenue: true, commissionRevenue: true, estimatedNetRevenue: true, productId: true },
   });
 
   const providerErrors = 0; // AnalyticsProviderMapping has no error flag in this schema version
 
-  const lastSync = await prisma.analyticsSyncJob.findFirst({
+  const lastSync = await tenantPrismaForWorkspace(workspaceId).analyticsSyncJob.findFirst({
     where: { workspaceId },
     orderBy: { createdAt: "desc" },
     select: { createdAt: true },
@@ -79,7 +79,7 @@ export async function runDataQualityScan(actor: string) {
   const scores = computeDataQualityScores(input);
   const issues = detectDataQualityIssues(input);
 
-  const report = await prisma.dataQualityReport.create({
+  const report = await tenantPrismaForWorkspace(workspaceId).dataQualityReport.create({
     data: {
       workspaceId,
       scopeType: "WORKSPACE" as DataQualityScope,
