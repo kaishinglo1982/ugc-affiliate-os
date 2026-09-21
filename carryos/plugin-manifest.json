@@ -46,7 +46,12 @@
           "productId": "string",
           "scoringVersion": "string"
         },
-        "required": ["workspaceId", "opportunityId", "productId", "scoringVersion"],
+        "required": [
+          "workspaceId",
+          "opportunityId",
+          "productId",
+          "scoringVersion"
+        ],
         "allowAdditionalProperties": false
       }
     },
@@ -61,11 +66,179 @@
           "platform": "string",
           "observedAt": "string"
         },
-        "required": ["workspaceId", "contentAssetId", "platform", "observedAt"],
+        "required": [
+          "workspaceId",
+          "contentAssetId",
+          "platform",
+          "observedAt"
+        ],
         "allowAdditionalProperties": false
       }
     }
   ],
   "dependencies": {},
-  "lifecycle": "draft"
+  "lifecycle": "draft",
+  "companyOS": {
+    "departments": [
+      {
+        "key": "affiliate-growth",
+        "name": "Affiliate Growth",
+        "purpose": "Identify and evaluate monetizable affiliate opportunities."
+      },
+      {
+        "key": "content-operations",
+        "name": "Content Operations",
+        "purpose": "Plan, produce and measure UGC content workflows."
+      }
+    ],
+    "capabilities": [
+      {
+        "key": "affiliate-opportunity-research",
+        "name": "Affiliate Opportunity Research",
+        "description": "Research and score products and affiliate opportunities.",
+        "departmentKey": "affiliate-growth",
+        "outcomeKeys": [
+          "opportunity-quality"
+        ]
+      },
+      {
+        "key": "content-performance-analysis",
+        "name": "Content Performance Analysis",
+        "description": "Analyze published UGC performance signals.",
+        "departmentKey": "content-operations",
+        "outcomeKeys": [
+          "content-performance"
+        ]
+      },
+      {
+        "key": "affiliate-attribution",
+        "name": "Affiliate Attribution",
+        "description": "Track affiliate outcomes and attribution signals.",
+        "departmentKey": "affiliate-growth",
+        "outcomeKeys": [
+          "affiliate-revenue"
+        ]
+      }
+    ],
+    "skills": [
+      {
+        "key": "product-research",
+        "version": "1",
+        "name": "Product Research",
+        "description": "Research products against affiliate and UGC opportunity criteria.",
+        "kind": "SKILL",
+        "departmentKey": "affiliate-growth",
+        "capabilityKeys": [
+          "affiliate-opportunity-research"
+        ]
+      },
+      {
+        "key": "ugc-performance-review",
+        "version": "1",
+        "name": "UGC Performance Review",
+        "description": "Review content performance and identify optimization opportunities.",
+        "kind": "SKILL",
+        "departmentKey": "content-operations",
+        "capabilityKeys": [
+          "content-performance-analysis"
+        ]
+      }
+    ],
+    "businessObjects": [
+      {
+        "type": "AffiliateOpportunity",
+        "displayName": "Affiliate Opportunity",
+        "owner": "PLUGIN",
+        "idField": "id",
+        "tenantField": "workspaceId",
+        "dataClass": "INTERNAL",
+        "eventTypes": [
+          "ugc.product.opportunity.created"
+        ]
+      },
+      {
+        "type": "ContentAsset",
+        "displayName": "Content Asset",
+        "owner": "PLUGIN",
+        "idField": "id",
+        "tenantField": "workspaceId",
+        "dataClass": "INTERNAL",
+        "eventTypes": [
+          "ugc.content.performance.updated"
+        ]
+      },
+      {
+        "type": "AffiliateAttribution",
+        "displayName": "Affiliate Attribution",
+        "owner": "PLUGIN",
+        "idField": "id",
+        "tenantField": "workspaceId",
+        "dataClass": "CONFIDENTIAL"
+      }
+    ],
+    "outcomes": [
+      {
+        "key": "opportunity-quality",
+        "name": "Opportunity quality",
+        "unit": "score",
+        "direction": "HIGHER_IS_BETTER",
+        "source": "BUSINESS_OBJECT",
+        "baselineRequired": true
+      },
+      {
+        "key": "content-performance",
+        "name": "Content performance",
+        "unit": "score",
+        "direction": "HIGHER_IS_BETTER",
+        "source": "BUSINESS_OBJECT",
+        "baselineRequired": true
+      },
+      {
+        "key": "affiliate-revenue",
+        "name": "Affiliate revenue",
+        "unit": "currency",
+        "direction": "HIGHER_IS_BETTER",
+        "source": "BUSINESS_OBJECT",
+        "baselineRequired": true
+      }
+    ],
+    "workforceTemplates": [
+      {
+        "key": "ugc-affiliate-operator",
+        "version": "1",
+        "name": "UGC Affiliate Operator",
+        "description": "Cross-functional template for affiliate research, attribution and UGC performance operations.",
+        "departmentKeys": [
+          "affiliate-growth",
+          "content-operations"
+        ],
+        "capabilityKeys": [
+          "affiliate-opportunity-research",
+          "content-performance-analysis",
+          "affiliate-attribution"
+        ],
+        "skillKeys": [
+          "product-research",
+          "ugc-performance-review"
+        ],
+        "agentKeys": [
+          "ugc-affiliate-research-agent",
+          "ugc-performance-agent"
+        ],
+        "workflowKeys": [
+          "ugc-opportunity-research",
+          "ugc-performance-analysis"
+        ],
+        "requiredPluginIds": [
+          "ugc-affiliate-os"
+        ],
+        "outcomeKeys": [
+          "opportunity-quality",
+          "content-performance",
+          "affiliate-revenue"
+        ],
+        "defaultAutonomy": "L2"
+      }
+    ]
+  }
 }
