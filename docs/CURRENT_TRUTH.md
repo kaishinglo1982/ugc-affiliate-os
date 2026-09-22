@@ -183,3 +183,30 @@ Still **no Vercel Production deployment** until the global CarryOS Universe 10/1
 - Product Discovery query persistence now uses the transaction-bound workspace context for reads, updates, version snapshots and discovery runs.
 - Added migration `20260922050000_workspace_rls_policy_groundwork` with explicit workspace-isolation policies for the Phase 6 workspace-scoped tables.
 - RLS is **not yet enabled/forced** by that migration. This is deliberate: enforcement is gated until all production DB access paths establish the transaction-bound workspace context. Therefore UGC remains **not 10/10 release-ready** and no deployment is authorized.
+
+
+## Bulk P0 execution — 2026-09-22
+
+### Completed in this tranche
+
+- Analytics event import is now workspace-atomic: idempotency lookup and insert execute in the same workspace-bound transaction.
+- Analytics sync-jobs GET now reads through the workspace transaction helper.
+- Analytics sync-jobs POST now passes the resolved workspace explicitly into the queue processor; the queue can no longer be invoked without tenant/workspace scope from this route.
+- No deployment was performed.
+
+### Evidence
+
+- `4275389f50d7c8e5ae63b5e3585e8fb63fa4f7e5` — workspace-atomic analytics event import.
+- `430659caa9b633b73aa8ea62402fe2468b2fc4b8` — workspace-bound sync-jobs route.
+- Current RLS groundwork remains intentionally not ENABLE/FORCE until every production persistence path is transaction-bound.
+
+### Remaining P0
+
+- migrate remaining productive Prisma paths to authoritative workspace transactions;
+- add workspace ownership to remaining legacy single-tenant domain tables before RLS activation;
+- enable and FORCE RLS only after the complete persistence-path migration;
+- add A→B/B→A negative CRUD tests for API, raw SQL, workers, agents and workflows;
+- finish ServicePrincipal binding and CarryOS CORE_BOUND governance;
+- obtain a fresh full CI + E2E green run on the exact release SHA.
+
+This document does not authorize deployment.
