@@ -101,4 +101,5 @@ export async function runDataQualityScan(workspaceId: string, actor: string) {
 
   await writeAuditLog({ action: "data_quality.scan", entityType: "DataQualityReport", entityId: report.id, actor, metadata: { overall: scores.overall, issues: issues.length } });
   return { reportId: report.id, overall: scores.overall, issues: issues.length };
+  });
 }
