@@ -3,6 +3,17 @@
 -- Policies are created before RLS is enabled so application code can be migrated
 -- to transaction-bound workspace context without a partial production cutover.
 -- Enforcement is intentionally deferred to the dedicated RLS activation gate.
+--
+-- Corrected same-day: policies for ExperimentVariant, ExperimentResult, and
+-- DataQualityIssue were removed -- those tables have no workspaceId column
+-- (they are child records scoped only via a required FK to their
+-- workspace-scoped parent: ContentExperiment / ContentExperiment /
+-- DataQualityReport respectively). A direct "workspaceId" = current_workspace_id()
+-- policy on those tables would fail at CREATE POLICY time (column does not
+-- exist), aborting this whole migration transaction and blocking every
+-- migration after it. Scoping those 3 child tables needs a join-based policy
+-- (via their parent's workspaceId) -- tracked as a separate follow-up, not
+-- fabricated here.
 
 CREATE OR REPLACE FUNCTION current_workspace_id()
 RETURNS text
@@ -77,18 +88,8 @@ CREATE POLICY "ContentExperiment_workspace_isolation" ON "ContentExperiment"
   USING ("workspaceId" = current_workspace_id())
   WITH CHECK ("workspaceId" = current_workspace_id());
 
-DROP POLICY IF EXISTS "ExperimentVariant_workspace_isolation" ON "ExperimentVariant";
-CREATE POLICY "ExperimentVariant_workspace_isolation" ON "ExperimentVariant"
-  USING ("workspaceId" = current_workspace_id())
-  WITH CHECK ("workspaceId" = current_workspace_id());
-
 DROP POLICY IF EXISTS "ExperimentAssignment_workspace_isolation" ON "ExperimentAssignment";
 CREATE POLICY "ExperimentAssignment_workspace_isolation" ON "ExperimentAssignment"
-  USING ("workspaceId" = current_workspace_id())
-  WITH CHECK ("workspaceId" = current_workspace_id());
-
-DROP POLICY IF EXISTS "ExperimentResult_workspace_isolation" ON "ExperimentResult";
-CREATE POLICY "ExperimentResult_workspace_isolation" ON "ExperimentResult"
   USING ("workspaceId" = current_workspace_id())
   WITH CHECK ("workspaceId" = current_workspace_id());
 
@@ -109,11 +110,6 @@ CREATE POLICY "AudienceSegment_workspace_isolation" ON "AudienceSegment"
 
 DROP POLICY IF EXISTS "DataQualityReport_workspace_isolation" ON "DataQualityReport";
 CREATE POLICY "DataQualityReport_workspace_isolation" ON "DataQualityReport"
-  USING ("workspaceId" = current_workspace_id())
-  WITH CHECK ("workspaceId" = current_workspace_id());
-
-DROP POLICY IF EXISTS "DataQualityIssue_workspace_isolation" ON "DataQualityIssue";
-CREATE POLICY "DataQualityIssue_workspace_isolation" ON "DataQualityIssue"
   USING ("workspaceId" = current_workspace_id())
   WITH CHECK ("workspaceId" = current_workspace_id());
 
