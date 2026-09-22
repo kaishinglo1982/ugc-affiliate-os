@@ -1,7 +1,6 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 import { Decimal } from "@/lib/shared/decimal";
-import { DEFAULT_WORKSPACE_ID } from "@/lib/config/workspace";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
 import { safeRatio } from "@/lib/analytics/metrics";
@@ -68,10 +67,10 @@ function dayBounds(d: Date): { start: Date; end: Date } {
  * recommendation engine, and quality scans have data to operate on. Does not
  * mutate live configuration.
  */
-export async function runAggregation(actor: string) {
-  const workspaceId = DEFAULT_WORKSPACE_ID;
+export async function runAggregation(workspaceId: string, actor: string) {
+  return withWorkspaceTransaction(workspaceId, async (tx) => {
   const since = new Date(Date.now() - AGGREGATION_WINDOW_DAYS * 86_400_000);
-  const events = await prisma.analyticsEvent.findMany({
+  const events = await tx.analyticsEvent.findMany({
     where: { workspaceId, occurredAt: { gte: since } },
     select: {
       contentAssetId: true,
@@ -177,14 +176,14 @@ export async function runAggregation(actor: string) {
   let postingRows = 0;
 
   for (const a of content.values()) {
-    await prisma.contentPerformanceSnapshot.deleteMany({
+    await tx.contentPerformanceSnapshot.deleteMany({
       where: { workspaceId, contentAssetId: a.contentAssetId, contentVariantId: a.contentVariantId, platform: a.platform, periodStart: a.periodStart },
     });
     const impressions = BigInt(a.impressions);
     const views = BigInt(a.views);
     const linkClicks = BigInt(a.linkClicks);
     const conversions = BigInt(a.conversions);
-    await prisma.contentPerformanceSnapshot.create({
+    await tx.contentPerformanceSnapshot.create({
       data: {
         workspaceId,
         contentAssetId: a.contentAssetId,
@@ -217,14 +216,14 @@ export async function runAggregation(actor: string) {
   }
 
   for (const a of product.values()) {
-    await prisma.productPerformanceSnapshot.deleteMany({
+    await tx.productPerformanceSnapshot.deleteMany({
       where: { workspaceId, productId: a.productId, periodStart: a.periodStart },
     });
     const impressions = BigInt(a.impressions);
     const views = BigInt(a.views);
     const affiliateClicks = BigInt(a.affiliateClicks);
     const conversions = BigInt(a.conversions);
-    await prisma.productPerformanceSnapshot.create({
+    await tx.productPerformanceSnapshot.create({
       data: {
         workspaceId,
         productId: a.productId,
@@ -252,14 +251,14 @@ export async function runAggregation(actor: string) {
   }
 
   for (const a of posting.values()) {
-    await prisma.postingTimePerformance.deleteMany({
+    await tx.postingTimePerformance.deleteMany({
       where: { workspaceId, socialAccountId: a.socialAccountId, weekday: a.weekday, hourOfDay: a.hourOfDay, timezone: a.timezone },
     });
     const impressions = BigInt(a.impressions);
     const views = BigInt(a.views);
     const linkClicks = BigInt(a.linkClicks);
     const conversions = BigInt(a.conversions);
-    await prisma.postingTimePerformance.create({
+    await tx.postingTimePerformance.create({
       data: {
         workspaceId,
         socialAccountId: a.socialAccountId,
