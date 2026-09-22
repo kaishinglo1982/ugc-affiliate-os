@@ -40,7 +40,12 @@ export async function signTenantToken(tenantId: string): Promise<string> {
 export async function resolveWorkspaceId(): Promise<string> {
   const store = await headers();
   const token = store.get(TENANT_HEADER);
-  if (!token) return DEFAULT_WORKSPACE_ID;
+  if (!token) {
+    if (process.env.CARRYOS_INTEGRATION_MODE === "CORE_BOUND") {
+      throw new InvalidTenantTokenError("CarryOS tenant assertion is required in CORE_BOUND mode");
+    }
+    return DEFAULT_WORKSPACE_ID;
+  }
 
   const key = getTenantSecretKey();
   if (!key) throw new InvalidTenantTokenError("CARRYOS_TENANT_SECRET is not configured");
