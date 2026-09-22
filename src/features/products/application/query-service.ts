@@ -4,7 +4,6 @@
  * CRUD for `ProductDiscoveryQuery` plus versioned snapshots on update. All reads
  * are scoped by `workspaceId` (default `DEFAULT_WORKSPACE_ID`).
  */
-import { prisma } from "@/lib/db/client";
 import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 import { Prisma } from "@/generated/prisma/client";
 import { Decimal, type DecimalValue } from "@/lib/shared/decimal";
@@ -124,36 +123,40 @@ export async function updateQuery(
   actor: string,
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<unknown> {
-  const existing = await prisma.productDiscoveryQuery.findFirst({
-    where: { id, workspaceId },
-    select: { currentVersion: true },
-  });
-  if (!existing) throw new Error(`ProductDiscoveryQuery not found: ${id}`);
+  const query = await withWorkspaceTransaction(workspaceId, async (tx) => {
+    const existing = await tx.productDiscoveryQuery.findFirst({
+      where: { id, workspaceId },
+      select: { currentVersion: true },
+    });
+    if (!existing) throw new Error(`ProductDiscoveryQuery not found: ${id}`);
 
-  const nextVersion = existing.currentVersion + 1;
-  const query = await prisma.productDiscoveryQuery.update({
-    where: { id },
-    data: {
-      ...toCreateData(input, workspaceId),
-      id,
-      currentVersion: nextVersion,
-    },
-  });
+    const nextVersion = existing.currentVersion + 1;
+    const updated = await tx.productDiscoveryQuery.update({
+      where: { id },
+      data: {
+        ...toCreateData(input, workspaceId),
+        id,
+        currentVersion: nextVersion,
+      },
+    });
 
-  await prisma.productDiscoveryQueryVersion.create({
-    data: {
-      workspaceId,
-      queryId: id,
-      version: nextVersion,
-      querySnapshot: input as unknown as Prisma.InputJsonValue,
-    },
+    await tx.productDiscoveryQueryVersion.create({
+      data: {
+        workspaceId,
+        queryId: id,
+        version: nextVersion,
+        querySnapshot: input as unknown as Prisma.InputJsonValue,
+      },
+    });
+
+    return updated;
   });
 
   void writeAuditLog({
     action: "product.query.update",
     entityType: "ProductDiscoveryQuery",
     entityId: id,
-    metadata: { version: nextVersion } as Prisma.InputJsonValue,
+    metadata: { version: query.currentVersion } as Prisma.InputJsonValue,
     actor,
   });
 
@@ -163,19 +166,19 @@ export async function updateQuery(
 export async function listRuns(
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<unknown[]> {
-  return prisma.productDiscoveryRun.findMany({
+  return withWorkspaceTransaction(workspaceId, (tx) => tx.productDiscoveryRun.findMany({
     where: { workspaceId },
     orderBy: { createdAt: "desc" },
     include: { providerRuns: true },
-  });
+  }));
 }
 
 export async function getRun(
   id: string,
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<unknown | null> {
-  return prisma.productDiscoveryRun.findFirst({
+  return withWorkspaceTransaction(workspaceId, (tx) => tx.productDiscoveryRun.findFirst({
     where: { id, workspaceId },
     include: { providerRuns: true, query: true },
-  });
+  }));
 }
