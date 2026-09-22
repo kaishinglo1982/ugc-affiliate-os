@@ -289,4 +289,5 @@ export async function runAggregation(workspaceId: string, actor: string) {
     metadata: { contentRows, productRows, postingRows, events: events.length },
   });
   return { contentRows, productRows, postingRows, events: events.length };
+  });
 }
