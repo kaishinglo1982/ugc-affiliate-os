@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db/client";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 import { featureFlags } from "@/lib/config/feature-flags";
 import { AnalyticsSyncError, classifyProviderError } from "@/lib/analytics/provider/failure";
 import {
@@ -49,7 +50,7 @@ function newIdempotencyKey(prefix: string): string {
 export async function requestSyncJob(request: SyncJobRequest): Promise<{ id: string }> {
   requireAnalyticsEnabled();
   if (request.jobType === "POST_BACKFILL") requireBackfillEnabled();
-  const job = await prisma.analyticsSyncJob.create({
+  const job = await withWorkspaceTransaction(request.workspaceId, (tx) => tx.analyticsSyncJob.create({
     data: {
       workspaceId: request.workspaceId,
       jobType: request.jobType,
@@ -60,7 +61,7 @@ export async function requestSyncJob(request: SyncJobRequest): Promise<{ id: str
       idempotencyKey: newIdempotencyKey(`sync-${request.jobType}`),
       correlationId: newIdempotencyKey("corr"),
     },
-  });
+  }));
   await writeAuditLog({
     action: "analytics.sync.requested",
     entityType: "AnalyticsSyncJob",
@@ -88,14 +89,14 @@ export async function importAnalyticsEvents(
 
   let inserted = 0;
   if (unique.length > 0) {
-    const existing = await prisma.analyticsEvent.findMany({
+    const existing = await withWorkspaceTransaction(workspaceId, (tx) => tx.analyticsEvent.findMany({
       where: { idempotencyKey: { in: unique.map((e) => e.idempotencyKey) } },
       select: { idempotencyKey: true },
-    });
+    }));
     const existingKeys = new Set(existing.map((e) => e.idempotencyKey));
     const toInsert = unique.filter((e) => !existingKeys.has(e.idempotencyKey));
     if (toInsert.length > 0) {
-      await prisma.analyticsEvent.createMany({
+      await withWorkspaceTransaction(workspaceId, (tx) => tx.analyticsEvent.createMany({
         data: toInsert.map((e) => ({
           workspaceId,
           eventType: e.eventType,
@@ -123,7 +124,7 @@ export async function importAnalyticsEvents(
           idempotencyKey: e.idempotencyKey,
           metadataReferenceId: e.metadataReferenceId ?? null,
         })),
-      });
+      }));
       inserted = toInsert.length;
     }
   }
@@ -149,31 +150,32 @@ export interface SyncReport {
   deadLettered: number;
 }
 
-export async function processSyncQueue(limit = 10): Promise<SyncReport> {
+export async function processSyncQueue(workspaceId: string, limit = 10): Promise<SyncReport> {
   requireAnalyticsEnabled();
   const now = new Date();
-  const jobs = await prisma.analyticsSyncJob.findMany({
+  const jobs = await withWorkspaceTransaction(workspaceId, (tx) => tx.analyticsSyncJob.findMany({
     where: {
+      workspaceId,
       OR: [{ status: "PENDING" }, { status: "FAILED", nextAttemptAt: { lte: now } }],
     },
     orderBy: { createdAt: "asc" },
     take: limit,
-  });
+  }));
 
   const report: SyncReport = { processed: 0, succeeded: 0, failed: 0, deadLettered: 0 };
   for (const job of jobs) {
     report.processed += 1;
-    await prisma.analyticsSyncJob.update({ where: { id: job.id }, data: { status: "PROCESSING" } });
+    await withWorkspaceTransaction(workspaceId, (tx) => tx.analyticsSyncJob.update({ where: { id: job.id, workspaceId }, data: { status: "PROCESSING" } }));
     try {
       await runJob(job);
-      await prisma.analyticsSyncJob.update({ where: { id: job.id }, data: { status: "SUCCEEDED", attempts: { increment: 1 }, failureCode: null, lastError: null, nextAttemptAt: null } });
+      await withWorkspaceTransaction(workspaceId, (tx) => tx.analyticsSyncJob.update({ where: { id: job.id, workspaceId }, data: { status: "SUCCEEDED", attempts: { increment: 1 }, failureCode: null, lastError: null, nextAttemptAt: null } }));
       report.succeeded += 1;
     } catch (error) {
       const syncErr = error instanceof AnalyticsSyncError ? error : classifyProviderError(error);
       const decision = syncRetryPolicy(syncErr.code, job.attempts, job.maxAttempts, new Date());
       const nextStatus = decision.kind === "dead" ? "DEAD" : "FAILED";
-      await prisma.analyticsSyncJob.update({
-        where: { id: job.id },
+      await withWorkspaceTransaction(workspaceId, (tx) => tx.analyticsSyncJob.update({
+        where: { id: job.id, workspaceId },
         data: {
           status: nextStatus,
           attempts: { increment: 1 },
@@ -181,7 +183,7 @@ export async function processSyncQueue(limit = 10): Promise<SyncReport> {
           lastError: syncErr.message,
           nextAttemptAt: decision.nextAttemptAt,
         },
-      });
+      }));
       await writeAuditLog({
         action: "analytics.sync.failed",
         entityType: "AnalyticsSyncJob",
@@ -207,7 +209,7 @@ async function runJob(job: {
 }): Promise<void> {
   if (job.jobType === "ACCOUNT_SYNC" || job.jobType === "POST_SYNC") {
     if (!job.socialAccountId) throw new SyncJobError("Social-Account erforderlich.");
-    const account = await prisma.socialAccount.findUnique({ where: { id: job.socialAccountId } });
+    const account = await withWorkspaceTransaction(job.workspaceId, (tx) => tx.socialAccount.findFirst({ where: { id: job.socialAccountId, workspaceId: job.workspaceId } }));
     if (!account) throw new AnalyticsSyncError("POST_NOT_FOUND", "Social-Account nicht gefunden.");
     if (!isAnalyticsPlatform(account.platform)) {
       throw new AnalyticsSyncError("UNSUPPORTED_METRIC", `Plattform ${account.platform} wird nicht unterstützt.`);
@@ -224,7 +226,7 @@ async function runJob(job: {
         : await provider.getPostMetrics({ workspaceId: job.workspaceId, socialAccountId: account.id, platform, externalPostId: job.externalPostId ?? "", periodStart, periodEnd });
 
     const m = result.metrics;
-    await prisma.platformMetricSnapshot.create({
+    await withWorkspaceTransaction(job.workspaceId, (tx) => tx.platformMetricSnapshot.create({
       data: {
         workspaceId: job.workspaceId,
         platform,
@@ -252,7 +254,7 @@ async function runJob(job: {
         source: "PLATFORM_API",
         externalSnapshotId: result.externalSnapshotId,
       },
-    });
+    }));
     incrementMetric(METRICS.analyticsSnapshotCreatedTotal);
     await writeAuditLog({
       action: "analytics.snapshot.created",
