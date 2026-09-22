@@ -175,3 +175,11 @@ Still **no Vercel Production deployment** until the global CarryOS Universe 10/1
 ## Current critical path
 
 `Schema/migration truth -> transaction-bound tenant persistence -> RLS -> CORE_BOUND governance -> ServicePrincipal -> Creator bridge -> E2E green -> UGC GitHub 10/10 -> wait for global Universe gate -> Vercel`
+
+
+### Persistence/RLS hardening — 2026-09-22
+
+- Added `src/lib/db/workspace-transaction.ts`: authoritative workspace context is bound to a PostgreSQL transaction via `app.current_workspace_id`.
+- Product Discovery query persistence now uses the transaction-bound workspace context for reads, updates, version snapshots and discovery runs.
+- Added migration `20260922050000_workspace_rls_policy_groundwork` with explicit workspace-isolation policies for the Phase 6 workspace-scoped tables.
+- RLS is **not yet enabled/forced** by that migration. This is deliberate: enforcement is gated until all production DB access paths establish the transaction-bound workspace context. Therefore UGC remains **not 10/10 release-ready** and no deployment is authorized.
