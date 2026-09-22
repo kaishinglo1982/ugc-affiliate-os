@@ -46,7 +46,7 @@ export async function POST(request: Request) {
 
   let report = null;
   if (input.process && input.jobType !== "POST_BACKFILL") {
-    report = await processSyncQueue(5);
+    report = await processSyncQueue(workspaceId, 5);
   }
 
   return NextResponse.json({ jobId: job.id, report });
