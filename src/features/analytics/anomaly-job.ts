@@ -101,4 +101,5 @@ export async function runAnomalyDetection(workspaceId: string, actor: string) {
 
   await writeAuditLog({ action: "anomaly.detection.run", entityType: "AnalyticsAnomaly", entityId: "batch", actor, metadata: { detected } });
   return { detected };
+  });
 }
