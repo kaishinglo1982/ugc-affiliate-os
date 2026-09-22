@@ -1,7 +1,6 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 import { Decimal } from "@/lib/shared/decimal";
-import { DEFAULT_WORKSPACE_ID } from "@/lib/config/workspace";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
 import { computeDataQualityScores, detectDataQualityIssues, type DataQualityInput } from "@/lib/data-quality/engine";
@@ -19,17 +18,17 @@ function big(v: { toString(): string } | null | undefined): bigint {
  * DataQualityReport (+ issues). Scores are conservative: missing data lowers
  * the score rather than being assumed good. Never blocks anything directly.
  */
-export async function runDataQualityScan(actor: string) {
-  const workspaceId = DEFAULT_WORKSPACE_ID;
+export async function runDataQualityScan(workspaceId: string, actor: string) {
+  return withWorkspaceTransaction(workspaceId, async (tx) => {
 
-  const snapshots = await prisma.contentPerformanceSnapshot.findMany({
+  const snapshots = await tx.contentPerformanceSnapshot.findMany({
     where: { workspaceId },
     select: { periodEnd: true, impressions: true, views: true, engagements: true, linkClicks: true, conversions: true, grossRevenue: true, commissionRevenue: true, estimatedNetRevenue: true, productId: true },
   });
 
   const providerErrors = 0; // AnalyticsProviderMapping has no error flag in this schema version
 
-  const lastSync = await prisma.analyticsSyncJob.findFirst({
+  const lastSync = await tx.analyticsSyncJob.findFirst({
     where: { workspaceId },
     orderBy: { createdAt: "desc" },
     select: { createdAt: true },
@@ -79,7 +78,7 @@ export async function runDataQualityScan(actor: string) {
   const scores = computeDataQualityScores(input);
   const issues = detectDataQualityIssues(input);
 
-  const report = await prisma.dataQualityReport.create({
+  const report = await tx.dataQualityReport.create({
     data: {
       workspaceId,
       scopeType: "WORKSPACE" as DataQualityScope,
