@@ -5,6 +5,7 @@
  * are scoped by `workspaceId` (default `DEFAULT_WORKSPACE_ID`).
  */
 import { prisma } from "@/lib/db/client";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 import { Prisma } from "@/generated/prisma/client";
 import { Decimal, type DecimalValue } from "@/lib/shared/decimal";
 import { DEFAULT_WORKSPACE_ID } from "@/lib/config/workspace";
@@ -70,20 +71,20 @@ function toCreateData(
 export async function listQueries(
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<unknown[]> {
-  return prisma.productDiscoveryQuery.findMany({
+  return withWorkspaceTransaction(workspaceId, (tx) => tx.productDiscoveryQuery.findMany({
     where: { workspaceId },
     orderBy: { createdAt: "desc" },
-  });
+  }));
 }
 
 export async function getQuery(
   id: string,
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<unknown | null> {
-  return prisma.productDiscoveryQuery.findFirst({
+  return withWorkspaceTransaction(workspaceId, (tx) => tx.productDiscoveryQuery.findFirst({
     where: { id, workspaceId },
     include: { versions: { orderBy: { version: "desc" } }, runs: { orderBy: { createdAt: "desc" } } },
-  });
+  }));
 }
 
 export async function createQuery(
@@ -91,17 +92,19 @@ export async function createQuery(
   actor: string,
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<unknown> {
-  const query = await prisma.productDiscoveryQuery.create({
+  const query = await withWorkspaceTransaction(workspaceId, async (tx) => { const query = await tx.productDiscoveryQuery.create({
     data: toCreateData(input, workspaceId),
   });
 
-  await prisma.productDiscoveryQueryVersion.create({
+    await tx.productDiscoveryQueryVersion.create({
     data: {
       workspaceId,
       queryId: query.id,
       version: 1,
       querySnapshot: input as unknown as Prisma.InputJsonValue,
     },
+  });
+    return query;
   });
 
   void writeAuditLog({
