@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
 import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 import { processSyncQueue } from "@/features/analytics/sync";
 
 export async function GET(request: Request) {
@@ -22,11 +22,11 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const onlyPending = searchParams.get("pending") === "1";
 
-  const jobs = await prisma.analyticsSyncJob.findMany({
-    where: { workspaceId: workspaceId, ...(onlyPending ? { status: "PENDING" } : {}) },
+  const jobs = await withWorkspaceTransaction(workspaceId, (tx) => tx.analyticsSyncJob.findMany({
+    where: { workspaceId, ...(onlyPending ? { status: "PENDING" } : {}) },
     orderBy: { createdAt: "desc" },
     take: 50,
-  });
+  }));
   return NextResponse.json({ jobs });
 }
 
@@ -44,6 +44,6 @@ export async function POST(request: Request) {
     throw e;
   }
 
-  const report = await processSyncQueue(10);
+  const report = await processSyncQueue(workspaceId, 10);
   return NextResponse.json({ report });
 }
