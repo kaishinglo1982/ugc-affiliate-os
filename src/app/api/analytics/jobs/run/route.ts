@@ -25,8 +25,8 @@ async function runPhase6Jobs(request: Request, allowUserFallback: boolean) {
   if ("response" in auth) return auth.response;
   try {
     const workspaceId = await resolveWorkspaceId();
-    const aggregation = await runAggregation(auth.actor);
-    const [anomalies, quality] = await Promise.all([runAnomalyDetection(auth.actor), runDataQualityScan(auth.actor)]);
+    const aggregation = await runAggregation(workspaceId, auth.actor);
+    const [anomalies, quality] = await Promise.all([runAnomalyDetection(workspaceId, auth.actor), runDataQualityScan(workspaceId, auth.actor)]);
     return ok({ aggregation, anomalies, quality, workspaceId });
   } catch (error) {
     if (error instanceof InvalidTenantTokenError) {
