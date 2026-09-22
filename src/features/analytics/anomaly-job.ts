@@ -1,6 +1,5 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
-import { DEFAULT_WORKSPACE_ID } from "@/lib/config/workspace";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
 import { detectAnomalies, type AnomalyContext, type AnomalyScope } from "@/lib/anomaly/rules";
@@ -18,9 +17,9 @@ function big(v: { toString(): string } | null | undefined): bigint {
  * ranges), and detections are persisted as OPEN AnalyticsAnomaly rows. Existing
  * open anomalies of the same scope+type are not duplicated. Never auto-blocks.
  */
-export async function runAnomalyDetection(actor: string) {
-  const workspaceId = DEFAULT_WORKSPACE_ID;
-  const snapshots = await prisma.contentPerformanceSnapshot.findMany({
+export async function runAnomalyDetection(workspaceId: string, actor: string) {
+  return withWorkspaceTransaction(workspaceId, async (tx) => {
+  const snapshots = await tx.contentPerformanceSnapshot.findMany({
     where: { workspaceId },
     select: {
       contentAssetId: true,
@@ -71,7 +70,7 @@ export async function runAnomalyDetection(actor: string) {
     const drafts = detectAnomalies(ctx, scope);
 
     for (const d of drafts) {
-      const existing = await prisma.analyticsAnomaly.findFirst({
+      const existing = await tx.analyticsAnomaly.findFirst({
         where: {
           workspaceId,
           scopeType: d.scopeType,
@@ -81,7 +80,7 @@ export async function runAnomalyDetection(actor: string) {
         },
       });
       if (existing) continue;
-      await prisma.analyticsAnomaly.create({
+      await tx.analyticsAnomaly.create({
         data: {
           workspaceId,
           anomalyType: d.anomalyType,
