@@ -28,6 +28,15 @@ export async function GET(
     return NextResponse.json({ error: "Nicht authentifiziert." }, { status: 401 });
   }
 
+  // Local filesystem media is intentionally unavailable in production.
+  // Production media must be served through the durable object-storage path.
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json(
+      { error: "Lokaler Mediastore ist in Production deaktiviert." },
+      { status: 503 },
+    );
+  }
+
   const { key } = await context.params;
 
   if (!isValidStorageKey(key)) {
