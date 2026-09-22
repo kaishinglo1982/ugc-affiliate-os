@@ -1,6 +1,6 @@
 # UGC Affiliate OS — Current Truth
 
-**Last verified:** 2026-09-12  
+**Last verified:** 2026-09-22  
 **Default branch:** `master`  
 **Authority:** current GitHub state, open PRs and exact-head CI.  
 **Rule:** If this file conflicts with older UGC roadmaps, handoff notes or chat transcripts, this file is the current planning authority until superseded by a newer verified update.
