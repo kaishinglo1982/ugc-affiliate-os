@@ -89,14 +89,19 @@ export async function importAnalyticsEvents(
 
   let inserted = 0;
   if (unique.length > 0) {
-    const existing = await withWorkspaceTransaction(workspaceId, (tx) => tx.analyticsEvent.findMany({
-      where: { idempotencyKey: { in: unique.map((e) => e.idempotencyKey) } },
-      select: { idempotencyKey: true },
-    }));
-    const existingKeys = new Set(existing.map((e) => e.idempotencyKey));
-    const toInsert = unique.filter((e) => !existingKeys.has(e.idempotencyKey));
-    if (toInsert.length > 0) {
-      await withWorkspaceTransaction(workspaceId, (tx) => tx.analyticsEvent.createMany({
+    inserted = await withWorkspaceTransaction(workspaceId, async (tx) => {
+      const existing = await tx.analyticsEvent.findMany({
+        where: {
+          workspaceId,
+          idempotencyKey: { in: unique.map((e) => e.idempotencyKey) },
+        },
+        select: { idempotencyKey: true },
+      });
+      const existingKeys = new Set(existing.map((e) => e.idempotencyKey));
+      const toInsert = unique.filter((e) => !existingKeys.has(e.idempotencyKey));
+      if (toInsert.length === 0) return 0;
+
+      await tx.analyticsEvent.createMany({
         data: toInsert.map((e) => ({
           workspaceId,
           eventType: e.eventType,
@@ -124,9 +129,9 @@ export async function importAnalyticsEvents(
           idempotencyKey: e.idempotencyKey,
           metadataReferenceId: e.metadataReferenceId ?? null,
         })),
-      }));
-      inserted = toInsert.length;
-    }
+      });
+      return toInsert.length;
+    });
   }
 
   const dbDuplicates = unique.length - inserted;
