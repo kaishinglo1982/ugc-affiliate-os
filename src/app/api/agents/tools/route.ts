@@ -91,6 +91,7 @@ export async function POST(request: Request) {
       policies: policy
         ? {
             create: {
+              workspaceId,
               requiresApproval: policy.requiresApproval ?? false,
               maxCostPerCall: policy.maxCostPerCall,
               rateLimitPerMin: policy.rateLimitPerMin,
