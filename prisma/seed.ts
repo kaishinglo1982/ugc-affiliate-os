@@ -694,9 +694,9 @@ async function seedAutomations() {
 async function seedNotifications() {
   await prisma.notification.createMany({
     data: [
-      { level: "SUCCESS", title: "Video-Job abgeschlossen", message: "Ein Mock-Rendering wurde erfolgreich abgeschlossen.", link: "/app/videos" },
-      { level: "WARNING", title: "Integration im Mock-Modus", message: "Digistore24 läuft aktuell im Mock-Modus.", link: "/app/integrations" },
-      { level: "INFO", title: "Neues Produkt hinzugefügt", message: "Smart LED Skin Tool wurde dem Produkt-Radar hinzugefügt.", link: "/app/products" },
+      { workspaceId: DEFAULT_WORKSPACE_ID, level: "SUCCESS", title: "Video-Job abgeschlossen", message: "Ein Mock-Rendering wurde erfolgreich abgeschlossen.", link: "/app/videos" },
+      { workspaceId: DEFAULT_WORKSPACE_ID, level: "WARNING", title: "Integration im Mock-Modus", message: "Digistore24 läuft aktuell im Mock-Modus.", link: "/app/integrations" },
+      { workspaceId: DEFAULT_WORKSPACE_ID, level: "INFO", title: "Neues Produkt hinzugefügt", message: "Smart LED Skin Tool wurde dem Produkt-Radar hinzugefügt.", link: "/app/products" },
     ],
   });
   console.log("Seeded notifications");
