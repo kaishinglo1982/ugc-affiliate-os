@@ -8,8 +8,9 @@ export async function POST() {
   const guard = await requireApiPermission(Permission.VIEW_ANALYTICS);
   if (guard) return guard.response;
   const actor = (await getCurrentUser())?.id ?? "owner";
+  const workspaceId = process.env.DEFAULT_WORKSPACE_ID ?? "00000000-0000-0000-0000-000000000001";
   try {
-    const result = await runAggregation(actor);
+    const result = await runAggregation(workspaceId, actor);
     return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Aggregation fehlgeschlagen." }, { status: 400 });
