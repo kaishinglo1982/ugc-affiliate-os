@@ -35,7 +35,7 @@ export async function PATCH(
   }
 
   const tool = await prisma.agentToolDefinition.update({
-    where: { id: existing.id },
+    where: { id: existing.id, workspaceId },
     data: { enabled: parsed.data.enabled },
   });
 
