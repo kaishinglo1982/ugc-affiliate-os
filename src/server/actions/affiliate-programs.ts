@@ -53,7 +53,7 @@ export async function saveAffiliateProgramAction(
   if (programId) {
     const existing = await prisma.affiliateProgram.findFirst({ where: { id: programId, workspaceId } });
     if (!existing) return fail("Affiliate-Programm nicht gefunden.", requestId);
-    program = await prisma.affiliateProgram.update({ where: { id: existing.id }, data });
+    program = await prisma.affiliateProgram.update({ where: { id: existing.id, workspaceId }, data });
   } else {
     program = await prisma.affiliateProgram.create({
       data: { ...data, workspaceId, status: credentialId ? "CONNECTED" : "DISCONNECTED" },
@@ -102,7 +102,7 @@ export async function disconnectAffiliateProgramAction(id: string) {
       const existing = await prisma.affiliateProgram.findFirst({ where: { id: input.id, workspaceId } });
       if (!existing) throw new Error("AFFILIATE_PROGRAM_NOT_FOUND");
       return prisma.affiliateProgram.update({
-        where: { id: existing.id },
+        where: { id: existing.id, workspaceId },
         data: { status: "DISCONNECTED", credentialId: null },
       });
     },
