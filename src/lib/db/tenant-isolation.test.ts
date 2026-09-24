@@ -476,4 +476,3 @@ describe("tenant isolation (WorkflowDefinition + WorkflowRun)", () => {
     expect(runResult.count).toBe(0);
   });
 });
-\n
