@@ -137,7 +137,7 @@ export async function decideStrategy(id: string, body: unknown, workspaceId: str
   if (!transition.ok) throw new Error(transition.reason);
   const actor = (await getCurrentUser())?.id ?? "owner";
   const updated = await prisma.campaignStrategy.update({
-    where: { id },
+    where: { id, workspaceId },
     data:
       parsed.decision === "approved"
         ? { status: "approved", approvedById: actor, approvedAt: new Date() }
