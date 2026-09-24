@@ -3178,7 +3178,7 @@ model CampaignFactoryRun {
   campaignStrategyId String?
   contentBatchId     String?
   correlationId      String
-  idempotencyKey     String                 @unique
+  idempotencyKey     String                 
   startedAt          DateTime?
   completedAt        DateTime?
   failureCode        String?
@@ -3823,7 +3823,7 @@ model MediaGenerationJob {
   requestReferenceId  String
   status              MediaGenerationJobStatus @default(draft)
   approvalStatus      ApprovalStatus         @default(DRAFT)
-  idempotencyKey      String                 @unique
+  idempotencyKey      String                 
   externalJobId       String?
   estimatedCost       Decimal?               @db.Decimal(12, 2)
   reservedCost        Decimal?               @db.Decimal(12, 2)
@@ -3978,7 +3978,7 @@ model RenderJob {
   renderSpecificationId String
   status              MediaRenderStatus   @default(draft)
   approvalStatus      ApprovalStatus      @default(DRAFT)
-  idempotencyKey      String              @unique
+  idempotencyKey      String              
   externalRenderId    String?
   estimatedCost       Decimal?            @db.Decimal(12, 2)
   actualCost          Decimal?            @db.Decimal(12, 2)
