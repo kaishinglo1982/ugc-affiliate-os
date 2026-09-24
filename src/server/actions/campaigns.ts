@@ -28,6 +28,12 @@ export async function saveCampaignAction(
     return fail("Eingabe ungültig.", requestId, parsed.error.flatten().fieldErrors);
   }
 
+  const relationChecks = await Promise.all([
+    parsed.data.productId ? prisma.product.findFirst({ where: { id: parsed.data.productId, workspaceId }, select: { id: true } }) : null,
+    parsed.data.affiliateLinkId ? prisma.affiliateLink.findFirst({ where: { id: parsed.data.affiliateLinkId, workspaceId }, select: { id: true } }) : null,
+  ]);
+  if (relationChecks.some((value) => value === null)) return fail("Zugehörige Daten nicht gefunden.", requestId);
+
   const data = {
     workspaceId,
     name: parsed.data.name,
@@ -84,7 +90,7 @@ export async function changeCampaignStatusAction(id: string, status: string) {
   }
 
   const updated = await prisma.campaign.update({
-    where: { id },
+    where: { id: current.id },
     data: { status: parsed.data.status },
   });
 
