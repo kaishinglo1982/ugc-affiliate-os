@@ -158,3 +158,74 @@ describe("tenant isolation (AnalyticsEvent)", () => {
     expect(unchanged?.metadataReferenceId).not.toBe("cross-tenant-write");
   });
 });
+
+
+describe("tenant isolation (Script + VideoJob)", () => {
+  let scriptA: { id: string };
+  let scriptB: { id: string };
+  let videoA: { id: string };
+
+  beforeAll(async () => {
+    scriptA = await prisma.script.create({
+      data: { workspaceId: workspaceA, title: `Script-A-${randomUUID()}` },
+    });
+    scriptB = await prisma.script.create({
+      data: { workspaceId: workspaceB, title: `Script-B-${randomUUID()}` },
+    });
+    videoA = await prisma.videoJob.create({
+      data: {
+        workspaceId: workspaceA,
+        scriptId: scriptA.id,
+        format: "UGC",
+        aspectRatio: "9:16",
+        durationSec: 30,
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.videoJob.deleteMany({ where: { id: videoA.id } });
+    await prisma.script.deleteMany({ where: { id: { in: [scriptA.id, scriptB.id] } } });
+  });
+
+  it("blocks cross-workspace script lookup", async () => {
+    const own = await prisma.script.findFirst({
+      where: { id: scriptA.id, workspaceId: workspaceA },
+    });
+    const foreign = await prisma.script.findFirst({
+      where: { id: scriptA.id, workspaceId: workspaceB },
+    });
+    expect(own?.id).toBe(scriptA.id);
+    expect(foreign).toBeNull();
+  });
+
+  it("blocks cross-workspace video lookup", async () => {
+    const own = await prisma.videoJob.findFirst({
+      where: { id: videoA.id, workspaceId: workspaceA },
+    });
+    const foreign = await prisma.videoJob.findFirst({
+      where: { id: videoA.id, workspaceId: workspaceB },
+    });
+    expect(own?.id).toBe(videoA.id);
+    expect(foreign).toBeNull();
+  });
+
+  it("cross-workspace updates affect zero rows", async () => {
+    const scriptResult = await prisma.script.updateMany({
+      where: { id: scriptA.id, workspaceId: workspaceB },
+      data: { title: "cross-tenant-write" },
+    });
+    const videoResult = await prisma.videoJob.updateMany({
+      where: { id: videoA.id, workspaceId: workspaceB },
+      data: { progress: 99 },
+    });
+
+    expect(scriptResult.count).toBe(0);
+    expect(videoResult.count).toBe(0);
+
+    const script = await prisma.script.findUnique({ where: { id: scriptA.id } });
+    const video = await prisma.videoJob.findUnique({ where: { id: videoA.id } });
+    expect(script?.title).not.toBe("cross-tenant-write");
+    expect(video?.progress).toBe(0);
+  });
+});
