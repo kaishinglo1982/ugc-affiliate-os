@@ -7,12 +7,14 @@ import {
   type HuggingFaceConfig,
 } from "@/lib/providers/llm/huggingface";
 import { decryptSecret } from "@/lib/encryption/aes";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export const metadata: Metadata = { title: "Integrationen" };
 
 async function loadHuggingFaceSettings() {
-  const integration = await prisma.integration.findUnique({
-    where: { providerKey: "huggingface" },
+  const workspaceId = await resolveWorkspaceId();
+  const integration = await prisma.integration.findFirst({
+    where: { providerKey: "huggingface", workspaceId },
     include: { credential: { select: { id: true, lastRotatedAt: true } } },
   });
 
@@ -23,8 +25,8 @@ async function loadHuggingFaceSettings() {
   let maskedKey: string | null = null;
   if (integration.credentialId) {
     try {
-      const credential = await prisma.encryptedCredential.findUnique({
-        where: { id: integration.credentialId },
+      const credential = await prisma.encryptedCredential.findFirst({
+        where: { id: integration.credentialId, workspaceId },
       });
       if (credential) {
         const plain = decryptSecret({
