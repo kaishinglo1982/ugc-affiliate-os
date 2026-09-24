@@ -53,7 +53,7 @@ export async function saveCampaignAction(
   if (campaignId) {
     const existing = await prisma.campaign.findFirst({ where: { id: campaignId, workspaceId } });
     if (!existing) return fail("Kampagne nicht gefunden.", requestId);
-    campaign = await prisma.campaign.update({ where: { id: existing.id }, data });
+    campaign = await prisma.campaign.update({ where: { id: existing.id, workspaceId }, data });
   } else {
     campaign = await prisma.campaign.create({ data });
   }
@@ -118,7 +118,7 @@ export async function deleteCampaignAction(id: string) {
       const workspaceId = await resolveWorkspaceId();
       const existing = await prisma.campaign.findFirst({ where: { id: input.id, workspaceId } });
       if (!existing) throw new Error("CAMPAIGN_NOT_FOUND");
-      await prisma.campaign.delete({ where: { id: existing.id } });
+      await prisma.campaign.delete({ where: { id: existing.id, workspaceId } });
       return { id: input.id };
     },
     entityId: (output) => output.id,
