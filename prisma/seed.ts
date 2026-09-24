@@ -663,6 +663,7 @@ async function seedAgents() {
 async function seedAutomations() {
   const automation = await prisma.automation.create({
     data: {
+      workspaceId: DEFAULT_WORKSPACE_ID,
       name: "Score-Alarm für neue Produkte",
       isActive: true,
       trigger: "PRODUCT_SCORE_ABOVE_THRESHOLD",
@@ -672,11 +673,12 @@ async function seedAutomations() {
     },
   });
   await prisma.automationRun.create({
-    data: { automationId: automation.id, status: "SUCCESS", runAt: daysAgo(2), message: "1 Produkt über Schwellenwert gefunden." },
+    data: { workspaceId: DEFAULT_WORKSPACE_ID, automationId: automation.id, status: "SUCCESS", runAt: daysAgo(2), message: "1 Produkt über Schwellenwert gefunden." },
   });
 
   const automation2 = await prisma.automation.create({
     data: {
+      workspaceId: DEFAULT_WORKSPACE_ID,
       name: "Fehlgeschlagene Posts benachrichtigen",
       isActive: true,
       trigger: "POST_FAILED",
@@ -686,7 +688,7 @@ async function seedAutomations() {
     },
   });
   await prisma.automationRun.create({
-    data: { automationId: automation2.id, status: "SUCCESS", runAt: daysAgo(5), message: "Benachrichtigung erstellt." },
+    data: { workspaceId: DEFAULT_WORKSPACE_ID, automationId: automation2.id, status: "SUCCESS", runAt: daysAgo(5), message: "Benachrichtigung erstellt." },
   });
   console.log("Seeded 2 automations with run history");
 }
