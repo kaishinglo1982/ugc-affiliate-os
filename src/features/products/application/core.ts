@@ -417,7 +417,7 @@ export async function runDiscoveryForQuery(
       }
 
       await prisma.productDiscoveryProviderRun.update({
-        where: { id: providerRunId },
+        where: { id: providerRunId, workspaceId },
         data: {
           status: "COMPLETED",
           discoveredOfferCount: result.offers.length,
@@ -451,7 +451,7 @@ export async function runDiscoveryForQuery(
         : "PARTIALLY_COMPLETED";
 
   await prisma.productDiscoveryRun.update({
-    where: { id: runId },
+    where: { id: runId, workspaceId },
     data: {
       status: finalStatus,
       successfulProviderCount: successfulProviders,
@@ -737,8 +737,10 @@ export async function overrideCompliance(
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<unknown> {
   const newStatus = decision === "approve" ? "PASSED" : "FAILED";
-  const profile = await prisma.productComplianceProfile.update({
-    where: { id: profileId },
+  const profile = await prisma.productComplianceProfile.findFirst({ where: { id: profileId, workspaceId } });
+  if (!profile) throw new Error("ProductComplianceProfile not found");
+  const updatedProfile = await prisma.productComplianceProfile.update({
+    where: { id: profile.id },
     data: { status: COMPLIANCE_STATUS_TO_PRISMA[newStatus === "PASSED" ? "passed" : "failed"] },
   });
 
@@ -1188,7 +1190,7 @@ export async function convertOpportunityToCampaign(
   });
 
   await prisma.productOpportunity.update({
-    where: { id: opportunityId },
+    where: { id: opportunity.id },
     data: { status: "CONVERTED_TO_CAMPAIGN" },
   });
 
