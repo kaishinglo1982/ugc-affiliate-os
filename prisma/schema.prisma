@@ -299,6 +299,8 @@ enum ScriptStatus {
 
 model Script {
   id          String       @id @default(uuid())
+  workspaceId String       @default("00000000-0000-0000-0000-000000000001")
+       @id @default(uuid())
   title       String
   productId   String?
   product     Product?     @relation(fields: [productId], references: [id])
@@ -415,6 +417,7 @@ enum MediaKind {
 
 model MediaAsset {
   id          String    @id @default(uuid())
+  workspaceId String    @default("00000000-0000-0000-0000-000000000001")
   kind        MediaKind
   fileName    String
   storageKey  String
@@ -560,6 +563,7 @@ enum RevenueStatus {
 
 model Revenue {
   id            String        @id @default(uuid())
+  workspaceId   String        @default("00000000-0000-0000-0000-000000000001")
   date          DateTime
   programId     String?
   program       AffiliateProgram? @relation(fields: [programId], references: [id])
@@ -596,6 +600,7 @@ enum ExpenseCategory {
 
 model Expense {
   id           String          @id @default(uuid())
+  workspaceId  String          @default("00000000-0000-0000-0000-000000000001")
   date         DateTime
   category     ExpenseCategory
   vendor       String?
@@ -618,6 +623,7 @@ model Expense {
 
 model TaxSetting {
   id                    String   @id @default(uuid())
+  workspaceId           String   @default("00000000-0000-0000-0000-000000000001")
   reserveRatePercent    Decimal  @db.Decimal(5, 2) @default(30)
   vatRatePercent        Decimal  @db.Decimal(5, 2) @default(19)
   vatEnabled            Boolean  @default(false)
