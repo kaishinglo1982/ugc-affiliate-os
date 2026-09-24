@@ -160,7 +160,7 @@ export async function retryVideoJobAction(id: string): Promise<Result<VideoJob>>
   });
 
   const updated = await prisma.videoJob.update({
-    where: { id: job.id },
+    where: { id: job.id, workspaceId },
     data: {
       status: "QUEUED",
       progress: 0,
