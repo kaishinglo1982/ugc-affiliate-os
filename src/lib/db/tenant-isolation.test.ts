@@ -58,3 +58,103 @@ describe("tenant isolation (Product)", () => {
     expect(unchanged?.description).not.toBe("should never apply");
   });
 });
+
+
+describe("tenant isolation (Notification)", () => {
+  let notificationA: { id: string };
+  let notificationB: { id: string };
+
+  beforeAll(async () => {
+    notificationA = await prisma.notification.create({
+      data: { workspaceId: workspaceA, title: "A", message: "workspace A" },
+    });
+    notificationB = await prisma.notification.create({
+      data: { workspaceId: workspaceB, title: "B", message: "workspace B" },
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.notification.deleteMany({
+      where: { id: { in: [notificationA.id, notificationB.id] } },
+    });
+  });
+
+  it("cannot read another workspace notification through a scoped lookup", async () => {
+    const own = await prisma.notification.findFirst({
+      where: { id: notificationA.id, workspaceId: workspaceA },
+    });
+    const foreign = await prisma.notification.findFirst({
+      where: { id: notificationA.id, workspaceId: workspaceB },
+    });
+
+    expect(own?.id).toBe(notificationA.id);
+    expect(foreign).toBeNull();
+  });
+
+  it("cannot update another workspace notification", async () => {
+    const result = await prisma.notification.updateMany({
+      where: { id: notificationA.id, workspaceId: workspaceB },
+      data: { readAt: new Date() },
+    });
+
+    expect(result.count).toBe(0);
+    const unchanged = await prisma.notification.findUnique({ where: { id: notificationA.id } });
+    expect(unchanged?.readAt).toBeNull();
+    expect(notificationB.id).not.toBe(notificationA.id);
+  });
+});
+
+describe("tenant isolation (AnalyticsEvent)", () => {
+  let eventA: { id: string };
+  let eventB: { id: string };
+
+  beforeAll(async () => {
+    eventA = await prisma.analyticsEvent.create({
+      data: {
+        workspaceId: workspaceA,
+        eventType: "VIEW",
+        source: "INTERNAL",
+        idempotencyKey: `tenant-test-a-${randomUUID()}`,
+        occurredAt: new Date(),
+      },
+    });
+    eventB = await prisma.analyticsEvent.create({
+      data: {
+        workspaceId: workspaceB,
+        eventType: "VIEW",
+        source: "INTERNAL",
+        idempotencyKey: `tenant-test-b-${randomUUID()}`,
+        occurredAt: new Date(),
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.analyticsEvent.deleteMany({
+      where: { id: { in: [eventA.id, eventB.id] } },
+    });
+  });
+
+  it("cannot read another workspace event through a scoped lookup", async () => {
+    const own = await prisma.analyticsEvent.findFirst({
+      where: { id: eventA.id, workspaceId: workspaceA },
+    });
+    const foreign = await prisma.analyticsEvent.findFirst({
+      where: { id: eventA.id, workspaceId: workspaceB },
+    });
+
+    expect(own?.id).toBe(eventA.id);
+    expect(foreign).toBeNull();
+  });
+
+  it("cannot update another workspace event", async () => {
+    const result = await prisma.analyticsEvent.updateMany({
+      where: { id: eventA.id, workspaceId: workspaceB },
+      data: { metadataReferenceId: "cross-tenant-write" },
+    });
+
+    expect(result.count).toBe(0);
+    const unchanged = await prisma.analyticsEvent.findUnique({ where: { id: eventA.id } });
+    expect(unchanged?.metadataReferenceId).not.toBe("cross-tenant-write");
+  });
+});
