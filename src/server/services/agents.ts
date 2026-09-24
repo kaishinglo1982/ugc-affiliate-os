@@ -84,7 +84,7 @@ export async function setAgentStatus(
   }
 
   const updated = await prisma.agent.update({
-    where: { id: agent.id },
+    where: { id: agent.id, workspaceId },
     data: { status: target },
     select: { id: true, status: true },
   });
