@@ -38,7 +38,7 @@ export async function POST(
 
   const actor = (await getCurrentUser())?.id ?? "owner";
   const updated = await prisma.workflowRun.update({
-    where: { id: run.id },
+    where: { id: run.id, workspaceId },
     data: { status: "CANCELLED", finishedAt: new Date() },
   });
 
