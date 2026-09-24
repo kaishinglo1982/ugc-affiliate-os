@@ -8,6 +8,7 @@ import { buildTrackedUrl, generateShortSlug } from "@/features/affiliate/link-bu
 import { ok, fail, newRequestId, type Result } from "@/types/result";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export async function saveAffiliateLinkAction(
   linkId: string | null,
@@ -16,6 +17,7 @@ export async function saveAffiliateLinkAction(
 ): Promise<Result<{ id: string }>> {
   const requestId = newRequestId();
   const user = await getCurrentUser();
+  const workspaceId = await resolveWorkspaceId();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
   const raw = Object.fromEntries(formData.entries());
@@ -51,11 +53,16 @@ export async function saveAffiliateLinkAction(
     utmTerm: parsed.data.utmTerm || null,
   };
 
-  const link = linkId
-    ? await prisma.affiliateLink.update({ where: { id: linkId }, data })
-    : await prisma.affiliateLink.create({
-        data: { ...data, shortSlug: generateShortSlug() },
-      });
+  let link;
+  if (linkId) {
+    const existing = await prisma.affiliateLink.findFirst({ where: { id: linkId, workspaceId } });
+    if (!existing) return fail("Affiliate-Link nicht gefunden.", requestId);
+    link = await prisma.affiliateLink.update({ where: { id: existing.id }, data });
+  } else {
+    link = await prisma.affiliateLink.create({
+      data: { ...data, workspaceId, shortSlug: generateShortSlug() },
+    });
+  }
 
   await writeAuditLog({
     action: linkId ? "affiliate_link.update" : "affiliate_link.create",
@@ -76,7 +83,10 @@ export async function deleteAffiliateLinkAction(id: string) {
     auditAction: "affiliate_link.delete",
     entityType: "AffiliateLink",
     handler: async (input) => {
-      await prisma.affiliateLink.delete({ where: { id: input.id } });
+      const workspaceId = await resolveWorkspaceId();
+      const existing = await prisma.affiliateLink.findFirst({ where: { id: input.id, workspaceId } });
+      if (!existing) throw new Error("AFFILIATE_LINK_NOT_FOUND");
+      await prisma.affiliateLink.delete({ where: { id: existing.id } });
       return { id: input.id };
     },
     entityId: (output) => output.id,
@@ -94,13 +104,15 @@ export async function testAffiliateLinkAction(id: string) {
     auditAction: "affiliate_link.test",
     entityType: "AffiliateLink",
     handler: async (input) => {
-      const link = await prisma.affiliateLink.findUniqueOrThrow({ where: { id: input.id } });
+      const workspaceId = await resolveWorkspaceId();
+      const link = await prisma.affiliateLink.findFirst({ where: { id: input.id, workspaceId } });
+      if (!link) throw new Error("AFFILIATE_LINK_NOT_FOUND");
       const target = link.deepLink || link.destinationUrl;
       const url = new URL(target);
 
       if (PRIVATE_HOST_PATTERN.test(url.hostname)) {
         return prisma.affiliateLink.update({
-          where: { id: input.id },
+          where: { id: link.id },
           data: { lastCheckedAt: new Date(), lastCheckStatus: "BLOCKED" },
         });
       }
@@ -122,7 +134,7 @@ export async function testAffiliateLinkAction(id: string) {
       }
 
       return prisma.affiliateLink.update({
-        where: { id: input.id },
+        where: { id: link.id },
         data: { lastCheckedAt: new Date(), lastCheckStatus: status },
       });
     },
