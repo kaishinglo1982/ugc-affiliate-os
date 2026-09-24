@@ -654,6 +654,7 @@ enum IntegrationCategory {
 
 model Integration {
   id            String              @id @default(uuid())
+  workspaceId   String              @default("00000000-0000-0000-0000-000000000001")
   providerKey   String              @unique
   displayName   String
   category      IntegrationCategory
@@ -667,11 +668,12 @@ model Integration {
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
 
-  @@index([category])
+  @@index([workspaceId, category])
 }
 
 model EncryptedCredential {
   id            String   @id @default(uuid())
+  workspaceId   String   @default("00000000-0000-0000-0000-000000000001")
   label         String
   cipherText    String
   iv            String
@@ -683,6 +685,8 @@ model EncryptedCredential {
   affiliatePrograms AffiliateProgram[]
   socialAccounts    SocialAccount[]
   integrations      Integration[]
+
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
