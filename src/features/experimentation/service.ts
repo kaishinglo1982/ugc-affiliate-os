@@ -260,6 +260,7 @@ export async function analyzeExperimentById(experimentId: string, workspaceId: s
 
   const result = await prisma.experimentResult.create({
     data: {
+      workspaceId,
       experimentId,
       analyzedAt: new Date(),
       status: outcome.status,
