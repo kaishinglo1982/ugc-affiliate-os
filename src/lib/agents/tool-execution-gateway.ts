@@ -115,6 +115,16 @@ export class PostgresToolExecutionGateway {
         return this.deny(client, request, now, tool.id, "TOOL_DISABLED", "tool is disabled");
       }
 
+      if (request.agentRunId) {
+        const run = await client.query<{ id: string }>(
+          `SELECT "id" FROM "AgentRun" WHERE "workspaceId" = $1 AND "id" = $2`,
+          [request.workspaceId, request.agentRunId],
+        );
+        if (run.rows.length === 0) {
+          throw new Error("AGENT_RUN_NOT_FOUND_IN_WORKSPACE");
+        }
+      }
+
       const policies = await client.query<{
         requiresApproval: boolean;
         maxCostPerCall: string | null;
