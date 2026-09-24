@@ -49,6 +49,17 @@ export async function uploadMediaAction(
     return fail("Keine Datei ausgewählt.", requestId);
   }
 
+  const [product, campaign] = await Promise.all([
+    metaParsed.data.productId
+      ? prisma.product.findFirst({ where: { id: metaParsed.data.productId, workspaceId }, select: { id: true } })
+      : Promise.resolve(null),
+    metaParsed.data.campaignId
+      ? prisma.campaign.findFirst({ where: { id: metaParsed.data.campaignId, workspaceId }, select: { id: true } })
+      : Promise.resolve(null),
+  ]);
+  if (metaParsed.data.productId && !product) return fail("Produkt nicht gefunden.", requestId);
+  if (metaParsed.data.campaignId && !campaign) return fail("Kampagne nicht gefunden.", requestId);
+
   const storage = await resolveStorageProvider();
   const uploaded: UploadedAssetSummary[] = [];
 
@@ -112,6 +123,17 @@ export async function updateMediaAction(
     campaignId: formData.get("campaignId") ?? "",
   });
   if (!parsed.success) return fail("Eingabe ungültig.", requestId);
+
+  const [product, campaign] = await Promise.all([
+    parsed.data.productId
+      ? prisma.product.findFirst({ where: { id: parsed.data.productId, workspaceId }, select: { id: true } })
+      : Promise.resolve(null),
+    parsed.data.campaignId
+      ? prisma.campaign.findFirst({ where: { id: parsed.data.campaignId, workspaceId }, select: { id: true } })
+      : Promise.resolve(null),
+  ]);
+  if (parsed.data.productId && !product) return fail("Produkt nicht gefunden.", requestId);
+  if (parsed.data.campaignId && !campaign) return fail("Kampagne nicht gefunden.", requestId);
 
   const existing = await prisma.mediaAsset.findFirst({ where: { id, workspaceId } });
   if (!existing) return fail("Medienobjekt nicht gefunden.", requestId);
