@@ -69,7 +69,7 @@ export async function savePostAction(
   if (postId) {
     const existing = await prisma.socialPost.findFirst({ where: { id: postId, workspaceId } });
     if (!existing) return fail("Post nicht gefunden.", requestId);
-    post = await prisma.socialPost.update({ where: { id: existing.id }, data });
+    post = await prisma.socialPost.update({ where: { id: existing.id, workspaceId }, data });
   } else {
     post = await prisma.socialPost.create({ data: { ...data, workspaceId, status: "DRAFT" } });
   }
@@ -261,7 +261,7 @@ export async function deletePostAction(id: string) {
       const workspaceId = await resolveWorkspaceId();
       const existing = await prisma.socialPost.findFirst({ where: { id: input.id, workspaceId } });
       if (!existing) throw new Error("SOCIAL_POST_NOT_FOUND");
-      await prisma.socialPost.delete({ where: { id: existing.id } });
+      await prisma.socialPost.delete({ where: { id: existing.id, workspaceId } });
       return { id: input.id };
     },
     entityId: (output) => output.id,
