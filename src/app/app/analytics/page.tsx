@@ -11,6 +11,7 @@ import { BarList } from "@/components/charts/bar-list";
 import { KpiCard } from "@/components/dashboard/kpi-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SOCIAL_POST_STATUS_LABELS } from "@/lib/status-labels";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export const metadata: Metadata = { title: "Analytics" };
 
@@ -29,6 +30,7 @@ interface AnalyticsPageProps {
 
 export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps) {
   const params = await searchParams;
+  const workspaceId = await resolveWorkspaceId();
   const period: DashboardPeriod = VALID_PERIODS.includes(params.period as DashboardPeriod)
     ? (params.period as DashboardPeriod)
     : "30d";
@@ -42,9 +44,9 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       programId: params.programId,
       contentStatus: params.contentStatus,
     }),
-    prisma.product.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
-    prisma.campaign.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
-    prisma.affiliateProgram.findMany({ select: { id: true, provider: true, customName: true }, orderBy: { provider: "asc" } }),
+    prisma.product.findMany({ where: { workspaceId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.campaign.findMany({ where: { workspaceId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.affiliateProgram.findMany({ where: { workspaceId }, select: { id: true, provider: true, customName: true }, orderBy: { provider: "asc" } }),
   ]);
 
   return (
