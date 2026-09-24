@@ -39,8 +39,22 @@ export async function saveAffiliateLinkAction(
     return fail("Ziel-URL oder Deep Link ist ungültig.", requestId);
   }
 
+  const program = await prisma.affiliateProgram.findFirst({
+    where: { id: parsed.data.programId, workspaceId },
+    select: { id: true },
+  });
+  if (!program) return fail("Affiliate-Programm nicht gefunden.", requestId);
+
+  if (parsed.data.productId) {
+    const product = await prisma.product.findFirst({
+      where: { id: parsed.data.productId, workspaceId },
+      select: { id: true },
+    });
+    if (!product) return fail("Produkt nicht gefunden.", requestId);
+  }
+
   const data = {
-    programId: parsed.data.programId,
+    programId: program.id,
     productId: parsed.data.productId || null,
     label: parsed.data.label,
     destinationUrl: parsed.data.destinationUrl,
