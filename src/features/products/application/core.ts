@@ -558,7 +558,7 @@ export async function recomputeMatchesForPendingOffers(
       if (candidate.productId === offer.productId) continue;
 
       const dup = await tx.productMatchCandidate.findFirst({
-        where: { sourceOfferId: offer.id, candidateProductId: candidate.productId },
+        where: { workspaceId, sourceOfferId: offer.id, candidateProductId: candidate.productId },
         select: { id: true },
       });
       if (dup) continue;
@@ -606,8 +606,10 @@ export async function confirmMatch(
   actor: string,
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<void> {
+  const candidate = await prisma.productMatchCandidate.findFirst({ where: { id: candidateId, workspaceId } });
+  if (!candidate) throw new Error("ProductMatchCandidate not found");
   await prisma.productMatchCandidate.update({
-    where: { id: candidateId },
+    where: { id: candidate.id },
     data: {
       status: "CONFIRMED",
       decidedAt: new Date(),
@@ -628,8 +630,10 @@ export async function rejectMatch(
   actor: string,
   workspaceId: string = DEFAULT_WORKSPACE_ID,
 ): Promise<void> {
+  const candidate = await prisma.productMatchCandidate.findFirst({ where: { id: candidateId, workspaceId } });
+  if (!candidate) throw new Error("ProductMatchCandidate not found");
   await prisma.productMatchCandidate.update({
-    where: { id: candidateId },
+    where: { id: candidate.id },
     data: {
       status: "REJECTED",
       decidedAt: new Date(),
@@ -846,7 +850,7 @@ export async function estimateProfitabilityForOffer(
     evidence: ["heuristic"],
   });
 
-  await prisma.productProfitabilityEstimate.deleteMany({ where: { affiliateOfferId: offerId } });
+  await prisma.productProfitabilityEstimate.deleteMany({ where: { workspaceId, affiliateOfferId: offerId } });
   const created = await prisma.productProfitabilityEstimate.create({
     data: {
       workspaceId,
@@ -1080,7 +1084,9 @@ async function applyProductDecision(
   const prismaStatus = PRODUCT_STATUS_TO_PRISMA[nextProductStatus(action)];
   const data: Prisma.ProductUncheckedUpdateInput = { status: prismaStatus };
   if (action === "archive") data.archivedAt = new Date();
-  const product = await prisma.product.update({ where: { id: productId }, data });
+  const product = await prisma.product.findFirst({ where: { id: productId, workspaceId } });
+  if (!product) throw new Error("Product not found");
+  const updatedProduct = await prisma.product.update({ where: { id: product.id }, data });
 
   await prisma.approval.create({
     data: {
@@ -1102,7 +1108,7 @@ async function applyProductDecision(
     actor,
   });
 
-  return product;
+  return updatedProduct;
 }
 
 export async function approveOpportunity(
@@ -1443,7 +1449,7 @@ export async function scanDataQualityForProduct(
   });
 
   await prisma.$transaction(async (tx: Tx) => {
-    await tx.productDataQualityReport.deleteMany({ where: { productId } });
+    await tx.productDataQualityReport.deleteMany({ where: { productId, workspaceId } });
     const report = await tx.productDataQualityReport.create({
       data: {
         workspaceId,
