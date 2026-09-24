@@ -183,6 +183,7 @@ enum IntegrationMode {
 
 model AffiliateProgram {
   id             String               @id @default(uuid())
+  workspaceId    String               @default("00000000-0000-0000-0000-000000000001")
   provider       AffiliateProviderKey
   customName     String?
   trackingId     String?
@@ -198,11 +199,12 @@ model AffiliateProgram {
   revenues Revenue[]
   offers   AffiliateOffer[]
 
-  @@index([provider])
+  @@index([workspaceId, provider])
 }
 
 model AffiliateLink {
   id               String            @id @default(uuid())
+  workspaceId      String            @default("00000000-0000-0000-0000-000000000001")
   programId        String
   program          AffiliateProgram  @relation(fields: [programId], references: [id], onDelete: Cascade)
   productId        String?
@@ -226,8 +228,8 @@ model AffiliateLink {
   clicks       LinkClick[]
   campaignLinks Campaign[]
 
-  @@index([programId])
-  @@index([productId])
+  @@index([workspaceId, programId])
+  @@index([workspaceId, productId])
 }
 
 model LinkClick {
