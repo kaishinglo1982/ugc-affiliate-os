@@ -33,8 +33,30 @@ export async function savePostAction(
     return fail("Eingabe ungültig.", requestId, parsed.error.flatten().fieldErrors);
   }
 
+  const account = await prisma.socialAccount.findFirst({
+    where: { id: parsed.data.accountId, workspaceId },
+    select: { id: true },
+  });
+  if (!account) return fail("Social-Account nicht gefunden.", requestId);
+
+  if (parsed.data.campaignId) {
+    const campaign = await prisma.campaign.findFirst({
+      where: { id: parsed.data.campaignId, workspaceId },
+      select: { id: true },
+    });
+    if (!campaign) return fail("Kampagne nicht gefunden.", requestId);
+  }
+
+  if (parsed.data.mediaAssetId) {
+    const mediaAsset = await prisma.mediaAsset.findFirst({
+      where: { id: parsed.data.mediaAssetId, workspaceId },
+      select: { id: true },
+    });
+    if (!mediaAsset) return fail("Media-Asset nicht gefunden.", requestId);
+  }
+
   const data = {
-    accountId: parsed.data.accountId,
+    accountId: account.id,
     campaignId: parsed.data.campaignId || null,
     mediaAssetId: parsed.data.mediaAssetId || null,
     caption: parsed.data.caption,
