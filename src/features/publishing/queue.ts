@@ -83,7 +83,7 @@ export async function enqueuePublish(postId: string, actor: string): Promise<Soc
 
   await prisma.$transaction([
     prisma.publishJob.create({ data: { workspaceId, postId, status: "PENDING" } }),
-    prisma.socialPost.update({ where: { id: postId }, data: { status: "SCHEDULED" } }),
+    prisma.socialPost.update({ where: { id: post.id }, data: { status: "SCHEDULED" } }),
   ]);
   await writeAuditLog({
     action: "social_post.enqueue",
@@ -92,7 +92,7 @@ export async function enqueuePublish(postId: string, actor: string): Promise<Soc
     actor,
     metadata: { from: post.status },
   });
-  const refreshed = await prisma.socialPost.findUnique({ where: { id: postId } });
+  const refreshed = await prisma.socialPost.findFirst({ where: { id: postId, workspaceId } });
   if (!refreshed) throw new PublishError("Post nicht gefunden.");
   return refreshed;
 }
@@ -250,7 +250,7 @@ export async function retryDeadLetterJob(jobId: string, actor: string): Promise<
     throw new PublishError("Nur tote Jobs können manuell wiederholt werden.");
   }
   await prisma.publishJob.update({
-    where: { id: jobId },
+    where: { id: job.id },
     data: { status: "PENDING", attempts: 0, lastError: null, nextAttemptAt: null },
   });
   await writeAuditLog({
