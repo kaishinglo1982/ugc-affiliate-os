@@ -103,7 +103,7 @@ async function transitionPost(
   }
 
   const updated = await prisma.socialPost.update({
-    where: { id: post.id },
+    where: { id: current.id },
     data: { status: to, ...extraData },
   });
 
@@ -170,7 +170,7 @@ export async function publishPostAction(id: string): Promise<Result<SocialPost &
     return fail(`Post kann aus Status "${post.status}" nicht veröffentlicht werden.`, requestId);
   }
 
-  await prisma.socialPost.update({ where: { id }, data: { status: "PUBLISHING" } });
+  await prisma.socialPost.update({ where: { id: post.id }, data: { status: "PUBLISHING" } });
 
   const provider = resolveSocialProvider(post.account.platform);
   const result = await provider.publish({
@@ -182,7 +182,7 @@ export async function publishPostAction(id: string): Promise<Result<SocialPost &
   });
 
   const updated = await prisma.socialPost.update({
-    where: { id },
+    where: { id: post.id },
     data: result.success
       ? { status: "PUBLISHED", publishedAt: new Date(), errorMessage: null, attempts: { increment: 1 } }
       : { status: "FAILED", errorMessage: result.errorMessage ?? "Veröffentlichung fehlgeschlagen.", attempts: { increment: 1 } },
