@@ -1306,6 +1306,7 @@ model AnalyticsEvent {
   @@index([contentAssetId])
   @@index([experimentId])
   @@index([externalPostId])
+  @@unique([workspaceId, idempotencyKey])
 }
 
 // ---------------------------------------------------------------------------
@@ -1372,6 +1373,7 @@ model AnalyticsSyncJob {
   @@index([status, nextAttemptAt])
   @@index([workspaceId, jobType])
   @@index([socialAccountId])
+  @@unique([workspaceId, idempotencyKey])
 }
 
 model AnalyticsProviderMapping {
@@ -2084,6 +2086,7 @@ model ProductDiscoveryRun {
 
   @@index([workspaceId, queryId])
   @@index([workspaceId, status])
+  @@unique([workspaceId, idempotencyKey])
 }
 
 model ProductDiscoveryProviderRun {
@@ -2124,6 +2127,7 @@ model ProductImportBatch {
   rows  ProductImportRow[]
 
   @@index([workspaceId, previewToken])
+  @@unique([workspaceId, previewToken])
 }
 
 model ProductImportRow {
@@ -2341,6 +2345,7 @@ model ProductResearchJob {
   createdAt      DateTime          @default(now())
 
   @@index([workspaceId, jobType, status])
+  @@unique([workspaceId, idempotencyKey])
 }
 
 model ProductSourceConfiguration {
@@ -3189,6 +3194,7 @@ model CampaignFactoryRun {
 
   @@index([workspaceId, status])
   @@index([workspaceId, campaignCandidateId])
+  @@unique([workspaceId, idempotencyKey])
 }
 
 model CampaignQualityPolicy {
@@ -3845,6 +3851,7 @@ model MediaGenerationJob {
   @@index([workspaceId, mediaProductionProjectId])
   @@index([workspaceId, mediaSceneId])
   @@index([workspaceId, idempotencyKey])
+  @@unique([workspaceId, idempotencyKey])
 }
 
 model MediaGenerationAttempt {
@@ -3998,6 +4005,7 @@ model RenderJob {
   @@index([workspaceId, status])
   @@index([workspaceId, mediaProductionProjectId])
   @@index([workspaceId, idempotencyKey])
+  @@unique([workspaceId, idempotencyKey])
 }
 
 model SubtitleTrack {
