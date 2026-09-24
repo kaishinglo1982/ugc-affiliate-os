@@ -1134,8 +1134,10 @@ async function applyOpportunityDecision(
   workspaceId: string,
 ): Promise<unknown> {
   const prismaStatus = OPPORTUNITY_STATUS_TO_PRISMA[action === "approve" ? "approved" : "rejected"];
-  const opportunity = await prisma.productOpportunity.update({
-    where: { id: opportunityId },
+  const opportunity = await prisma.productOpportunity.findFirst({ where: { id: opportunityId, workspaceId } });
+  if (!opportunity) throw new Error("ProductOpportunity not found");
+  const updatedOpportunity = await prisma.productOpportunity.update({
+    where: { id: opportunity.id },
     data: { status: prismaStatus },
   });
 
@@ -1160,7 +1162,7 @@ async function applyOpportunityDecision(
     actor,
   });
 
-  return opportunity;
+  return updatedOpportunity;
 }
 
 export async function convertOpportunityToCampaign(
