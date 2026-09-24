@@ -46,7 +46,7 @@ export async function POST(
   }
 
   const approval = await prisma.approval.update({
-    where: { id: existing.id },
+    where: { id: existing.id, workspaceId },
     data: {
       status: parsed.data.decision,
       decidedBy: actor,
