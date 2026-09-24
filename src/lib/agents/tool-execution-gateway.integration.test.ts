@@ -83,7 +83,7 @@ describeDb("PostgresToolExecutionGateway", () => {
 
     await pool.query(
       `INSERT INTO "Agent" ("id", "workspaceId", "key", "name", "role", "status", "updatedAt")
-       VALUES ($1, $2, $3, $4, 'IDLE', NOW())`,
+       VALUES ($1, $2, $3, $4, $5, 'IDLE', NOW())`,
       [agentId, foreignWorkspaceId, `foreign-agent-${randomUUID()}`, "Foreign agent", "test"],
     );
     await pool.query(
