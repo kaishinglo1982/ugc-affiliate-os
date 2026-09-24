@@ -365,7 +365,7 @@ export async function updateAgentMemoryEntry(
   const existing = await prisma.agentMemoryEntry.findFirst({ where: { id, workspaceId } });
   if (!existing) throw new Error("AGENT_MEMORY_NOT_FOUND");
   return prisma.agentMemoryEntry.update({
-    where: { id: existing.id },
+    where: { id: existing.id, workspaceId },
     data: {
       ...(patch.type ? { type: patch.type } : {}),
       ...(patch.key ? { key: patch.key } : {}),
