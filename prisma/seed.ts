@@ -7,6 +7,8 @@ import { computeProductScore, type ScoreDimensions } from "../src/features/produ
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
+const DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const ALLOW_DEMO_SEED = process.env.ALLOW_DEMO_SEED === "true";
 
