@@ -349,7 +349,7 @@ export async function runDiscoveryForQuery(
             },
           });
           await prisma.product.update({
-            where: { id: productId },
+            where: { id: productId, workspaceId },
             data: { lastVerifiedAt: new Date() },
           });
           counters.updatedProductCount++;
