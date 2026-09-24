@@ -90,7 +90,7 @@ export async function updateAngle(id: string, input: UpdateAngleInput, workspace
   if (parsed.recommendedScriptStructures) {
     data.recommendedScriptStructures = parsed.recommendedScriptStructures as ScriptStructureType[];
   }
-  const updated = await prisma.creativeAngle.update({ where: { id }, data });
+  const updated = await prisma.creativeAngle.update({ where: { id, workspaceId }, data });
   const actor = (await getCurrentUser())?.id ?? "owner";
   await writeAuditLog({
     action: "creative_angle.updated",
