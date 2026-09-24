@@ -237,9 +237,9 @@ export async function startAgentRun(
 export async function finishAgentRun(
   runId: string,
   input: AgentRunFinishInput,
-  options: { incrementObservability?: boolean } = {},
+  options: { workspaceId?: string; incrementObservability?: boolean } = {},
 ): Promise<{ id: string; status: AgentRunStatus; finishedAt: Date | null }> {
-  const workspaceId = await resolveWorkspaceId();
+  const workspaceId = options.workspaceId ?? (await resolveWorkspaceId());
   const run = await prisma.agentRun.findFirst({
     where: { id: runId, workspaceId },
     select: { id: true, status: true, agentId: true },
