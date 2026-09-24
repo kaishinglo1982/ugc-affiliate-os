@@ -89,7 +89,7 @@ export async function updateStrategy(id: string, input: UpdateStrategyInput, wor
   if (parsed.estimatedBudget != null) {
     data.estimatedBudget = new Prisma.Decimal(Number(parsed.estimatedBudget));
   }
-  const updated = await prisma.campaignStrategy.update({ where: { id }, data });
+  const updated = await prisma.campaignStrategy.update({ where: { id, workspaceId }, data });
   const actor = (await getCurrentUser())?.id ?? "owner";
   await writeAuditLog({
     action: "campaign_strategy.updated",
