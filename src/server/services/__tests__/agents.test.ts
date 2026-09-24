@@ -311,7 +311,7 @@ describe("agents service — memory CRUD", () => {
     await updateAgentMemoryEntry("m1", "ws1", { importance: 5 });
 
     expect(prismaMock.agentMemoryEntry.update).toHaveBeenCalledWith({
-      where: { id: "m1" },
+      where: { id: "m1", workspaceId: "ws1" },
       data: { importance: 5 },
     });
   });
