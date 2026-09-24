@@ -233,13 +233,15 @@ model AffiliateLink {
 }
 
 model LinkClick {
-  id        String        @id @default(uuid())
+  id          String        @id @default(uuid())
+  workspaceId String        @default("00000000-0000-0000-0000-000000000001")
   linkId    String
   link      AffiliateLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
   occurredAt DateTime     @default(now())
   source    String?
 
-  @@index([linkId])
+  @@index([workspaceId, linkId])
+  @@index([workspaceId, occurredAt])
 }
 
 // ---------------------------------------------------------------------------
