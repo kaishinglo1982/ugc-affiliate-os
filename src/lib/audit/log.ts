@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/client";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import type { Prisma } from "@/generated/prisma/client";
 
 interface AuditEntryInput {
@@ -13,8 +14,10 @@ interface AuditEntryInput {
 /** Writes one audit trail entry. Never throws — audit failures must not break the mutation. */
 export async function writeAuditLog(entry: AuditEntryInput): Promise<void> {
   try {
+    const workspaceId = await resolveWorkspaceId();
     await prisma.auditLog.create({
       data: {
+        workspaceId,
         action: entry.action,
         entityType: entry.entityType,
         entityId: entry.entityId,
