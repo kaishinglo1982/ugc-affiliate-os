@@ -19,7 +19,7 @@ export async function markNotificationReadAction(id: string) {
       const existing = await prisma.notification.findFirst({ where: { id: input.id, workspaceId } });
       if (!existing) throw new Error("NOTIFICATION_NOT_FOUND");
       const notification = await prisma.notification.update({
-        where: { id: existing.id },
+        where: { id: existing.id, workspaceId },
         data: { readAt: new Date() },
       });
       return notification;
