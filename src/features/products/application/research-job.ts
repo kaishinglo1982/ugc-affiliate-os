@@ -67,7 +67,7 @@ async function runStep(
   try {
     await fn();
     await prisma.productResearchJob.update({
-      where: { id: jobId },
+      where: { id: jobId, workspaceId },
       data: { status: "COMPLETED", completedAt: new Date() },
     });
     return { name, status: "completed" };
