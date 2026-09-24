@@ -2463,6 +2463,25 @@ enum WorkflowStatus {
   ARCHIVED
 }
 
+enum WorkflowStepType {
+  AGENT
+  TOOL
+  APPROVAL
+  CONDITION
+}
+
+enum WorkflowRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  CANCELLED
+  QUEUED
+  WAITING_FOR_APPROVAL
+  PAUSED
+  RETRYING
+  COMPENSATING
+}
+
 model WorkflowDefinition {
   id             String         @id @default(uuid())
   workspaceId    String         @default("00000000-0000-0000-0000-000000000001")
