@@ -34,7 +34,7 @@ export async function PATCH(
   const existing = await prisma.agent.findFirst({ where: { id, workspaceId } });
   if (!existing) return NextResponse.json({ error: "Agent nicht gefunden." }, { status: 404 });
   const agent = await prisma.agent.update({
-    where: { id: existing.id },
+    where: { id: existing.id, workspaceId },
     data: {
       status: parsed.data.status as AgentStatus,
       ...(parsed.data.name ? { name: parsed.data.name } : {}),
