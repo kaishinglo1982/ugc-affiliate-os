@@ -689,7 +689,7 @@ export async function evaluateComplianceForProduct(
   });
 
   await prisma.$transaction(async (tx: Tx) => {
-    await tx.productComplianceProfile.deleteMany({ where: { productId } });
+    await tx.productComplianceProfile.deleteMany({ where: { productId, workspaceId } });
     await tx.productComplianceProfile.create({
       data: {
         workspaceId,
