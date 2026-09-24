@@ -25,6 +25,28 @@ async function assertPublishingEnabled(): Promise<void> {
  * default (SOCIAL_LIVE_ADAPTERS_ENABLED=false); the mock provider is always used
  * unless live adapters are explicitly enabled AND the account is in LIVE mode.
  */
+async function assertPostRelationsInWorkspace(postId: string, workspaceId: string): Promise<void> {
+  const post = await prisma.socialPost.findFirst({
+    where: { id: postId, workspaceId },
+    select: { accountId: true, campaignId: true, mediaAssetId: true },
+  });
+  if (!post) throw new PublishError("Post nicht gefunden.");
+
+  const [account, campaign, mediaAsset] = await Promise.all([
+    prisma.socialAccount.findFirst({ where: { id: post.accountId, workspaceId }, select: { id: true } }),
+    post.campaignId
+      ? prisma.campaign.findFirst({ where: { id: post.campaignId, workspaceId }, select: { id: true } })
+      : Promise.resolve(null),
+    post.mediaAssetId
+      ? prisma.mediaAsset.findFirst({ where: { id: post.mediaAssetId, workspaceId }, select: { id: true } })
+      : Promise.resolve(null),
+  ]);
+
+  if (!account) throw new PublishError("Social-Account gehört nicht zum aktuellen Workspace.");
+  if (post.campaignId && !campaign) throw new PublishError("Kampagne gehört nicht zum aktuellen Workspace.");
+  if (post.mediaAssetId && !mediaAsset) throw new PublishError("Media-Asset gehört nicht zum aktuellen Workspace.");
+}
+
 function resolvePublisher(account: SocialAccount) {
   if (featureFlags.liveAdaptersEnabled && account.mode === "LIVE") {
     // Live adapters are intentionally out of scope for the mock-first Phase 5
@@ -136,6 +158,7 @@ export async function processPublishQueue(limit = 10): Promise<PublishWorkerRepo
     const post = job.post;
     await prisma.publishJob.update({ where: { id: job.id, workspaceId }, data: { status: "PROCESSING" } });
 
+      await assertPostRelationsInWorkspace(post.id, workspaceId);
     const publisher = resolvePublisher(post.account);
     let success = false;
     let externalPostUrl: string | undefined;
