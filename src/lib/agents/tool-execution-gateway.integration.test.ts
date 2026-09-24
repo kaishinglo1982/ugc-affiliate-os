@@ -75,6 +75,41 @@ describeDb("PostgresToolExecutionGateway", () => {
     ).rejects.toThrow(ToolExecutionDeniedError);
   });
 
+  it("rejects an agent run from another workspace before execution", async () => {
+    const { toolName } = await createTool({ workspaceId });
+    const foreignWorkspaceId = randomUUID();
+    const agentId = randomUUID();
+    const agentRunId = randomUUID();
+
+    await pool.query(
+      `INSERT INTO "Agent" ("id", "workspaceId", "key", "name", "status", "updatedAt")
+       VALUES ($1, $2, $3, $4, 'IDLE', NOW())`,
+      [agentId, foreignWorkspaceId, `foreign-agent-${randomUUID()}`, "Foreign agent"],
+    );
+    await pool.query(
+      `INSERT INTO "AgentRun" ("id", "workspaceId", "agentId", "status", "startedAt")
+       VALUES ($1, $2, $3, 'RUNNING', NOW())`,
+      [agentRunId, foreignWorkspaceId, agentId],
+    );
+
+    await expect(
+      gateway.execute(
+        { workspaceId, toolName, agentKey: "agent-a", agentRunId },
+        async () => ({ output: { shouldNotRun: true } }),
+      ),
+    ).rejects.toThrow("AGENT_RUN_NOT_FOUND_IN_WORKSPACE");
+
+    const calls = await pool.query(
+      `SELECT COUNT(*)::int AS count FROM "AgentToolCall"
+       WHERE "workspaceId" = $1 AND "agentRunId" = $2`,
+      [workspaceId, agentRunId],
+    );
+    expect(calls.rows[0].count).toBe(0);
+
+    await pool.query(`DELETE FROM "AgentRun" WHERE "id" = $1 AND "workspaceId" = $2`, [agentRunId, foreignWorkspaceId]);
+    await pool.query(`DELETE FROM "Agent" WHERE "id" = $1 AND "workspaceId" = $2`, [agentId, foreignWorkspaceId]);
+  });
+
   it("denies disabled tools and records the denial", async () => {
     const { toolName, toolId } = await createTool({ workspaceId, enabled: false });
 
