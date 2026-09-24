@@ -696,6 +696,7 @@ enum AgentStatus {
 
 model Agent {
   id             String      @id @default(uuid())
+  workspaceId    String      @default("00000000-0000-0000-0000-000000000001")
   key            String      @unique
   name           String
   role           String
@@ -712,6 +713,8 @@ model Agent {
   updatedAt      DateTime    @updatedAt
 
   runs AgentRun[]
+
+  @@index([workspaceId])
 }
 
 enum AgentRunStatus {
@@ -731,7 +734,9 @@ model AgentRun {
   logs       Json?
   toolCalls  AgentToolCall[]
 
+  workspaceId String         @default("00000000-0000-0000-000000000001")
   @@index([agentId])
+  @@index([workspaceId, agentId])
 }
 
 enum AutomationTrigger {
