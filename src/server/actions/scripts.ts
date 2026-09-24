@@ -210,7 +210,7 @@ export async function changeScriptStatusAction(id: string, status: string) {
       const workspaceId = await resolveWorkspaceId();
       const existing = await prisma.script.findFirst({ where: { id: input.id, workspaceId } });
       if (!existing) throw new Error("SCRIPT_NOT_FOUND");
-      return prisma.script.update({ where: { id: existing.id }, data: { status: input.status } });
+      return prisma.script.update({ where: { id: existing.id, workspaceId }, data: { status: input.status } });
     },
     entityId: (output) => output.id,
   });
@@ -228,7 +228,7 @@ export async function deleteScriptAction(id: string) {
       const workspaceId = await resolveWorkspaceId();
       const existing = await prisma.script.findFirst({ where: { id: input.id, workspaceId } });
       if (!existing) throw new Error("SCRIPT_NOT_FOUND");
-      await prisma.script.delete({ where: { id: existing.id } });
+      await prisma.script.delete({ where: { id: existing.id, workspaceId } });
       return { id: input.id };
     },
     entityId: (output) => output.id,
