@@ -148,7 +148,7 @@ export async function testAffiliateLinkAction(id: string) {
       }
 
       return prisma.affiliateLink.update({
-        where: { id: link.id },
+        where: { id: link.id, workspaceId },
         data: { lastCheckedAt: new Date(), lastCheckStatus: status },
       });
     },
