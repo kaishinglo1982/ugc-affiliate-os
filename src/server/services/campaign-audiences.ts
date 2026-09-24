@@ -84,7 +84,7 @@ export async function deleteAudience(id: string, workspaceId: string) {
   if (audience.status !== "draft") {
     throw new Error("Nur Entwürfe können gelöscht werden.");
   }
-  await prisma.campaignAudienceProfile.delete({ where: { id: audience.id } });
+  await prisma.campaignAudienceProfile.delete({ where: { id: audience.id, workspaceId } });
   const actor = (await getCurrentUser())?.id ?? "owner";
   await writeAuditLog({
     action: "campaign_audience.deleted",
