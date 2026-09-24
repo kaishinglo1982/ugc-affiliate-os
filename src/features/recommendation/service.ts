@@ -102,7 +102,7 @@ export async function reviewRecommendation(id: string, actor: string, status: "R
   const rec = await prisma.optimizationRecommendation.findFirst({ where: { id, workspaceId } });
   if (!rec) throw new RecommendationError("Empfehlung nicht gefunden.");
   const updated = await prisma.optimizationRecommendation.update({
-    where: { id },
+    where: { id: rec.id },
     data: { status, reviewedAt: new Date(), reviewedBy: actor },
   });
   await writeAuditLog({ action: "recommendation.reviewed", entityType: "OptimizationRecommendation", entityId: id, actor, metadata: { status, note } });
