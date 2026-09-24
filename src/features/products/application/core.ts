@@ -1088,7 +1088,7 @@ async function applyProductDecision(
   if (action === "archive") data.archivedAt = new Date();
   const product = await prisma.product.findFirst({ where: { id: productId, workspaceId } });
   if (!product) throw new Error("Product not found");
-  const updatedProduct = await prisma.product.update({ where: { id: product.id }, data });
+  const updatedProduct = await prisma.product.update({ where: { id: product.id, workspaceId }, data });
 
   await prisma.approval.create({
     data: {
@@ -1139,7 +1139,7 @@ async function applyOpportunityDecision(
   const opportunity = await prisma.productOpportunity.findFirst({ where: { id: opportunityId, workspaceId } });
   if (!opportunity) throw new Error("ProductOpportunity not found");
   const updatedOpportunity = await prisma.productOpportunity.update({
-    where: { id: opportunity.id },
+    where: { id: opportunity.id, workspaceId },
     data: { status: prismaStatus },
   });
 
@@ -1190,7 +1190,7 @@ export async function convertOpportunityToCampaign(
   });
 
   await prisma.productOpportunity.update({
-    where: { id: opportunity.id },
+    where: { id: opportunity.id, workspaceId },
     data: { status: "CONVERTED_TO_CAMPAIGN" },
   });
 
@@ -1382,7 +1382,7 @@ export async function commitImport(
     }
 
     await tx.productImportBatch.update({
-      where: { id: batch.id },
+      where: { id: batch.id, workspaceId },
       data: { status: "committed", committedAt: new Date() },
     });
   });
