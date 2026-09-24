@@ -71,7 +71,7 @@ export async function approvePost(postId: string, actor: string): Promise<Social
     throw new PublishError(`Post kann aus Status "${post.status}" nicht freigegeben werden.`);
   }
   const updated = await prisma.socialPost.update({
-    where: { id: postId },
+    where: { id: post.id },
     data: { status: "APPROVED", approvedBy: actor, approvedAt: new Date() },
   });
   await writeAuditLog({
