@@ -5,6 +5,7 @@ import { Permission } from "@/lib/auth/rbac";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/db/client";
 import { writeAuditLog } from "@/lib/audit/log";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import type { AgentStatus } from "@/generated/prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -23,14 +24,17 @@ export async function PATCH(
   if (guard) return guard.response;
 
   const { id } = await context.params;
+  const workspaceId = await resolveWorkspaceId();
   const parsed = patchSchema.safeParse(await request.json());
   if (!parsed.success) {
     return NextResponse.json({ error: "Ungültige Eingabe." }, { status: 400 });
   }
 
   const actor = (await getCurrentUser())?.id ?? "owner";
+  const existing = await prisma.agent.findFirst({ where: { id, workspaceId } });
+  if (!existing) return NextResponse.json({ error: "Agent nicht gefunden." }, { status: 404 });
   const agent = await prisma.agent.update({
-    where: { id },
+    where: { id: existing.id },
     data: {
       status: parsed.data.status as AgentStatus,
       ...(parsed.data.name ? { name: parsed.data.name } : {}),
