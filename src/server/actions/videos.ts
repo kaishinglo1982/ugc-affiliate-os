@@ -25,6 +25,14 @@ export async function createVideoJobAction(
   }
 
   const input = parsed.data;
+  const [script, product, campaign] = await Promise.all([
+    input.scriptId ? prisma.script.findFirst({ where: { id: input.scriptId, workspaceId }, select: { id: true } }) : null,
+    input.productId ? prisma.product.findFirst({ where: { id: input.productId, workspaceId }, select: { id: true } }) : null,
+    input.campaignId ? prisma.campaign.findFirst({ where: { id: input.campaignId, workspaceId }, select: { id: true } }) : null,
+  ]);
+  if (input.scriptId && !script) return fail("Skript nicht gefunden.", requestId);
+  if (input.productId && !product) return fail("Produkt nicht gefunden.", requestId);
+  if (input.campaignId && !campaign) return fail("Kampagne nicht gefunden.", requestId);
 
   const job = await prisma.videoJob.create({
     data: {
@@ -180,7 +188,7 @@ export async function cancelVideoJobAction(id: string): Promise<Result<VideoJob>
   const workspaceId = await resolveWorkspaceId();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
-  const job = await prisma.videoJob.findUnique({ where: { id } });
+  const job = await prisma.videoJob.findFirst({ where: { id, workspaceId } });
   if (!job) return fail("Video-Job nicht gefunden.", requestId);
 
   const provider = resolveVideoProvider(job.provider);
