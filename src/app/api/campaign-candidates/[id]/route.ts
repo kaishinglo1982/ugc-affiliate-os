@@ -108,7 +108,7 @@ export async function PATCH(
       : {}),
   };
   const candidate = await prisma.campaignCandidate.update({
-    where: { id },
+    where: { id: existing.id },
     data,
   });
   const actor = (await getCurrentUser())?.id ?? "owner";
