@@ -56,7 +56,7 @@ async function persistProductWithScore(
   if (productId) {
     const existing = await prisma.product.findFirst({ where: { id: productId, workspaceId } });
     if (!existing) throw new Error("PRODUCT_NOT_FOUND");
-    product = await prisma.product.update({ where: { id: existing.id }, data });
+    product = await prisma.product.update({ where: { id: existing.id, workspaceId }, data });
   } else {
     product = await prisma.product.create({ data });
   }
@@ -151,7 +151,7 @@ export async function toggleFavoriteAction(id: string, isFavorite: boolean) {
       const workspaceId = await resolveWorkspaceId();
       const existing = await prisma.product.findFirst({ where: { id: input.id, workspaceId } });
       if (!existing) throw new Error("PRODUCT_NOT_FOUND");
-      return prisma.product.update({ where: { id: existing.id }, data: { isFavorite } });
+      return prisma.product.update({ where: { id: existing.id, workspaceId }, data: { isFavorite } });
     },
     entityId: (output) => output.id,
   });
@@ -170,7 +170,7 @@ export async function archiveProductAction(id: string) {
       const existing = await prisma.product.findFirst({ where: { id: input.id, workspaceId } });
       if (!existing) throw new Error("PRODUCT_NOT_FOUND");
       return prisma.product.update({
-        where: { id: existing.id },
+        where: { id: existing.id, workspaceId },
         data: { status: "ARCHIVED", archivedAt: new Date() },
       });
     },
@@ -190,7 +190,7 @@ export async function deleteProductAction(id: string) {
       const workspaceId = await resolveWorkspaceId();
       const existing = await prisma.product.findFirst({ where: { id: input.id, workspaceId } });
       if (!existing) throw new Error("PRODUCT_NOT_FOUND");
-      await prisma.product.delete({ where: { id: existing.id } });
+      await prisma.product.delete({ where: { id: existing.id, workspaceId } });
       return { id: input.id };
     },
     entityId: (output) => output.id,
