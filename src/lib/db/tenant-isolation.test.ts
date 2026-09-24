@@ -249,7 +249,7 @@ describe("tenant isolation (MediaAsset + AffiliateLink)", () => {
     });
 
     const programA = await prisma.affiliateProgram.create({
-      data: { workspaceId: workspaceA, provider: "AMAZON" },
+      data: { workspaceId: workspaceA, provider: "AMAZON_ASSOCIATES" },
     });
     linkA = await prisma.affiliateLink.create({
       data: {
