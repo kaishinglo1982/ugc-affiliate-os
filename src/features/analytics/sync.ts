@@ -80,18 +80,27 @@ async function assertEventReferences(
 export async function requestSyncJob(request: SyncJobRequest): Promise<{ id: string }> {
   requireAnalyticsEnabled();
   if (request.jobType === "POST_BACKFILL") requireBackfillEnabled();
-  const job = await withWorkspaceTransaction(request.workspaceId, (tx) => tx.analyticsSyncJob.create({
-    data: {
-      workspaceId: request.workspaceId,
-      jobType: request.jobType,
+  const job = await withWorkspaceTransaction(request.workspaceId, async (tx) => {
+    if (request.socialAccountId) {
+      const account = await tx.socialAccount.findFirst({
+        where: { id: request.socialAccountId, workspaceId: request.workspaceId },
+        select: { id: true },
+      });
+      if (!account) throw new SyncJobError("Social-Account gehört nicht zum Workspace.");
+    }
+    return tx.analyticsSyncJob.create({
+      data: {
+        workspaceId: request.workspaceId,
+        jobType: request.jobType,
       socialAccountId: request.socialAccountId ?? null,
       externalPostId: request.externalPostId ?? null,
       periodStart: request.periodStart,
       periodEnd: request.periodEnd,
       idempotencyKey: newIdempotencyKey(`sync-${request.jobType}`),
       correlationId: newIdempotencyKey("corr"),
-    },
-  }));
+      },
+    });
+  });
   await writeAuditLog({
     action: "analytics.sync.requested",
     entityType: "AnalyticsSyncJob",
