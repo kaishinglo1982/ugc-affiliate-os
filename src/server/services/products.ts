@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db/client";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import type {
   Prisma,
   ProductStatus,
@@ -19,7 +20,8 @@ export interface ProductListFilters {
 }
 
 export async function listProducts(filters: ProductListFilters) {
-  const where: Prisma.ProductWhereInput = {};
+  const workspaceId = await resolveWorkspaceId();
+  const where: Prisma.ProductWhereInput = { workspaceId };
 
   if (!filters.includeArchived) {
     where.status = { not: "ARCHIVED" };
@@ -72,8 +74,9 @@ export async function listProducts(filters: ProductListFilters) {
 }
 
 export async function getProductById(id: string) {
-  return prisma.product.findUnique({
-    where: { id },
+  const workspaceId = await resolveWorkspaceId();
+  return prisma.product.findFirst({
+    where: { id, workspaceId },
     include: {
       scores: { orderBy: { createdAt: "desc" }, take: 1 },
       affiliateLinks: { include: { program: true } },
@@ -83,8 +86,9 @@ export async function getProductById(id: string) {
 }
 
 export async function listProductCategories(): Promise<string[]> {
+  const workspaceId = await resolveWorkspaceId();
   const products = await prisma.product.findMany({
-    where: { categoryLabel: { not: null } },
+    where: { workspaceId, categoryLabel: { not: null } },
     select: { categoryLabel: true },
     distinct: ["categoryLabel"],
   });
