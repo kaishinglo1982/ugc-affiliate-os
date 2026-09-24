@@ -1,9 +1,12 @@
 import "server-only";
 import { prisma } from "@/lib/db/client";
 import { summarizeFinance } from "@/lib/finance/calculations";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export async function listRevenues() {
+  const workspaceId = await resolveWorkspaceId();
   return prisma.revenue.findMany({
+    where: { workspaceId },
     include: {
       product: { select: { id: true, name: true } },
       campaign: { select: { id: true, name: true } },
@@ -14,7 +17,9 @@ export async function listRevenues() {
 }
 
 export async function listExpenses() {
+  const workspaceId = await resolveWorkspaceId();
   return prisma.expense.findMany({
+    where: { workspaceId },
     include: {
       product: { select: { id: true, name: true } },
       campaign: { select: { id: true, name: true } },
@@ -25,10 +30,12 @@ export async function listExpenses() {
 
 /** Singleton settings row — created with sensible defaults on first read. */
 export async function getOrCreateTaxSetting() {
-  const existing = await prisma.taxSetting.findFirst();
+  const workspaceId = await resolveWorkspaceId();
+  const existing = await prisma.taxSetting.findFirst({ where: { workspaceId } });
   if (existing) return existing;
   return prisma.taxSetting.create({
     data: {
+      workspaceId,
       reserveRatePercent: 30,
       vatRatePercent: 19,
       vatEnabled: false,
@@ -56,11 +63,14 @@ export interface FinanceOverview {
 }
 
 export async function getFinanceOverview(): Promise<FinanceOverview> {
+  const workspaceId = await resolveWorkspaceId();
   const [revenues, expenses] = await Promise.all([
     prisma.revenue.findMany({
+      where: { workspaceId },
       include: { product: { select: { name: true } }, campaign: { select: { name: true } } },
     }),
     prisma.expense.findMany({
+      where: { workspaceId },
       include: { product: { select: { name: true } }, campaign: { select: { name: true } } },
     }),
   ]);
