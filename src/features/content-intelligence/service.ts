@@ -80,7 +80,7 @@ export async function analyzeContent(input: unknown, workspaceId: string) {
 
   if (latest) {
     await prisma.contentIntelligenceProfile.update({
-      where: { id: latest.id },
+      where: { id: latest.id, workspaceId },
       data: { supersededByProfileId: profile.id },
     });
   }
