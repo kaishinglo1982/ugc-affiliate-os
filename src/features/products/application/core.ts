@@ -79,12 +79,20 @@ function newId(): string {
   return randomUUID();
 }
 
-async function ensureProgram(tx: Tx, provider: AffiliateNetwork): Promise<string> {
-  const id = `${PROVIDER_DEFAULT_PROGRAM_PREFIX}${provider.toLowerCase()}`;
-  await tx.affiliateProgram.upsert({
-    where: { id },
-    create: { id, provider, mode: "MOCK" },
-    update: {},
+async function ensureProgram(
+  tx: Tx,
+  provider: AffiliateNetwork,
+  workspaceId: string,
+): Promise<string> {
+  const existing = await tx.affiliateProgram.findFirst({
+    where: { workspaceId, provider },
+    select: { id: true },
+  });
+  if (existing) return existing.id;
+
+  const id = randomUUID();
+  await tx.affiliateProgram.create({
+    data: { id, workspaceId, provider, mode: "MOCK" },
   });
   return id;
 }
@@ -249,7 +257,7 @@ export async function runDiscoveryForQuery(
     });
 
     try {
-      const programId = await ensureProgram(prisma, provider);
+      const programId = await ensureProgram(prisma, provider, workspaceId);
       const providerPort = getProductSourceProvider(provider);
       const request = {
         workspaceId,
