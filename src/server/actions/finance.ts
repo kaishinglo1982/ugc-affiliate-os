@@ -42,9 +42,14 @@ export async function saveRevenueAction(
     notes: parsed.data.notes || null,
   };
 
-  const revenue = revenueId
-    ? await prisma.revenue.update({ where: { id: revenueId, workspaceId }, data })
-    : await prisma.revenue.create({ data });
+  let revenue;
+  if (revenueId) {
+    const existing = await prisma.revenue.findFirst({ where: { id: revenueId, workspaceId } });
+    if (!existing) return fail("Umsatz nicht gefunden.", requestId);
+    revenue = await prisma.revenue.update({ where: { id: existing.id }, data });
+  } else {
+    revenue = await prisma.revenue.create({ data });
+  }
 
   await writeAuditLog({
     action: revenueId ? "revenue.update" : "revenue.create",
@@ -66,7 +71,9 @@ export async function deleteRevenueAction(id: string) {
     entityType: "Revenue",
     handler: async (input) => {
       const workspaceId = await resolveWorkspaceId();
-      await prisma.revenue.delete({ where: { id: input.id, workspaceId } });
+      const existing = await prisma.revenue.findFirst({ where: { id: input.id, workspaceId } });
+      if (!existing) throw new Error("REVENUE_NOT_FOUND");
+      await prisma.revenue.delete({ where: { id: existing.id } });
       return { id: input.id };
     },
     entityId: (output) => output.id,
@@ -82,6 +89,7 @@ export async function saveExpenseAction(
 ): Promise<Result<{ id: string }>> {
   const requestId = newRequestId();
   const user = await getCurrentUser();
+  const workspaceId = await resolveWorkspaceId();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
   const parsed = expenseFormSchema.safeParse(Object.fromEntries(formData.entries()));
@@ -102,9 +110,14 @@ export async function saveExpenseAction(
     notes: parsed.data.notes || null,
   };
 
-  const expense = expenseId
-    ? await prisma.expense.update({ where: { id: expenseId, workspaceId }, data })
-    : await prisma.expense.create({ data });
+  let expense;
+  if (expenseId) {
+    const existing = await prisma.expense.findFirst({ where: { id: expenseId, workspaceId } });
+    if (!existing) return fail("Ausgabe nicht gefunden.", requestId);
+    expense = await prisma.expense.update({ where: { id: existing.id }, data });
+  } else {
+    expense = await prisma.expense.create({ data });
+  }
 
   await writeAuditLog({
     action: expenseId ? "expense.update" : "expense.create",
@@ -126,7 +139,9 @@ export async function deleteExpenseAction(id: string) {
     entityType: "Expense",
     handler: async (input) => {
       const workspaceId = await resolveWorkspaceId();
-      await prisma.expense.delete({ where: { id: input.id, workspaceId } });
+      const existing = await prisma.expense.findFirst({ where: { id: input.id, workspaceId } });
+      if (!existing) throw new Error("EXPENSE_NOT_FOUND");
+      await prisma.expense.delete({ where: { id: existing.id } });
       return { id: input.id };
     },
     entityId: (output) => output.id,
@@ -160,7 +175,7 @@ export async function saveTaxSettingAction(
   };
 
   const setting = existing
-    ? await prisma.taxSetting.update({ where: { id: existing.id, workspaceId }, data })
+    ? await prisma.taxSetting.update({ where: { id: existing.id }, data })
     : await prisma.taxSetting.create({ data });
 
   await writeAuditLog({
