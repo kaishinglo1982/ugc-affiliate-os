@@ -1,8 +1,11 @@
 import "server-only";
 import { prisma } from "@/lib/db/client";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export async function listScripts() {
+  const workspaceId = await resolveWorkspaceId();
   return prisma.script.findMany({
+    where: { workspaceId },
     include: {
       product: { select: { id: true, name: true } },
       campaign: { select: { id: true, name: true } },
@@ -13,8 +16,9 @@ export async function listScripts() {
 }
 
 export async function getScriptById(id: string) {
-  return prisma.script.findUnique({
-    where: { id },
+  const workspaceId = await resolveWorkspaceId();
+  return prisma.script.findFirst({
+    where: { id, workspaceId },
     include: {
       product: true,
       campaign: true,
