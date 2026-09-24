@@ -58,6 +58,15 @@ export async function createExperiment(input: CreateExperimentInput, actor: stri
     throw new ExperimentError(validation.errors.join(" "));
   }
 
+  const brand = await prisma.brand.findFirst({ where: { id: input.brandId, workspaceId }, select: { id: true } });
+  if (!brand) throw new ExperimentError("Marke nicht gefunden.");
+  for (const variant of input.variants) {
+    if (variant.contentVariantId) {
+      const contentVariant = await prisma.contentVariant.findFirst({ where: { id: variant.contentVariantId, workspaceId }, select: { id: true } });
+      if (!contentVariant) throw new ExperimentError("Content-Variante nicht gefunden.");
+    }
+  }
+
   const experiment = await prisma.contentExperiment.create({
     data: {
       workspaceId,
@@ -104,7 +113,7 @@ async function transition(experimentId: string, to: ExperimentStatus, actor: str
   if (!canTransitionExperiment(exp.status as ExperimentStatus, to)) {
     throw new ExperimentError(`Statuswechsel von ${exp.status} zu ${to} ist nicht erlaubt.`);
   }
-  const updated = await prisma.contentExperiment.update({ where: { id: experimentId }, data: { status: to, ...extra } });
+  const updated = await prisma.contentExperiment.update({ where: { id: exp.id }, data: { status: to, ...extra } });
   return updated;
 }
 
@@ -119,7 +128,7 @@ export async function approveExperiment(experimentId: string, actor: string, wor
   if (!exp) throw new ExperimentError("Experiment nicht gefunden.");
   if (exp.status !== "AWAITING_APPROVAL") throw new ExperimentError("Experiment ist nicht zur Freigabe vorliegend.");
   const updated = await prisma.contentExperiment.update({
-    where: { id: experimentId },
+    where: { id: exp.id },
     data: { approvalStatus: "APPROVED" as ApprovalStatus, status: "SCHEDULED" },
   });
   await writeAuditLog({ action: "experiment.approved", entityType: "ContentExperiment", entityId: experimentId, actor });
@@ -177,7 +186,7 @@ export async function assignExperimentJobs(experimentId: string, jobIds: string[
   // Idempotent: upsert by unique (experimentId, assignmentKey).
   for (const a of assignments) {
     await prisma.experimentAssignment.upsert({
-      where: { experimentId_assignmentKey: { experimentId: a.experimentId, assignmentKey: a.assignmentKey } },
+      where: { workspaceId_experimentId_assignmentKey: { workspaceId, experimentId: a.experimentId, assignmentKey: a.assignmentKey } },
       create: { ...a, workspaceId },
       update: { experimentVariantId: a.experimentVariantId, assignmentReferenceId: a.assignmentReferenceId },
     });
@@ -199,7 +208,7 @@ export async function analyzeExperimentById(experimentId: string, workspaceId: s
   for (const v of exp.variants) {
     const snapshot = v.contentVariantId
       ? await prisma.contentPerformanceSnapshot.aggregate({
-          where: { contentVariantId: v.contentVariantId },
+          where: { workspaceId, contentVariantId: v.contentVariantId },
           _sum: { impressions: true, linkClicks: true, conversions: true, views: true },
           _count: { _all: true },
         })
