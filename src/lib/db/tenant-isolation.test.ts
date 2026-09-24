@@ -433,10 +433,10 @@ describe("tenant isolation (WorkflowDefinition + WorkflowRun)", () => {
 
   beforeAll(async () => {
     workflowA = await prisma.workflowDefinition.create({
-      data: { workspaceId: workspaceA, key: `workflow-a-${randomUUID()}`, name: `Workflow-A-${randomUUID()}` },
+      data: { workspaceId: workspaceA, name: `Workflow-A-${randomUUID()}` },
     });
     workflowB = await prisma.workflowDefinition.create({
-      data: { workspaceId: workspaceB, key: `workflow-b-${randomUUID()}`, name: `Workflow-B-${randomUUID()}` },
+      data: { workspaceId: workspaceB, name: `Workflow-B-${randomUUID()}` },
     });
     runA = await prisma.workflowRun.create({
       data: { workspaceId: workspaceA, workflowId: workflowA.id, status: "RUNNING" },
