@@ -113,7 +113,7 @@ async function transition(experimentId: string, to: ExperimentStatus, actor: str
   if (!canTransitionExperiment(exp.status as ExperimentStatus, to)) {
     throw new ExperimentError(`Statuswechsel von ${exp.status} zu ${to} ist nicht erlaubt.`);
   }
-  const updated = await prisma.contentExperiment.update({ where: { id: exp.id }, data: { status: to, ...extra } });
+  const updated = await prisma.contentExperiment.update({ where: { id: exp.id, workspaceId }, data: { status: to, ...extra } });
   return updated;
 }
 
