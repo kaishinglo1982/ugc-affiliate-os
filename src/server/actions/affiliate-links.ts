@@ -71,7 +71,7 @@ export async function saveAffiliateLinkAction(
   if (linkId) {
     const existing = await prisma.affiliateLink.findFirst({ where: { id: linkId, workspaceId } });
     if (!existing) return fail("Affiliate-Link nicht gefunden.", requestId);
-    link = await prisma.affiliateLink.update({ where: { id: existing.id }, data });
+    link = await prisma.affiliateLink.update({ where: { id: existing.id, workspaceId }, data });
   } else {
     link = await prisma.affiliateLink.create({
       data: { ...data, workspaceId, shortSlug: generateShortSlug() },
