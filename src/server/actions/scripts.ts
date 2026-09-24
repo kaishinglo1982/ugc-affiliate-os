@@ -26,7 +26,12 @@ export async function generateScriptAction(
   }
 
   const input = parsed.data;
-  const product = input.productId
+  const [product, campaign] = await Promise.all([
+    input.productId ? prisma.product.findFirst({ where: { id: input.productId, workspaceId } }) : null,
+    input.campaignId ? prisma.campaign.findFirst({ where: { id: input.campaignId, workspaceId }, select: { id: true } }) : null,
+  ]);
+  if (input.productId && !product) return fail("Produkt nicht gefunden.", requestId);
+  if (input.campaignId && !campaign) return fail("Kampagne nicht gefunden.", requestId);
     ? await prisma.product.findFirst({ where: { id: input.productId, workspaceId } })
     : null;
 
