@@ -35,18 +35,3 @@ DROP INDEX IF EXISTS "ProductResearchJob_idempotencyKey_key";
 CREATE UNIQUE INDEX "ProductResearchJob_workspaceId_idempotencyKey_key"
   ON "ProductResearchJob"("workspaceId", "idempotencyKey");
 
-DROP INDEX IF EXISTS "ContentBatchItem_contentBatchId_orderIndex_key";
-CREATE UNIQUE INDEX "ContentBatchItem_workspaceId_contentBatchId_orderIndex_key"
-  ON "ContentBatchItem"("workspaceId", "contentBatchId", "orderIndex");
-
-DROP INDEX IF EXISTS "CampaignFactoryRun_idempotencyKey_key";
-CREATE UNIQUE INDEX "CampaignFactoryRun_workspaceId_idempotencyKey_key"
-  ON "CampaignFactoryRun"("workspaceId", "idempotencyKey");
-
-DROP INDEX IF EXISTS "MediaGenerationJob_idempotencyKey_key";
-CREATE UNIQUE INDEX "MediaGenerationJob_workspaceId_idempotencyKey_key"
-  ON "MediaGenerationJob"("workspaceId", "idempotencyKey");
-
-DROP INDEX IF EXISTS "RenderJob_idempotencyKey_key";
-CREATE UNIQUE INDEX "RenderJob_workspaceId_idempotencyKey_key"
-  ON "RenderJob"("workspaceId", "idempotencyKey");
