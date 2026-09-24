@@ -1,8 +1,11 @@
 import "server-only";
 import { prisma } from "@/lib/db/client";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export async function listVideoJobs() {
+  const workspaceId = await resolveWorkspaceId();
   return prisma.videoJob.findMany({
+    where: { workspaceId },
     include: {
       script: { select: { id: true, title: true } },
       product: { select: { id: true, name: true } },
@@ -13,8 +16,9 @@ export async function listVideoJobs() {
 }
 
 export async function getVideoJobById(id: string) {
-  return prisma.videoJob.findUnique({
-    where: { id },
+  const workspaceId = await resolveWorkspaceId();
+  return prisma.videoJob.findFirst({
+    where: { id, workspaceId },
     include: {
       script: true,
       product: { select: { id: true, name: true } },
