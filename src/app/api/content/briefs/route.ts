@@ -68,6 +68,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Ungültige Eingabe." }, { status: 400 });
   }
 
+  if (parsed.data.campaignId) {
+    const campaign = await prisma.campaign.findFirst({ where: { id: parsed.data.campaignId, workspaceId }, select: { id: true } });
+    if (!campaign) return NextResponse.json({ error: "Kampagne nicht gefunden." }, { status: 404 });
+  }
+
   const actor = (await getCurrentUser())?.id ?? "owner";
   const brief = await prisma.contentBrief.create({
     data: { workspaceId: workspaceId, createdBy: actor, ...parsed.data },
