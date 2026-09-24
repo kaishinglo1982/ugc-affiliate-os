@@ -792,7 +792,7 @@ export async function analyzeContentFitForProduct(
   });
 
   await prisma.$transaction(async (tx: Tx) => {
-    await tx.productContentFitProfile.deleteMany({ where: { productId } });
+    await tx.productContentFitProfile.deleteMany({ where: { productId, workspaceId } });
     await tx.productContentFitProfile.create({
       data: {
         workspaceId,
