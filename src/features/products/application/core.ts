@@ -1539,14 +1539,14 @@ export async function refreshOffers(
         const urlCheck = validateUrl(fresh.productUrl);
         if (!urlCheck.valid) {
           await prisma.affiliateOffer.update({
-            where: { id: o.id },
+            where: { id: o.id, workspaceId },
             data: { status: "UNAVAILABLE", lastCheckedAt: new Date() },
           });
           unavailable++;
           continue;
         }
         await prisma.affiliateOffer.update({
-          where: { id: o.id },
+          where: { id: o.id, workspaceId },
           data: {
             priceAmount: fresh.priceAmount,
             availability: AVAILABILITY_TO_PRISMA[fresh.availability],
