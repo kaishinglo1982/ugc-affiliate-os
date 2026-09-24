@@ -183,7 +183,7 @@ export async function publishPostAction(id: string): Promise<Result<SocialPost &
     return fail(`Post kann aus Status "${post.status}" nicht veröffentlicht werden.`, requestId);
   }
 
-  await prisma.socialPost.update({ where: { id: post.id }, data: { status: "PUBLISHING" } });
+  await prisma.socialPost.update({ where: { id: post.id, workspaceId }, data: { status: "PUBLISHING" } });
 
   const provider = resolveSocialProvider(post.account.platform);
   const result = await provider.publish({
