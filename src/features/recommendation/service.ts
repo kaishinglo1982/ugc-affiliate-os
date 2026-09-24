@@ -115,7 +115,7 @@ export async function createVariantDraftFromRecommendation(id: string, actor: st
   const asset = await prisma.contentAsset.findFirst({ where: { workspaceId } });
   if (!asset) throw new RecommendationError("Kein Content-Asset für den Entwurf vorhanden.");
 
-  const version = (await prisma.contentVariant.count({ where: { parentContentAssetId: asset.id } })) + 1;
+  const version = (await prisma.contentVariant.count({ where: { workspaceId, parentContentAssetId: asset.id } })) + 1;
   const variant = await prisma.contentVariant.create({
     data: {
       workspaceId,
