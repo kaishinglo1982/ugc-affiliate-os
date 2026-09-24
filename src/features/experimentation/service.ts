@@ -128,7 +128,7 @@ export async function approveExperiment(experimentId: string, actor: string, wor
   if (!exp) throw new ExperimentError("Experiment nicht gefunden.");
   if (exp.status !== "AWAITING_APPROVAL") throw new ExperimentError("Experiment ist nicht zur Freigabe vorliegend.");
   const updated = await prisma.contentExperiment.update({
-    where: { id: exp.id },
+    where: { id: exp.id, workspaceId },
     data: { approvalStatus: "APPROVED" as ApprovalStatus, status: "SCHEDULED" },
   });
   await writeAuditLog({ action: "experiment.approved", entityType: "ContentExperiment", entityId: experimentId, actor });
