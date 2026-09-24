@@ -109,7 +109,7 @@ export async function decideAngle(id: string, body: unknown, workspaceId: string
   if (!transition.ok) throw new Error(transition.reason);
   const actor = (await getCurrentUser())?.id ?? "owner";
   const updated = await prisma.creativeAngle.update({
-    where: { id },
+    where: { id, workspaceId },
     data: parsed.decision === "approved" ? { status: "approved" } : { status: "rejected" },
   });
   await writeAuditLog({
