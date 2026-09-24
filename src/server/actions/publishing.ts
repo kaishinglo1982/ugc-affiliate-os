@@ -166,6 +166,19 @@ export async function publishPostAction(id: string): Promise<Result<SocialPost &
   });
   if (!post) return fail("Post nicht gefunden.", requestId);
 
+  const [account, campaign, mediaAsset] = await Promise.all([
+    prisma.socialAccount.findFirst({ where: { id: post.accountId, workspaceId }, select: { id: true } }),
+    post.campaignId
+      ? prisma.campaign.findFirst({ where: { id: post.campaignId, workspaceId }, select: { id: true } })
+      : Promise.resolve(null),
+    post.mediaAssetId
+      ? prisma.mediaAsset.findFirst({ where: { id: post.mediaAssetId, workspaceId }, select: { id: true } })
+      : Promise.resolve(null),
+  ]);
+  if (!account) return fail("Social-Account gehört nicht zum aktuellen Workspace.", requestId);
+  if (post.campaignId && !campaign) return fail("Kampagne gehört nicht zum aktuellen Workspace.", requestId);
+  if (post.mediaAssetId && !mediaAsset) return fail("Media-Asset gehört nicht zum aktuellen Workspace.", requestId);
+
   if (!isValidPostTransition(post.status as SocialPostStatus, "PUBLISHING")) {
     return fail(`Post kann aus Status "${post.status}" nicht veröffentlicht werden.`, requestId);
   }
