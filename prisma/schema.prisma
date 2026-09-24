@@ -725,6 +725,7 @@ model Agent {
   runs AgentRun[]
 
   @@index([workspaceId])
+  @@unique([workspaceId, key])
 }
 
 enum AgentRunStatus {
