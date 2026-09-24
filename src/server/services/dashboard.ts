@@ -73,7 +73,7 @@ export async function getDashboardData(period: DashboardPeriod) {
       orderBy: { date: "asc" },
     }),
     prisma.linkClick.count({ where: { workspaceId, occurredAt: { gte: from, lte: to } } }),
-    prisma.revenue.count({ where: { date: { gte: from, lte: to } } }),
+    prisma.revenue.count({ where: { workspaceId, date: { gte: from, lte: to } } }),
     prisma.socialPost.count({
       where: { workspaceId, status: "PUBLISHED", publishedAt: { gte: from, lte: to } },
     }),
