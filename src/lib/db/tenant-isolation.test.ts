@@ -229,3 +229,68 @@ describe("tenant isolation (Script + VideoJob)", () => {
     expect(video?.progress).toBe(0);
   });
 });
+
+
+describe("tenant isolation (MediaAsset + AffiliateLink)", () => {
+  let mediaA: { id: string };
+  let linkA: { id: string };
+
+  beforeAll(async () => {
+    mediaA = await prisma.mediaAsset.create({
+      data: {
+        workspaceId: workspaceA,
+        kind: "IMAGE",
+        fileName: "tenant-a.png",
+        storageKey: `tenant-test/${randomUUID()}.png`,
+        url: "https://example.invalid/tenant-a.png",
+        mimeType: "image/png",
+        sizeBytes: 1,
+      },
+    });
+
+    const programA = await prisma.affiliateProgram.create({
+      data: { workspaceId: workspaceA, provider: "AMAZON" },
+    });
+    linkA = await prisma.affiliateLink.create({
+      data: {
+        workspaceId: workspaceA,
+        programId: programA.id,
+        label: "Tenant A",
+        destinationUrl: "https://example.invalid/a",
+        shortSlug: `tenant-a-${randomUUID()}`,
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.affiliateLink.deleteMany({ where: { id: linkA.id } });
+    await prisma.mediaAsset.deleteMany({ where: { id: mediaA.id } });
+    await prisma.affiliateProgram.deleteMany({ where: { workspaceId: workspaceA } });
+  });
+
+  it("blocks cross-workspace media lookup and update", async () => {
+    const foreign = await prisma.mediaAsset.findFirst({
+      where: { id: mediaA.id, workspaceId: workspaceB },
+    });
+    const result = await prisma.mediaAsset.updateMany({
+      where: { id: mediaA.id, workspaceId: workspaceB },
+      data: { fileName: "cross-tenant-write.png" },
+    });
+
+    expect(foreign).toBeNull();
+    expect(result.count).toBe(0);
+  });
+
+  it("blocks cross-workspace affiliate-link lookup and update", async () => {
+    const foreign = await prisma.affiliateLink.findFirst({
+      where: { id: linkA.id, workspaceId: workspaceB },
+    });
+    const result = await prisma.affiliateLink.updateMany({
+      where: { id: linkA.id, workspaceId: workspaceB },
+      data: { label: "cross-tenant-write" },
+    });
+
+    expect(foreign).toBeNull();
+    expect(result.count).toBe(0);
+  });
+});
