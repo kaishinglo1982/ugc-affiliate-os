@@ -1322,7 +1322,7 @@ export async function commitImport(
       const normalized = row.normalizedData as unknown as NormalizedOffer | null;
       if (!normalized) continue;
       const provider = (normalized.productUrl ? "CUSTOM" : "CUSTOM") as AffiliateNetwork;
-      const programId = await ensureProgram(tx, provider);
+      const programId = await ensureProgram(tx, provider, workspaceId);
 
       const product = await tx.product.create({
         data: {
