@@ -74,7 +74,7 @@ async function runStep(
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown_error";
     await prisma.productResearchJob.update({
-      where: { id: jobId },
+      where: { id: jobId, workspaceId },
       data: { status: "FAILED", errorMessage: message.slice(0, 500), completedAt: new Date() },
     });
     logStructured({
