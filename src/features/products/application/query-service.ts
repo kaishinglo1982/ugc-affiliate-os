@@ -132,7 +132,7 @@ export async function updateQuery(
 
     const nextVersion = existing.currentVersion + 1;
     const updated = await tx.productDiscoveryQuery.update({
-      where: { id },
+      where: { id: existing.id },
       data: {
         ...toCreateData(input, workspaceId),
         id,
