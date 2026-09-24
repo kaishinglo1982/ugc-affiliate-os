@@ -219,7 +219,7 @@ export async function deleteVideoJobAction(id: string) {
 
   const existing = await prisma.videoJob.findFirst({ where: { id, workspaceId } });
   if (!existing) return fail("Video-Job nicht gefunden.", requestId);
-  await prisma.videoJob.delete({ where: { id: existing.id } });
+  await prisma.videoJob.delete({ where: { id: existing.id, workspaceId } });
 
   await writeAuditLog({
     action: "video_job.cancel",
