@@ -47,6 +47,35 @@ function newIdempotencyKey(prefix: string): string {
   return `${prefix}:${Date.now()}:${idempotencyCounter}`;
 }
 
+async function assertEventReferences(
+  tx: Parameters<Parameters<typeof withWorkspaceTransaction>[1]>[0],
+  workspaceId: string,
+  event: import("@/lib/analytics/event").ValidatedAnalyticsEvent,
+): Promise<void> {
+  const checks: Promise<unknown>[] = [];
+  if (event.socialAccountId) checks.push(tx.socialAccount.findFirst({ where: { id: event.socialAccountId, workspaceId }, select: { id: true } }));
+  if (event.brandId) checks.push(tx.brand.findFirst({ where: { id: event.brandId, workspaceId }, select: { id: true } }));
+  if (event.nicheId) checks.push(tx.niche.findFirst({ where: { id: event.nicheId, workspaceId }, select: { id: true } }));
+  if (event.campaignId) checks.push(tx.campaign.findFirst({ where: { id: event.campaignId, workspaceId }, select: { id: true } }));
+  if (event.publishingJobId) checks.push(tx.publishJob.findFirst({ where: { id: event.publishingJobId, workspaceId }, select: { id: true } }));
+  if (event.contentAssetId) checks.push(tx.contentAsset.findFirst({ where: { id: event.contentAssetId, workspaceId }, select: { id: true } }));
+  if (event.contentVariantId) checks.push(tx.contentVariant.findFirst({ where: { id: event.contentVariantId, workspaceId }, select: { id: true } }));
+  if (event.productId) checks.push(tx.product.findFirst({ where: { id: event.productId, workspaceId }, select: { id: true } }));
+  if (event.affiliateProgramId) checks.push(tx.affiliateProgram.findFirst({ where: { id: event.affiliateProgramId, workspaceId }, select: { id: true } }));
+  if (event.affiliateLinkId) checks.push(tx.affiliateLink.findFirst({ where: { id: event.affiliateLinkId, workspaceId }, select: { id: true } }));
+  if (event.experimentId) checks.push(tx.contentExperiment.findFirst({ where: { id: event.experimentId, workspaceId }, select: { id: true } }));
+  if (event.experimentVariantId) {
+    checks.push(tx.experimentVariant.findFirst({
+      where: { id: event.experimentVariantId, experiment: { workspaceId } },
+      select: { id: true },
+    }));
+  }
+  const results = await Promise.all(checks);
+  if (results.some((value) => !value)) {
+    throw new SyncJobError("Analytics-Event enthält eine Referenz aus einem anderen Workspace.");
+  }
+}
+
 export async function requestSyncJob(request: SyncJobRequest): Promise<{ id: string }> {
   requireAnalyticsEnabled();
   if (request.jobType === "POST_BACKFILL") requireBackfillEnabled();
@@ -90,6 +119,10 @@ export async function importAnalyticsEvents(
   let inserted = 0;
   if (unique.length > 0) {
     inserted = await withWorkspaceTransaction(workspaceId, async (tx) => {
+      for (const event of unique) {
+        await assertEventReferences(tx, workspaceId, event);
+      }
+
       const existing = await tx.analyticsEvent.findMany({
         where: {
           workspaceId,
