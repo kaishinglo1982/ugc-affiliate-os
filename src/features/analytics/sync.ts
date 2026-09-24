@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db/client";
+import { Prisma } from "@/generated/prisma/client";
 import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 import { featureFlags } from "@/lib/config/feature-flags";
 import { AnalyticsSyncError, classifyProviderError } from "@/lib/analytics/provider/failure";
@@ -48,7 +49,7 @@ function newIdempotencyKey(prefix: string): string {
 }
 
 async function assertEventReferences(
-  tx: Parameters<Parameters<typeof withWorkspaceTransaction>[1]>[0],
+  tx: Prisma.TransactionClient,
   workspaceId: string,
   event: import("@/lib/analytics/event").ValidatedAnalyticsEvent,
 ): Promise<void> {
