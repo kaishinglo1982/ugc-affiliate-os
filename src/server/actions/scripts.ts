@@ -32,8 +32,6 @@ export async function generateScriptAction(
   ]);
   if (input.productId && !product) return fail("Produkt nicht gefunden.", requestId);
   if (input.campaignId && !campaign) return fail("Kampagne nicht gefunden.", requestId);
-    ? await prisma.product.findFirst({ where: { id: input.productId, workspaceId } })
-    : null;
 
   const provider = resolveScriptProvider(input.provider);
   const generated = await provider.generate({
