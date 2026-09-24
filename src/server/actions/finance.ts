@@ -53,7 +53,7 @@ export async function saveRevenueAction(
   if (revenueId) {
     const existing = await prisma.revenue.findFirst({ where: { id: revenueId, workspaceId } });
     if (!existing) return fail("Umsatz nicht gefunden.", requestId);
-    revenue = await prisma.revenue.update({ where: { id: existing.id }, data });
+    revenue = await prisma.revenue.update({ where: { id: existing.id, workspaceId }, data });
   } else {
     revenue = await prisma.revenue.create({ data });
   }
@@ -80,7 +80,7 @@ export async function deleteRevenueAction(id: string) {
       const workspaceId = await resolveWorkspaceId();
       const existing = await prisma.revenue.findFirst({ where: { id: input.id, workspaceId } });
       if (!existing) throw new Error("REVENUE_NOT_FOUND");
-      await prisma.revenue.delete({ where: { id: existing.id } });
+      await prisma.revenue.delete({ where: { id: existing.id, workspaceId } });
       return { id: input.id };
     },
     entityId: (output) => output.id,
@@ -127,7 +127,7 @@ export async function saveExpenseAction(
   if (expenseId) {
     const existing = await prisma.expense.findFirst({ where: { id: expenseId, workspaceId } });
     if (!existing) return fail("Ausgabe nicht gefunden.", requestId);
-    expense = await prisma.expense.update({ where: { id: existing.id }, data });
+    expense = await prisma.expense.update({ where: { id: existing.id, workspaceId }, data });
   } else {
     expense = await prisma.expense.create({ data });
   }
@@ -154,7 +154,7 @@ export async function deleteExpenseAction(id: string) {
       const workspaceId = await resolveWorkspaceId();
       const existing = await prisma.expense.findFirst({ where: { id: input.id, workspaceId } });
       if (!existing) throw new Error("EXPENSE_NOT_FOUND");
-      await prisma.expense.delete({ where: { id: existing.id } });
+      await prisma.expense.delete({ where: { id: existing.id, workspaceId } });
       return { id: input.id };
     },
     entityId: (output) => output.id,
