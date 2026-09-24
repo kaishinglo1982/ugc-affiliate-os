@@ -67,7 +67,7 @@ export async function updateAudience(id: string, input: UpdateAudienceInput, wor
   const audience = await getAudience(id, workspaceId);
   if (!audience) throw new Error("Zielgruppe nicht gefunden.");
   if (parsed.status) assertAudienceTransition(audience.status, parsed.status);
-  const updated = await prisma.campaignAudienceProfile.update({ where: { id }, data: parsed });
+  const updated = await prisma.campaignAudienceProfile.update({ where: { id, workspaceId }, data: parsed });
   const actor = (await getCurrentUser())?.id ?? "owner";
   await writeAuditLog({
     action: "campaign_audience.updated",
