@@ -43,8 +43,13 @@ export async function saveHuggingFaceSettingsAction(
   if (apiKey) {
     const encrypted = encryptSecret(apiKey);
     if (credentialId) {
+      const credential = await prisma.encryptedCredential.findFirst({
+        where: { id: credentialId, workspaceId },
+        select: { id: true },
+      });
+      if (!credential) throw new Error("INTEGRATION_CREDENTIAL_NOT_FOUND");
       await prisma.encryptedCredential.update({
-        where: { id: credentialId },
+        where: { id: credential.id },
         data: {
           cipherText: encrypted.cipherText,
           iv: encrypted.iv,
@@ -89,7 +94,13 @@ export async function disconnectIntegrationAction(providerKey: string) {
       const integration = await prisma.integration.findFirst({ where: { providerKey: key, workspaceId } });
       if (!integration) return { providerKey: key };
       if (integration.credentialId) {
-        await prisma.encryptedCredential.delete({ where: { id: integration.credentialId } });
+        const credential = await prisma.encryptedCredential.findFirst({
+          where: { id: integration.credentialId, workspaceId },
+          select: { id: true },
+        });
+        if (credential) {
+          await prisma.encryptedCredential.delete({ where: { id: credential.id } });
+        }
       }
       await prisma.integration.update({
         where: { id: integration.id },
