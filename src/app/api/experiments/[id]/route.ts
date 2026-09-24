@@ -72,7 +72,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 
   const updated = await prisma.contentExperiment.update({
-    where: { id: existing.id },
+    where: { id: existing.id, workspaceId },
     data: {
       ...(parsed.data.name !== undefined ? { name: parsed.data.name } : {}),
       ...(parsed.data.description !== undefined ? { description: parsed.data.description } : {}),
