@@ -104,7 +104,8 @@ export async function disconnectAffiliateProgramAction(id: string) {
       return prisma.affiliateProgram.update({
         where: { id: existing.id },
         data: { status: "DISCONNECTED", credentialId: null },
-      }),
+      });
+    },
     entityId: (output) => output.id,
   });
   revalidatePath("/app/affiliate-programs");
