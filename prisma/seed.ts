@@ -633,7 +633,7 @@ const AGENT_CATALOG = [
 async function seedAgents() {
   for (const [i, a] of AGENT_CATALOG.entries()) {
     const agent = await prisma.agent.upsert({
-      where: { key: a.key },
+      where: { workspaceId_key: { workspaceId: DEFAULT_WORKSPACE_ID, key: a.key } },
       update: {},
       create: {
         key: a.key,
