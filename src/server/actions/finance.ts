@@ -12,6 +12,7 @@ import {
 import { ok, fail, newRequestId, type Result } from "@/types/result";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export async function saveRevenueAction(
   revenueId: string | null,
@@ -20,6 +21,7 @@ export async function saveRevenueAction(
 ): Promise<Result<{ id: string }>> {
   const requestId = newRequestId();
   const user = await getCurrentUser();
+  const workspaceId = await resolveWorkspaceId();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
   const parsed = revenueFormSchema.safeParse(Object.fromEntries(formData.entries()));
@@ -32,6 +34,7 @@ export async function saveRevenueAction(
     programId: parsed.data.programId || null,
     productId: parsed.data.productId || null,
     campaignId: parsed.data.campaignId || null,
+    workspaceId,
     platform: parsed.data.platform || null,
     grossAmount: parsed.data.grossAmount,
     status: parsed.data.status,
@@ -40,7 +43,7 @@ export async function saveRevenueAction(
   };
 
   const revenue = revenueId
-    ? await prisma.revenue.update({ where: { id: revenueId }, data })
+    ? await prisma.revenue.update({ where: { id: revenueId, workspaceId }, data })
     : await prisma.revenue.create({ data });
 
   await writeAuditLog({
@@ -62,7 +65,8 @@ export async function deleteRevenueAction(id: string) {
     auditAction: "revenue.delete",
     entityType: "Revenue",
     handler: async (input) => {
-      await prisma.revenue.delete({ where: { id: input.id } });
+      const workspaceId = await resolveWorkspaceId();
+      await prisma.revenue.delete({ where: { id: input.id, workspaceId } });
       return { id: input.id };
     },
     entityId: (output) => output.id,
@@ -87,6 +91,7 @@ export async function saveExpenseAction(
 
   const data = {
     date: new Date(parsed.data.date),
+    workspaceId,
     category: parsed.data.category,
     vendor: parsed.data.vendor || null,
     campaignId: parsed.data.campaignId || null,
@@ -98,7 +103,7 @@ export async function saveExpenseAction(
   };
 
   const expense = expenseId
-    ? await prisma.expense.update({ where: { id: expenseId }, data })
+    ? await prisma.expense.update({ where: { id: expenseId, workspaceId }, data })
     : await prisma.expense.create({ data });
 
   await writeAuditLog({
@@ -120,7 +125,8 @@ export async function deleteExpenseAction(id: string) {
     auditAction: "expense.delete",
     entityType: "Expense",
     handler: async (input) => {
-      await prisma.expense.delete({ where: { id: input.id } });
+      const workspaceId = await resolveWorkspaceId();
+      await prisma.expense.delete({ where: { id: input.id, workspaceId } });
       return { id: input.id };
     },
     entityId: (output) => output.id,
@@ -142,8 +148,10 @@ export async function saveTaxSettingAction(
     return fail("Eingabe ungültig.", requestId, parsed.error.flatten().fieldErrors);
   }
 
-  const existing = await prisma.taxSetting.findFirst();
+  const workspaceId = await resolveWorkspaceId();
+  const existing = await prisma.taxSetting.findFirst({ where: { workspaceId } });
   const data = {
+    workspaceId,
     reserveRatePercent: parsed.data.reserveRatePercent,
     vatRatePercent: parsed.data.vatRatePercent,
     vatEnabled: parsed.data.vatEnabled ?? false,
@@ -152,7 +160,7 @@ export async function saveTaxSettingAction(
   };
 
   const setting = existing
-    ? await prisma.taxSetting.update({ where: { id: existing.id }, data })
+    ? await prisma.taxSetting.update({ where: { id: existing.id, workspaceId }, data })
     : await prisma.taxSetting.create({ data });
 
   await writeAuditLog({
