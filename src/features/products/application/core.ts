@@ -310,7 +310,7 @@ export async function runDiscoveryForQuery(
         if (existingOffer) {
           counters.duplicateCount++;
           await prisma.affiliateOffer.update({
-            where: { id: existingOffer.id },
+            where: { id: existingOffer.id, workspaceId },
             data: { lastCheckedAt: new Date() },
           });
           continue;
