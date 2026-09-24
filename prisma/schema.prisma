@@ -814,15 +814,17 @@ enum NotificationLevel {
 }
 
 model Notification {
-  id        String             @id @default(uuid())
-  level     NotificationLevel  @default(INFO)
-  title     String
-  message   String
-  link      String?
-  readAt    DateTime?
-  createdAt DateTime           @default(now())
+  id          String             @id @default(uuid())
+  workspaceId String             @default("00000000-0000-0000-0000-000000000001")
+  level       NotificationLevel  @default(INFO)
+  title       String
+  message     String
+  link        String?
+  readAt      DateTime?
+  createdAt   DateTime           @default(now())
 
-  @@index([readAt])
+  @@index([workspaceId, readAt])
+  @@index([workspaceId, createdAt])
 }
 
 model ContactRequest {
