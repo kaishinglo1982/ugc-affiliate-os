@@ -8,6 +8,7 @@ import {
 import { encryptSecret } from "@/lib/encryption/aes";
 import { runMutation } from "@/server/actions/action-helpers";
 import { revalidatePath } from "next/cache";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export async function saveHuggingFaceSettingsAction(
   _prevState: unknown,
@@ -23,11 +24,13 @@ export async function saveHuggingFaceSettingsAction(
   }
 
   const { apiKey, model, temperature, maxTokens, autoSuggestHooks } = parsed.data;
+  const workspaceId = await resolveWorkspaceId();
 
   const integration = await prisma.integration.upsert({
-    where: { providerKey: "huggingface" },
+    where: { providerKey: "huggingface", workspaceId },
     update: {},
     create: {
+      workspaceId,
       providerKey: "huggingface",
       displayName: "HuggingFace",
       category: "AI",
@@ -41,7 +44,7 @@ export async function saveHuggingFaceSettingsAction(
     const encrypted = encryptSecret(apiKey);
     if (credentialId) {
       await prisma.encryptedCredential.update({
-        where: { id: credentialId },
+        where: { id: credentialId, workspaceId },
         data: {
           cipherText: encrypted.cipherText,
           iv: encrypted.iv,
@@ -51,6 +54,7 @@ export async function saveHuggingFaceSettingsAction(
     } else {
       const credential = await prisma.encryptedCredential.create({
         data: {
+          workspaceId,
           label: "HuggingFace API Key",
           cipherText: encrypted.cipherText,
           iv: encrypted.iv,
@@ -62,7 +66,7 @@ export async function saveHuggingFaceSettingsAction(
   }
 
   await prisma.integration.update({
-    where: { id: integration.id },
+    where: { id: integration.id, workspaceId },
     data: {
       credentialId: credentialId,
       status: credentialId ? "CONNECTED" : integration.status,
@@ -81,10 +85,11 @@ export async function disconnectIntegrationAction(providerKey: string) {
     auditAction: "integration.disconnect",
     entityType: "Integration",
     handler: async ({ providerKey: key }) => {
-      const integration = await prisma.integration.findUnique({ where: { providerKey: key } });
+      const workspaceId = await resolveWorkspaceId();
+      const integration = await prisma.integration.findFirst({ where: { providerKey: key, workspaceId } });
       if (!integration) return { providerKey: key };
       if (integration.credentialId) {
-        await prisma.encryptedCredential.delete({ where: { id: integration.credentialId } });
+        await prisma.encryptedCredential.delete({ where: { id: integration.credentialId, workspaceId } });
       }
       await prisma.integration.update({
         where: { providerKey: key },
