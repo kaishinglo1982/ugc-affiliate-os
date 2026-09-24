@@ -85,6 +85,7 @@ export async function regenerateScriptVersionAction(
 ): Promise<Result<{ id: string; versionNumber: number }>> {
   const requestId = newRequestId();
   const user = await getCurrentUser();
+  const workspaceId = await resolveWorkspaceId();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
   const script = await prisma.script.findFirst({
@@ -134,6 +135,7 @@ export async function regenerateScriptVersionAction(
 export async function duplicateScriptAction(id: string): Promise<Result<{ id: string }>> {
   const requestId = newRequestId();
   const user = await getCurrentUser();
+  const workspaceId = await resolveWorkspaceId();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
   const original = await prisma.script.findFirst({
