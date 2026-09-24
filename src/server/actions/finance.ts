@@ -30,13 +30,6 @@ export async function saveRevenueAction(
   }
 
   const relationChecks = await Promise.all([
-    parsed.data.programId ? prisma.affiliateProgram.findFirst({ where: { id: parsed.data.programId, workspaceId }, select: { id: true } }).then(Boolean) : null,
-    parsed.data.productId ? prisma.product.findFirst({ where: { id: parsed.data.productId, workspaceId }, select: { id: true } }).then(Boolean) : null,
-    parsed.data.campaignId ? prisma.campaign.findFirst({ where: { id: parsed.data.campaignId, workspaceId }, select: { id: true } }).then(Boolean) : null,
-  ]);
-  if (relationChecks.some((value) => value === false)) return fail("Zugehörige Daten nicht gefunden.", requestId);
-
-  const relationChecks = await Promise.all([
     parsed.data.programId ? prisma.affiliateProgram.findFirst({ where: { id: parsed.data.programId, workspaceId }, select: { id: true } }) : null,
     parsed.data.productId ? prisma.product.findFirst({ where: { id: parsed.data.productId, workspaceId }, select: { id: true } }) : null,
     parsed.data.campaignId ? prisma.campaign.findFirst({ where: { id: parsed.data.campaignId, workspaceId }, select: { id: true } }) : null,
