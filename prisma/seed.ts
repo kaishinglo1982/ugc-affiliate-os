@@ -308,13 +308,13 @@ async function seedAffiliateLinks(
 }
 
 async function seedLinkClicks(links: Awaited<ReturnType<typeof seedAffiliateLinks>>) {
-  const rows: Array<{ linkId: string; occurredAt: Date; source: string | null }> = [];
+  const rows: Array<{ workspaceId: string; linkId: string; occurredAt: Date; source: string | null }> = [];
   for (const link of links) {
     for (let i = 0; i < link.clickCount; i++) {
       const dayOffset = Math.floor(Math.random() * 90);
       const date = daysAgo(dayOffset);
       date.setHours(Math.floor(Math.random() * 14) + 8, Math.floor(Math.random() * 60), 0, 0);
-      rows.push({ linkId: link.id, occurredAt: date, source: link.platform });
+      rows.push({ workspaceId: DEFAULT_WORKSPACE_ID, linkId: link.id, occurredAt: date, source: link.platform });
     }
   }
   await prisma.linkClick.createMany({ data: rows });
