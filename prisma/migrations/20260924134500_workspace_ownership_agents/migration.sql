@@ -4,5 +4,7 @@
 ALTER TABLE "Agent" ADD COLUMN "workspaceId" TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001';
 ALTER TABLE "AgentRun" ADD COLUMN "workspaceId" TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001';
 
+UPDATE "AgentRun" r SET "workspaceId" = a."workspaceId" FROM "Agent" a WHERE r."agentId" = a."id";
+
 CREATE INDEX "Agent_workspaceId_idx" ON "Agent"("workspaceId");
 CREATE INDEX "AgentRun_workspaceId_agentId_idx" ON "AgentRun"("workspaceId", "agentId");
