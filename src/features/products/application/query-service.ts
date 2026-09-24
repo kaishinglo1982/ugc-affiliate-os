@@ -126,7 +126,7 @@ export async function updateQuery(
   const query = await withWorkspaceTransaction(workspaceId, async (tx) => {
     const existing = await tx.productDiscoveryQuery.findFirst({
       where: { id, workspaceId },
-      select: { currentVersion: true },
+      select: { id: true, currentVersion: true },
     });
     if (!existing) throw new Error(`ProductDiscoveryQuery not found: ${id}`);
 
