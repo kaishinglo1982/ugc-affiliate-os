@@ -1297,7 +1297,7 @@ model AnalyticsEvent {
   importedAt         DateTime            @default(now())
   source             AnalyticsEventSource
   externalEventId    String?
-  idempotencyKey     String              @unique
+  idempotencyKey     String
   metadataReferenceId String?
   correctedByEventId String?
 
@@ -1357,7 +1357,7 @@ model AnalyticsSyncJob {
   socialAccountId  String?
   externalPostId   String?
   correlationId    String
-  idempotencyKey   String?             @unique
+  idempotencyKey   String?
   periodStart      DateTime?
   periodEnd        DateTime?
   attempts         Int                 @default(0)
@@ -1381,7 +1381,7 @@ model AnalyticsProviderMapping {
   version         Int      @default(1)
   mapping         Json
   createdAt       DateTime @default(now())
-  @@unique([platform, version])
+  @@unique([workspaceId, platform, version])
   @@index([workspaceId, platform])
 }
 
@@ -1545,7 +1545,7 @@ model PostingTimePerformance {
   sampleSize          BigInt         @default(0)
   generatedAt         DateTime       @default(now())
 
-  @@unique([socialAccountId, weekday, hourOfDay, timezone])
+  @@unique([workspaceId, socialAccountId, weekday, hourOfDay, timezone])
   @@index([workspaceId, socialAccountId])
 }
 
@@ -1614,7 +1614,7 @@ model ExperimentAssignment {
   experiment          ContentExperiment        @relation(fields: [experimentId], references: [id], onDelete: Cascade)
   variant             ExperimentVariant        @relation(fields: [experimentVariantId], references: [id])
 
-  @@unique([experimentId, assignmentKey])
+  @@unique([workspaceId, experimentId, assignmentKey])
   @@index([workspaceId, experimentId])
   @@index([assignmentReferenceId])
 }
@@ -1782,7 +1782,7 @@ model OptimizationRule {
   updatedAt   DateTime             @updatedAt
 
   executions  OptimizationRuleExecution[]
-  @@unique([code, version])
+  @@unique([workspaceId, code, version])
   @@index([workspaceId, status])
 }
 
@@ -2073,7 +2073,7 @@ model ProductDiscoveryRun {
   startedAt             DateTime?
   completedAt           DateTime?
   correlationId         String
-  idempotencyKey        String              @unique
+  idempotencyKey        String
   failureReason         String?
   createdAt             DateTime            @default(now())
 
@@ -2112,7 +2112,7 @@ model ProductImportBatch {
   fileHash     String?
   source       String   @default("csv")
   status       String   @default("preview")
-  previewToken String?  @unique
+  previewToken String?
   validRows    Int      @default(0)
   invalidRows  Int      @default(0)
   warningRows  Int      @default(0)
@@ -2327,7 +2327,7 @@ model ProductResearchJob {
   jobType        ResearchJobType
   status         ResearchJobStatus @default(QUEUED)
   correlationId  String
-  idempotencyKey String            @unique
+  idempotencyKey String
   queryId        String?
   productId      String?
   provider       AffiliateProviderKey?
@@ -3094,7 +3094,7 @@ model ContentBatchItem {
   createdAt         DateTime              @default(now())
   updatedAt         DateTime              @updatedAt
 
-  @@unique([contentBatchId, orderIndex])
+  @@unique([workspaceId, contentBatchId, orderIndex])
   @@index([workspaceId, contentBatchId])
 }
 
