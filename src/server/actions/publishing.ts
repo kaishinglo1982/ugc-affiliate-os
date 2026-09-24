@@ -195,7 +195,7 @@ export async function publishPostAction(id: string): Promise<Result<SocialPost &
   });
 
   const updated = await prisma.socialPost.update({
-    where: { id: post.id },
+    where: { id: post.id, workspaceId },
     data: result.success
       ? { status: "PUBLISHED", publishedAt: new Date(), errorMessage: null, attempts: { increment: 1 } }
       : { status: "FAILED", errorMessage: result.errorMessage ?? "Veröffentlichung fehlgeschlagen.", attempts: { increment: 1 } },
