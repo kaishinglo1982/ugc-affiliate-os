@@ -28,6 +28,20 @@ export async function analyzeContent(input: unknown, workspaceId: string) {
   }
   const data = parsed.data;
 
+  const contentAsset = await prisma.contentAsset.findFirst({
+    where: { id: data.contentAssetId, workspaceId },
+    select: { id: true },
+  });
+  if (!contentAsset) throw new ContentIntelligenceError("Content-Asset nicht gefunden.");
+
+  if (data.contentVariantId) {
+    const contentVariant = await prisma.contentVariant.findFirst({
+      where: { id: data.contentVariantId, workspaceId, parentContentAssetId: data.contentAssetId },
+      select: { id: true },
+    });
+    if (!contentVariant) throw new ContentIntelligenceError("Content-Variante nicht gefunden.");
+  }
+
   const latest = await prisma.contentIntelligenceProfile.findFirst({
     where: { workspaceId, contentAssetId: data.contentAssetId },
     orderBy: { analyzedAt: "desc" },
@@ -88,8 +102,22 @@ export async function createVariant(input: unknown, workspaceId: string) {
     throw new ContentIntelligenceError("Ungültige Varianten-Eingabe.");
   }
   const data = parsed.data;
+  const parentAsset = await prisma.contentAsset.findFirst({
+    where: { id: data.parentContentAssetId, workspaceId },
+    select: { id: true },
+  });
+  if (!parentAsset) throw new ContentIntelligenceError("Content-Asset nicht gefunden.");
+
+  if (data.sourceVariantId) {
+    const sourceVariant = await prisma.contentVariant.findFirst({
+      where: { id: data.sourceVariantId, workspaceId, parentContentAssetId: data.parentContentAssetId },
+      select: { id: true },
+    });
+    if (!sourceVariant) throw new ContentIntelligenceError("Quellvariante nicht gefunden.");
+  }
+
   const existing = await prisma.contentVariant.findMany({
-    where: { parentContentAssetId: data.parentContentAssetId },
+    where: { workspaceId, parentContentAssetId: data.parentContentAssetId },
     select: { version: true },
   });
   const version = nextVersion(existing.map((v) => v.version));
