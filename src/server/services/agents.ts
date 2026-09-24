@@ -84,7 +84,7 @@ export async function setAgentStatus(
   }
 
   const updated = await prisma.agent.update({
-    where: { id },
+    where: { id: agent.id },
     data: { status: target },
     select: { id: true, status: true },
   });
@@ -217,7 +217,7 @@ export async function startAgentRun(
   });
 
   await prisma.agent.update({
-    where: { id: input.agentId },
+    where: { id: agent.id },
     data: { status: "RUNNING", lastRunAt: new Date() },
   });
 
@@ -257,7 +257,7 @@ export async function finishAgentRun(
   }
 
   const updated = await prisma.agentRun.update({
-    where: { id: runId },
+    where: { id: run.id },
     data: {
       status: input.status,
       summary: input.summary ?? undefined,
@@ -268,13 +268,17 @@ export async function finishAgentRun(
   });
 
   if (input.status === "SUCCESS") {
+    const owningAgent = await prisma.agent.findFirst({ where: { id: run.agentId, workspaceId }, select: { id: true } });
+    if (!owningAgent) throw new Error("AGENT_NOT_FOUND");
     await prisma.agent.update({
-      where: { id: run.agentId },
+      where: { id: owningAgent.id },
       data: { status: "IDLE", successCount: { increment: 1 } },
     });
   } else {
+    const owningAgent = await prisma.agent.findFirst({ where: { id: run.agentId, workspaceId }, select: { id: true } });
+    if (!owningAgent) throw new Error("AGENT_NOT_FOUND");
     await prisma.agent.update({
-      where: { id: run.agentId },
+      where: { id: owningAgent.id },
       data: { status: "ERROR", errorCount: { increment: 1 } },
     });
   }
