@@ -3,6 +3,7 @@ import { prisma } from "@/lib/db/client";
 import { incrementMetric } from "@/lib/observability/metrics";
 import type { AgentStatus, AgentRunStatus, AgentMemoryType } from "@/generated/prisma/client";
 import { Prisma } from "@/generated/prisma/client";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 /**
  * Lifecycle states an agent moves through. Mirrors the Prisma `AgentStatus`
@@ -62,9 +63,10 @@ export async function setAgentStatus(
   options: { workspaceId?: string } = {},
 ): Promise<AgentStatus> {
   const target = LIFECYCLE_TO_STATUS[lifecycle];
+  const workspaceId = options.workspaceId ?? (await resolveWorkspaceId());
 
   const agent = await prisma.agent.findFirst({
-    where: { id, ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}) },
+    where: { id, workspaceId },
     select: { id: true, status: true },
   });
   if (!agent) {
@@ -82,7 +84,7 @@ export async function setAgentStatus(
   }
 
   const updated = await prisma.agent.update({
-    where: { id },
+    where: { id: agent.id },
     data: { status: target },
     select: { id: true, status: true },
   });
@@ -179,9 +181,11 @@ export async function startAgentRun(
   options: { workspaceId?: string; incrementObservability?: boolean } = {},
 ): Promise<{ id: string; status: AgentRunStatus; startedAt: Date }> {
   if (input.executionKey) {
+    const workspaceId = options.workspaceId ?? (await resolveWorkspaceId());
     const existing = await prisma.agentRun.findFirst({
       where: {
         agentId: input.agentId,
+        workspaceId,
         status: "RUNNING",
         logs: { path: ["executionKey"], equals: input.executionKey },
       },
@@ -192,11 +196,9 @@ export async function startAgentRun(
     }
   }
 
+  const workspaceId = options.workspaceId ?? (await resolveWorkspaceId());
   const agent = await prisma.agent.findFirst({
-    where: {
-      id: input.agentId,
-      ...(options.workspaceId ? { workspaceId: options.workspaceId } : {}),
-    },
+    where: { id: input.agentId, workspaceId },
     select: { id: true },
   });
   if (!agent) {
@@ -205,6 +207,7 @@ export async function startAgentRun(
 
   const run = await prisma.agentRun.create({
     data: {
+      workspaceId,
       agentId: input.agentId,
       status: "RUNNING",
       summary: input.summary ?? null,
@@ -214,7 +217,7 @@ export async function startAgentRun(
   });
 
   await prisma.agent.update({
-    where: { id: input.agentId },
+    where: { id: agent.id },
     data: { status: "RUNNING", lastRunAt: new Date() },
   });
 
@@ -236,8 +239,9 @@ export async function finishAgentRun(
   input: AgentRunFinishInput,
   options: { incrementObservability?: boolean } = {},
 ): Promise<{ id: string; status: AgentRunStatus; finishedAt: Date | null }> {
-  const run = await prisma.agentRun.findUnique({
-    where: { id: runId },
+  const workspaceId = await resolveWorkspaceId();
+  const run = await prisma.agentRun.findFirst({
+    where: { id: runId, workspaceId },
     select: { id: true, status: true, agentId: true },
   });
   if (!run) {
@@ -253,7 +257,7 @@ export async function finishAgentRun(
   }
 
   const updated = await prisma.agentRun.update({
-    where: { id: runId },
+    where: { id: run.id },
     data: {
       status: input.status,
       summary: input.summary ?? undefined,
@@ -264,13 +268,17 @@ export async function finishAgentRun(
   });
 
   if (input.status === "SUCCESS") {
+    const owningAgent = await prisma.agent.findFirst({ where: { id: run.agentId, workspaceId }, select: { id: true } });
+    if (!owningAgent) throw new Error("AGENT_NOT_FOUND");
     await prisma.agent.update({
-      where: { id: run.agentId },
+      where: { id: owningAgent.id },
       data: { status: "IDLE", successCount: { increment: 1 } },
     });
   } else {
+    const owningAgent = await prisma.agent.findFirst({ where: { id: run.agentId, workspaceId }, select: { id: true } });
+    if (!owningAgent) throw new Error("AGENT_NOT_FOUND");
     await prisma.agent.update({
-      where: { id: run.agentId },
+      where: { id: owningAgent.id },
       data: { status: "ERROR", errorCount: { increment: 1 } },
     });
   }
@@ -354,8 +362,10 @@ export async function updateAgentMemoryEntry(
     expiresAt?: Date | null;
   },
 ) {
+  const existing = await prisma.agentMemoryEntry.findFirst({ where: { id, workspaceId } });
+  if (!existing) throw new Error("AGENT_MEMORY_NOT_FOUND");
   return prisma.agentMemoryEntry.update({
-    where: { id },
+    where: { id: existing.id },
     data: {
       ...(patch.type ? { type: patch.type } : {}),
       ...(patch.key ? { key: patch.key } : {}),
@@ -376,8 +386,10 @@ export async function deleteAgentMemoryEntry(id: string, workspaceId: string) {
 }
 
 export async function listAgents(filters?: { status?: string }) {
+  const workspaceId = await resolveWorkspaceId();
   return prisma.agent.findMany({
     where: {
+      workspaceId,
       ...(filters?.status ? { status: filters.status as AgentStatus } : {}),
     },
     orderBy: { createdAt: "desc" },
@@ -385,8 +397,9 @@ export async function listAgents(filters?: { status?: string }) {
 }
 
 export async function getAgent(id: string) {
+  const workspaceId = await resolveWorkspaceId();
   return prisma.agent.findFirst({
-    where: { id },
+    where: { id, workspaceId },
     include: {
       runs: { orderBy: { startedAt: "desc" }, take: 10 },
     },
@@ -394,8 +407,10 @@ export async function getAgent(id: string) {
 }
 
 export async function listAgentRuns(filters?: { agentId?: string; status?: string }) {
+  const workspaceId = await resolveWorkspaceId();
   return prisma.agentRun.findMany({
     where: {
+      workspaceId,
       ...(filters?.agentId ? { agentId: filters.agentId } : {}),
       ...(filters?.status ? { status: filters.status as AgentRunStatus } : {}),
     },
@@ -405,8 +420,9 @@ export async function listAgentRuns(filters?: { agentId?: string; status?: strin
 }
 
 export async function getAgentRun(id: string) {
+  const workspaceId = await resolveWorkspaceId();
   return prisma.agentRun.findFirst({
-    where: { id },
+    where: { id, workspaceId },
     include: {
       agent: { select: { id: true, name: true, key: true } },
       toolCalls: { orderBy: { createdAt: "desc" } },

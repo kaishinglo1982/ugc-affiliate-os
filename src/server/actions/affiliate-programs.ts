@@ -8,6 +8,7 @@ import { encryptSecret } from "@/lib/encryption/aes";
 import { ok, fail, newRequestId, type Result } from "@/types/result";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export async function saveAffiliateProgramAction(
   programId: string | null,
@@ -16,6 +17,7 @@ export async function saveAffiliateProgramAction(
 ): Promise<Result<{ id: string }>> {
   const requestId = newRequestId();
   const user = await getCurrentUser();
+  const workspaceId = await resolveWorkspaceId();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
   const parsed = affiliateProgramSchema.safeParse(Object.fromEntries(formData.entries()));
@@ -32,6 +34,7 @@ export async function saveAffiliateProgramAction(
         cipherText: encrypted.cipherText,
         iv: encrypted.iv,
         authTag: encrypted.authTag,
+        workspaceId,
       },
     });
     credentialId = credential.id;
@@ -46,11 +49,16 @@ export async function saveAffiliateProgramAction(
     ...(credentialId ? { credentialId, status: "CONNECTED" } : {}),
   };
 
-  const program = programId
-    ? await prisma.affiliateProgram.update({ where: { id: programId }, data })
-    : await prisma.affiliateProgram.create({
-        data: { ...data, status: credentialId ? "CONNECTED" : "DISCONNECTED" },
-      });
+  let program;
+  if (programId) {
+    const existing = await prisma.affiliateProgram.findFirst({ where: { id: programId, workspaceId } });
+    if (!existing) return fail("Affiliate-Programm nicht gefunden.", requestId);
+    program = await prisma.affiliateProgram.update({ where: { id: existing.id }, data });
+  } else {
+    program = await prisma.affiliateProgram.create({
+      data: { ...data, workspaceId, status: credentialId ? "CONNECTED" : "DISCONNECTED" },
+    });
+  }
 
   await writeAuditLog({
     action: programId ? "affiliate_program.update" : "affiliate_program.create",
@@ -71,7 +79,10 @@ export async function deleteAffiliateProgramAction(id: string) {
     auditAction: "affiliate_program.delete",
     entityType: "AffiliateProgram",
     handler: async (input) => {
-      await prisma.affiliateProgram.delete({ where: { id: input.id } });
+      const workspaceId = await resolveWorkspaceId();
+      const existing = await prisma.affiliateProgram.findFirst({ where: { id: input.id, workspaceId } });
+      if (!existing) throw new Error("AFFILIATE_PROGRAM_NOT_FOUND");
+      await prisma.affiliateProgram.delete({ where: { id: existing.id } });
       return { id: input.id };
     },
     entityId: (output) => output.id,
@@ -86,11 +97,15 @@ export async function disconnectAffiliateProgramAction(id: string) {
     input: { id },
     auditAction: "integration.disconnect",
     entityType: "AffiliateProgram",
-    handler: async (input) =>
-      prisma.affiliateProgram.update({
-        where: { id: input.id },
+    handler: async (input) => {
+      const workspaceId = await resolveWorkspaceId();
+      const existing = await prisma.affiliateProgram.findFirst({ where: { id: input.id, workspaceId } });
+      if (!existing) throw new Error("AFFILIATE_PROGRAM_NOT_FOUND");
+      return prisma.affiliateProgram.update({
+        where: { id: existing.id },
         data: { status: "DISCONNECTED", credentialId: null },
-      }),
+      });
+    },
     entityId: (output) => output.id,
   });
   revalidatePath("/app/affiliate-programs");

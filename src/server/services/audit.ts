@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/db/client";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export interface AuditEntry {
   id: string;
@@ -10,7 +11,9 @@ export interface AuditEntry {
 }
 
 export async function listAudit(): Promise<AuditEntry[]> {
+  const workspaceId = await resolveWorkspaceId();
   const entries = await prisma.auditLog.findMany({
+    where: { workspaceId },
     orderBy: { createdAt: "desc" },
     take: 100,
   });

@@ -1,6 +1,7 @@
 import "server-only";
 import { prisma } from "@/lib/db/client";
 import type { Prisma } from "@/generated/prisma/client";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export interface MediaListFilters {
   search?: string;
@@ -9,7 +10,8 @@ export interface MediaListFilters {
 }
 
 export async function listMediaAssets(filters: MediaListFilters) {
-  const where: Prisma.MediaAssetWhereInput = {};
+  const workspaceId = await resolveWorkspaceId();
+  const where: Prisma.MediaAssetWhereInput = { workspaceId };
   if (!filters.includeArchived) where.archivedAt = null;
   if (filters.kind && filters.kind !== "ALL") where.kind = filters.kind as Prisma.EnumMediaKindFilter["equals"];
   if (filters.search) {

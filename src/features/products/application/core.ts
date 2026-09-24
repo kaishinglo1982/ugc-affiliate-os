@@ -1161,6 +1161,7 @@ export async function convertOpportunityToCampaign(
 
   const campaign = await prisma.campaign.create({
     data: {
+      workspaceId,
       name: opportunity.product.canonicalName,
       productId: opportunity.productId,
       status: "DRAFT",

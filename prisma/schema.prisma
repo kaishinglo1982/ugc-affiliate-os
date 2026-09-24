@@ -183,6 +183,7 @@ enum IntegrationMode {
 
 model AffiliateProgram {
   id             String               @id @default(uuid())
+  workspaceId    String               @default("00000000-0000-0000-0000-000000000001")
   provider       AffiliateProviderKey
   customName     String?
   trackingId     String?
@@ -198,11 +199,12 @@ model AffiliateProgram {
   revenues Revenue[]
   offers   AffiliateOffer[]
 
-  @@index([provider])
+  @@index([workspaceId, provider])
 }
 
 model AffiliateLink {
   id               String            @id @default(uuid())
+  workspaceId      String            @default("00000000-0000-0000-0000-000000000001")
   programId        String
   program          AffiliateProgram  @relation(fields: [programId], references: [id], onDelete: Cascade)
   productId        String?
@@ -226,8 +228,8 @@ model AffiliateLink {
   clicks       LinkClick[]
   campaignLinks Campaign[]
 
-  @@index([programId])
-  @@index([productId])
+  @@index([workspaceId, programId])
+  @@index([workspaceId, productId])
 }
 
 model LinkClick {
@@ -259,6 +261,7 @@ enum CampaignStatus {
 
 model Campaign {
   id             String         @id @default(uuid())
+  workspaceId    String         @default("00000000-0000-0000-0000-000000000001")
   name           String
   productId      String?
   product        Product?       @relation(fields: [productId], references: [id])
@@ -284,7 +287,7 @@ model Campaign {
   mediaAssets MediaAsset[]
   briefs      ContentBrief[]
 
-  @@index([status])
+  @@index([workspaceId, status])
 }
 
 // ---------------------------------------------------------------------------
@@ -299,6 +302,7 @@ enum ScriptStatus {
 
 model Script {
   id          String       @id @default(uuid())
+  workspaceId String       @default("00000000-0000-0000-0000-000000000001")
   title       String
   productId   String?
   product     Product?     @relation(fields: [productId], references: [id])
@@ -371,6 +375,7 @@ enum VideoProviderKey {
 
 model VideoJob {
   id           String         @id @default(uuid())
+  workspaceId  String         @default("00000000-0000-0000-0000-000000000001")
   scriptId     String?
   script       Script?        @relation(fields: [scriptId], references: [id])
   productId    String?
@@ -398,8 +403,8 @@ model VideoJob {
 
   mediaAssets MediaAsset[]
 
-  @@index([status])
-  @@index([campaignId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, campaignId])
 }
 
 // ---------------------------------------------------------------------------
@@ -415,6 +420,7 @@ enum MediaKind {
 
 model MediaAsset {
   id          String    @id @default(uuid())
+  workspaceId String    @default("00000000-0000-0000-0000-000000000001")
   kind        MediaKind
   fileName    String
   storageKey  String
@@ -438,8 +444,8 @@ model MediaAsset {
 
   primaryImageProducts Product[] @relation("ProductPrimaryImage")
 
-  @@index([kind])
-  @@index([campaignId])
+  @@index([workspaceId, kind])
+  @@index([workspaceId, campaignId])
 }
 
 // ---------------------------------------------------------------------------
@@ -459,6 +465,7 @@ enum SocialPlatform {
 
 model SocialAccount {
   id           String          @id @default(uuid())
+  workspaceId  String          @default("00000000-0000-0000-0000-000000000001")
   platform     SocialPlatform
   handle       String
   mode         IntegrationMode @default(MOCK)
@@ -470,7 +477,7 @@ model SocialAccount {
 
   posts SocialPost[]
 
-  @@index([platform])
+  @@index([workspaceId, platform])
 }
 
 enum SocialPostStatus {
@@ -486,6 +493,7 @@ enum SocialPostStatus {
 
 model SocialPost {
   id              String            @id @default(uuid())
+  workspaceId     String            @default("00000000-0000-0000-0000-000000000001")
   campaignId      String?
   campaign        Campaign?         @relation(fields: [campaignId], references: [id])
   mediaAssetId    String?
@@ -512,8 +520,8 @@ model SocialPost {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 
-  @@index([status])
-  @@index([scheduledAt])
+  @@index([workspaceId, status])
+  @@index([workspaceId, scheduledAt])
 }
 
 enum PublishJobStatus {
@@ -534,6 +542,7 @@ enum PublishJobStatus {
  */
 model PublishJob {
   id              String           @id @default(uuid())
+  workspaceId     String           @default("00000000-0000-0000-0000-000000000001")
   postId          String
   post            SocialPost       @relation(fields: [postId], references: [id], onDelete: Cascade)
   status          PublishJobStatus @default(PENDING)
@@ -544,7 +553,7 @@ model PublishJob {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
 
-  @@index([status, nextAttemptAt])
+  @@index([workspaceId, status, nextAttemptAt])
 }
 
 // ---------------------------------------------------------------------------
@@ -560,6 +569,7 @@ enum RevenueStatus {
 
 model Revenue {
   id            String        @id @default(uuid())
+  workspaceId   String        @default("00000000-0000-0000-0000-000000000001")
   date          DateTime
   programId     String?
   program       AffiliateProgram? @relation(fields: [programId], references: [id])
@@ -596,6 +606,7 @@ enum ExpenseCategory {
 
 model Expense {
   id           String          @id @default(uuid())
+  workspaceId  String          @default("00000000-0000-0000-0000-000000000001")
   date         DateTime
   category     ExpenseCategory
   vendor       String?
@@ -618,6 +629,7 @@ model Expense {
 
 model TaxSetting {
   id                    String   @id @default(uuid())
+  workspaceId           String   @default("00000000-0000-0000-0000-000000000001")
   reserveRatePercent    Decimal  @db.Decimal(5, 2) @default(30)
   vatRatePercent        Decimal  @db.Decimal(5, 2) @default(19)
   vatEnabled            Boolean  @default(false)
@@ -642,7 +654,8 @@ enum IntegrationCategory {
 
 model Integration {
   id            String              @id @default(uuid())
-  providerKey   String              @unique
+  workspaceId   String              @default("00000000-0000-0000-0000-000000000001")
+  providerKey   String
   displayName   String
   category      IntegrationCategory
   mode          IntegrationMode     @default(MOCK)
@@ -655,11 +668,13 @@ model Integration {
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
 
-  @@index([category])
+  @@index([workspaceId, category])
+  @@unique([workspaceId, providerKey])
 }
 
 model EncryptedCredential {
   id            String   @id @default(uuid())
+  workspaceId   String   @default("00000000-0000-0000-0000-000000000001")
   label         String
   cipherText    String
   iv            String
@@ -671,6 +686,8 @@ model EncryptedCredential {
   affiliatePrograms AffiliateProgram[]
   socialAccounts    SocialAccount[]
   integrations      Integration[]
+
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -686,6 +703,7 @@ enum AgentStatus {
 
 model Agent {
   id             String      @id @default(uuid())
+  workspaceId    String      @default("00000000-0000-0000-0000-000000000001")
   key            String      @unique
   name           String
   role           String
@@ -702,6 +720,8 @@ model Agent {
   updatedAt      DateTime    @updatedAt
 
   runs AgentRun[]
+
+  @@index([workspaceId])
 }
 
 enum AgentRunStatus {
@@ -721,7 +741,9 @@ model AgentRun {
   logs       Json?
   toolCalls  AgentToolCall[]
 
+  workspaceId String         @default("00000000-0000-0000-000000000001")
   @@index([agentId])
+  @@index([workspaceId, agentId])
 }
 
 enum AutomationTrigger {
@@ -813,6 +835,7 @@ model ContactRequest {
 
 model AuditLog {
   id         String   @id @default(uuid())
+  workspaceId String  @default("00000000-0000-0000-0000-000000000001")
   actor      String   @default("owner")
   action     String
   entityType String
@@ -821,8 +844,8 @@ model AuditLog {
   requestId  String?
   createdAt  DateTime @default(now())
 
-  @@index([entityType, entityId])
-  @@index([createdAt])
+  @@index([workspaceId, entityType, entityId])
+  @@index([workspaceId, createdAt])
 }
 
 // ===========================================================================

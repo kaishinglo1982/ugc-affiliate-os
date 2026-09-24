@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db/client";
 import { summarizeFinance } from "@/lib/finance/calculations";
 import type { DashboardPeriod } from "@/lib/dashboard-period";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export type { DashboardPeriod } from "@/lib/dashboard-period";
 
@@ -43,6 +44,7 @@ function dayKey(date: Date): string {
 
 export async function getDashboardData(period: DashboardPeriod) {
   const { from, to } = getPeriodRange(period);
+  const workspaceId = await resolveWorkspaceId();
 
   const [
     revenues,
@@ -62,36 +64,36 @@ export async function getDashboardData(period: DashboardPeriod) {
     socialPosts,
   ] = await Promise.all([
     prisma.revenue.findMany({
-      where: { date: { gte: from, lte: to } },
+      where: { workspaceId, date: { gte: from, lte: to } },
       include: { product: true },
       orderBy: { date: "asc" },
     }),
     prisma.expense.findMany({
-      where: { date: { gte: from, lte: to } },
+      where: { workspaceId, date: { gte: from, lte: to } },
       orderBy: { date: "asc" },
     }),
-    prisma.linkClick.count({ where: { occurredAt: { gte: from, lte: to } } }),
-    prisma.revenue.count({ where: { date: { gte: from, lte: to } } }),
+    prisma.linkClick.count({ where: { workspaceId, occurredAt: { gte: from, lte: to } } }),
+    prisma.revenue.count({ where: { workspaceId, date: { gte: from, lte: to } } }),
     prisma.socialPost.count({
-      where: { status: "PUBLISHED", publishedAt: { gte: from, lte: to } },
+      where: { workspaceId, status: "PUBLISHED", publishedAt: { gte: from, lte: to } },
     }),
-    prisma.campaign.count({ where: { status: "ACTIVE" } }),
+    prisma.campaign.count({ where: { workspaceId, status: "ACTIVE" } }),
     prisma.videoJob.count({
-      where: { status: { in: ["QUEUED", "PROCESSING", "REVIEW_REQUIRED"] } },
+      where: { workspaceId, status: { in: ["QUEUED", "PROCESSING", "REVIEW_REQUIRED"] } },
     }),
-    prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
+    prisma.auditLog.findMany({ where: { workspaceId }, orderBy: { createdAt: "desc" }, take: 8 }),
     prisma.socialPost.findMany({
-      where: { status: "SCHEDULED", scheduledAt: { gte: new Date() } },
+      where: { workspaceId, status: "SCHEDULED", scheduledAt: { gte: new Date() } },
       orderBy: { scheduledAt: "asc" },
       take: 5,
       include: { account: true, campaign: true },
     }),
-    prisma.integration.findMany({ where: { lastError: { not: null } } }),
-    prisma.agent.findMany({ orderBy: { name: "asc" } }),
-    prisma.campaign.groupBy({ by: ["status"], _count: { _all: true } }),
-    prisma.script.groupBy({ by: ["status"], _count: { _all: true } }),
-    prisma.videoJob.groupBy({ by: ["status"], _count: { _all: true } }),
-    prisma.socialPost.groupBy({ by: ["status"], _count: { _all: true } }),
+    prisma.integration.findMany({ where: { workspaceId, lastError: { not: null } } }),
+    prisma.agent.findMany({ where: { workspaceId }, orderBy: { name: "asc" } }),
+    prisma.campaign.groupBy({ where: { workspaceId }, by: ["status"], _count: { _all: true } }),
+    prisma.script.groupBy({ where: { workspaceId }, by: ["status"], _count: { _all: true } }),
+    prisma.videoJob.groupBy({ where: { workspaceId }, by: ["status"], _count: { _all: true } }),
+    prisma.socialPost.groupBy({ where: { workspaceId }, by: ["status"], _count: { _all: true } }),
   ]);
 
   const summary = summarizeFinance(

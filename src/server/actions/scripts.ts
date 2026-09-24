@@ -9,6 +9,7 @@ import { ok, fail, newRequestId, type Result } from "@/types/result";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
 import { z } from "zod";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export async function generateScriptAction(
   _prevState: Result<{ id: string }> | null,
@@ -16,6 +17,7 @@ export async function generateScriptAction(
 ): Promise<Result<{ id: string }>> {
   const requestId = newRequestId();
   const user = await getCurrentUser();
+  const workspaceId = await resolveWorkspaceId();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
   const parsed = scriptGenerateSchema.safeParse(Object.fromEntries(formData.entries()));
@@ -25,7 +27,7 @@ export async function generateScriptAction(
 
   const input = parsed.data;
   const product = input.productId
-    ? await prisma.product.findUnique({ where: { id: input.productId } })
+    ? await prisma.product.findFirst({ where: { id: input.productId, workspaceId } })
     : null;
 
   const provider = resolveScriptProvider(input.provider);
@@ -43,6 +45,7 @@ export async function generateScriptAction(
 
   const script = await prisma.script.create({
     data: {
+      workspaceId,
       title: input.title,
       productId: input.productId || null,
       campaignId: input.campaignId || null,
@@ -82,10 +85,11 @@ export async function regenerateScriptVersionAction(
 ): Promise<Result<{ id: string; versionNumber: number }>> {
   const requestId = newRequestId();
   const user = await getCurrentUser();
+  const workspaceId = await resolveWorkspaceId();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
-  const script = await prisma.script.findUnique({
-    where: { id: scriptId },
+  const script = await prisma.script.findFirst({
+    where: { id: scriptId, workspaceId },
     include: { product: true, versions: { orderBy: { versionNumber: "desc" }, take: 1 } },
   });
   if (!script) return fail("Skript nicht gefunden.", requestId);
@@ -131,10 +135,11 @@ export async function regenerateScriptVersionAction(
 export async function duplicateScriptAction(id: string): Promise<Result<{ id: string }>> {
   const requestId = newRequestId();
   const user = await getCurrentUser();
+  const workspaceId = await resolveWorkspaceId();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
-  const original = await prisma.script.findUnique({
-    where: { id },
+  const original = await prisma.script.findFirst({
+    where: { id, workspaceId },
     include: { versions: { orderBy: { versionNumber: "desc" }, take: 1 } },
   });
   if (!original) return fail("Skript nicht gefunden.", requestId);
@@ -142,6 +147,7 @@ export async function duplicateScriptAction(id: string): Promise<Result<{ id: st
   const latest = original.versions[0];
   const copy = await prisma.script.create({
     data: {
+      workspaceId,
       title: `${original.title} (Kopie)`,
       productId: original.productId,
       campaignId: original.campaignId,
@@ -197,7 +203,12 @@ export async function changeScriptStatusAction(id: string, status: string) {
     input: { id, status },
     auditAction: "script.status_change",
     entityType: "Script",
-    handler: async (input) => prisma.script.update({ where: { id: input.id }, data: { status: input.status } }),
+    handler: async (input) => {
+      const workspaceId = await resolveWorkspaceId();
+      const existing = await prisma.script.findFirst({ where: { id: input.id, workspaceId } });
+      if (!existing) throw new Error("SCRIPT_NOT_FOUND");
+      return prisma.script.update({ where: { id: existing.id }, data: { status: input.status } });
+    },
     entityId: (output) => output.id,
   });
   revalidatePath("/app/scripts");
@@ -211,7 +222,10 @@ export async function deleteScriptAction(id: string) {
     auditAction: "script.delete",
     entityType: "Script",
     handler: async (input) => {
-      await prisma.script.delete({ where: { id: input.id } });
+      const workspaceId = await resolveWorkspaceId();
+      const existing = await prisma.script.findFirst({ where: { id: input.id, workspaceId } });
+      if (!existing) throw new Error("SCRIPT_NOT_FOUND");
+      await prisma.script.delete({ where: { id: existing.id } });
       return { id: input.id };
     },
     entityId: (output) => output.id,

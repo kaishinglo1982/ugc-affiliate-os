@@ -8,6 +8,7 @@ import { isValidCampaignTransition, type CampaignStatus } from "@/features/campa
 import { ok, fail, newRequestId, type Result } from "@/types/result";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export async function saveCampaignAction(
   campaignId: string | null,
@@ -16,6 +17,7 @@ export async function saveCampaignAction(
 ): Promise<Result<{ id: string }>> {
   const requestId = newRequestId();
   const user = await getCurrentUser();
+  const workspaceId = await resolveWorkspaceId();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
   const parsed = campaignFormSchema.safeParse({
@@ -27,6 +29,7 @@ export async function saveCampaignAction(
   }
 
   const data = {
+    workspaceId,
     name: parsed.data.name,
     productId: parsed.data.productId || null,
     affiliateLinkId: parsed.data.affiliateLinkId || null,
@@ -40,9 +43,14 @@ export async function saveCampaignAction(
     notes: parsed.data.notes || null,
   };
 
-  const campaign = campaignId
-    ? await prisma.campaign.update({ where: { id: campaignId }, data })
-    : await prisma.campaign.create({ data });
+  let campaign;
+  if (campaignId) {
+    const existing = await prisma.campaign.findFirst({ where: { id: campaignId, workspaceId } });
+    if (!existing) return fail("Kampagne nicht gefunden.", requestId);
+    campaign = await prisma.campaign.update({ where: { id: existing.id }, data });
+  } else {
+    campaign = await prisma.campaign.create({ data });
+  }
 
   await writeAuditLog({
     action: campaignId ? "campaign.update" : "campaign.create",
@@ -64,7 +72,9 @@ export async function changeCampaignStatusAction(id: string, status: string) {
   if (!user) return fail("Nicht authentifiziert.", requestId);
   if (!parsed.success) return fail("Ungültiger Status.", requestId);
 
-  const current = await prisma.campaign.findUniqueOrThrow({ where: { id } });
+  const workspaceId = await resolveWorkspaceId();
+  const current = await prisma.campaign.findFirst({ where: { id, workspaceId } });
+  if (!current) return fail("Kampagne nicht gefunden.", requestId);
 
   if (!isValidCampaignTransition(current.status as CampaignStatus, parsed.data.status as CampaignStatus)) {
     return fail(
@@ -99,7 +109,10 @@ export async function deleteCampaignAction(id: string) {
     auditAction: "campaign.delete",
     entityType: "Campaign",
     handler: async (input) => {
-      await prisma.campaign.delete({ where: { id: input.id } });
+      const workspaceId = await resolveWorkspaceId();
+      const existing = await prisma.campaign.findFirst({ where: { id: input.id, workspaceId } });
+      if (!existing) throw new Error("CAMPAIGN_NOT_FOUND");
+      await prisma.campaign.delete({ where: { id: existing.id } });
       return { id: input.id };
     },
     entityId: (output) => output.id,

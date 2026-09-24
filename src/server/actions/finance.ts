@@ -12,6 +12,7 @@ import {
 import { ok, fail, newRequestId, type Result } from "@/types/result";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export async function saveRevenueAction(
   revenueId: string | null,
@@ -20,6 +21,7 @@ export async function saveRevenueAction(
 ): Promise<Result<{ id: string }>> {
   const requestId = newRequestId();
   const user = await getCurrentUser();
+  const workspaceId = await resolveWorkspaceId();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
   const parsed = revenueFormSchema.safeParse(Object.fromEntries(formData.entries()));
@@ -32,6 +34,7 @@ export async function saveRevenueAction(
     programId: parsed.data.programId || null,
     productId: parsed.data.productId || null,
     campaignId: parsed.data.campaignId || null,
+    workspaceId,
     platform: parsed.data.platform || null,
     grossAmount: parsed.data.grossAmount,
     status: parsed.data.status,
@@ -39,9 +42,14 @@ export async function saveRevenueAction(
     notes: parsed.data.notes || null,
   };
 
-  const revenue = revenueId
-    ? await prisma.revenue.update({ where: { id: revenueId }, data })
-    : await prisma.revenue.create({ data });
+  let revenue;
+  if (revenueId) {
+    const existing = await prisma.revenue.findFirst({ where: { id: revenueId, workspaceId } });
+    if (!existing) return fail("Umsatz nicht gefunden.", requestId);
+    revenue = await prisma.revenue.update({ where: { id: existing.id }, data });
+  } else {
+    revenue = await prisma.revenue.create({ data });
+  }
 
   await writeAuditLog({
     action: revenueId ? "revenue.update" : "revenue.create",
@@ -62,7 +70,10 @@ export async function deleteRevenueAction(id: string) {
     auditAction: "revenue.delete",
     entityType: "Revenue",
     handler: async (input) => {
-      await prisma.revenue.delete({ where: { id: input.id } });
+      const workspaceId = await resolveWorkspaceId();
+      const existing = await prisma.revenue.findFirst({ where: { id: input.id, workspaceId } });
+      if (!existing) throw new Error("REVENUE_NOT_FOUND");
+      await prisma.revenue.delete({ where: { id: existing.id } });
       return { id: input.id };
     },
     entityId: (output) => output.id,
@@ -78,6 +89,7 @@ export async function saveExpenseAction(
 ): Promise<Result<{ id: string }>> {
   const requestId = newRequestId();
   const user = await getCurrentUser();
+  const workspaceId = await resolveWorkspaceId();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
   const parsed = expenseFormSchema.safeParse(Object.fromEntries(formData.entries()));
@@ -87,6 +99,7 @@ export async function saveExpenseAction(
 
   const data = {
     date: new Date(parsed.data.date),
+    workspaceId,
     category: parsed.data.category,
     vendor: parsed.data.vendor || null,
     campaignId: parsed.data.campaignId || null,
@@ -97,9 +110,14 @@ export async function saveExpenseAction(
     notes: parsed.data.notes || null,
   };
 
-  const expense = expenseId
-    ? await prisma.expense.update({ where: { id: expenseId }, data })
-    : await prisma.expense.create({ data });
+  let expense;
+  if (expenseId) {
+    const existing = await prisma.expense.findFirst({ where: { id: expenseId, workspaceId } });
+    if (!existing) return fail("Ausgabe nicht gefunden.", requestId);
+    expense = await prisma.expense.update({ where: { id: existing.id }, data });
+  } else {
+    expense = await prisma.expense.create({ data });
+  }
 
   await writeAuditLog({
     action: expenseId ? "expense.update" : "expense.create",
@@ -120,7 +138,10 @@ export async function deleteExpenseAction(id: string) {
     auditAction: "expense.delete",
     entityType: "Expense",
     handler: async (input) => {
-      await prisma.expense.delete({ where: { id: input.id } });
+      const workspaceId = await resolveWorkspaceId();
+      const existing = await prisma.expense.findFirst({ where: { id: input.id, workspaceId } });
+      if (!existing) throw new Error("EXPENSE_NOT_FOUND");
+      await prisma.expense.delete({ where: { id: existing.id } });
       return { id: input.id };
     },
     entityId: (output) => output.id,
@@ -142,8 +163,10 @@ export async function saveTaxSettingAction(
     return fail("Eingabe ungültig.", requestId, parsed.error.flatten().fieldErrors);
   }
 
-  const existing = await prisma.taxSetting.findFirst();
+  const workspaceId = await resolveWorkspaceId();
+  const existing = await prisma.taxSetting.findFirst({ where: { workspaceId } });
   const data = {
+    workspaceId,
     reserveRatePercent: parsed.data.reserveRatePercent,
     vatRatePercent: parsed.data.vatRatePercent,
     vatEnabled: parsed.data.vatEnabled ?? false,

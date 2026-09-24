@@ -5,6 +5,7 @@ import { Permission } from "@/lib/auth/rbac";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/db/client";
 import { writeAuditLog } from "@/lib/audit/log";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import type { AgentStatus } from "@/generated/prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -13,11 +14,12 @@ export async function GET(request: Request) {
   const guard = await requireApiPermission(Permission.VIEW_AGENTS);
   if (guard) return guard.response;
 
+  const workspaceId = await resolveWorkspaceId();
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");
 
   const agents = await prisma.agent.findMany({
-    where: { ...(status ? { status: status as AgentStatus } : {}) },
+    where: { workspaceId, ...(status ? { status: status as AgentStatus } : {}) },
     orderBy: { createdAt: "desc" },
   });
 
@@ -44,8 +46,10 @@ export async function POST(request: Request) {
   }
 
   const actor = (await getCurrentUser())?.id ?? "owner";
+  const workspaceId = await resolveWorkspaceId();
   const agent = await prisma.agent.create({
     data: {
+      workspaceId,
       key: parsed.data.key,
       name: parsed.data.name,
       role: parsed.data.role,
