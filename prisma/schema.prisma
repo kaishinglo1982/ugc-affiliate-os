@@ -1641,6 +1641,7 @@ model ExperimentResult {
   experiment            ContentExperiment      @relation(fields: [experimentId], references: [id], onDelete: Cascade)
 
   @@index([experimentId])
+  @@index([workspaceId, experimentId])
 }
 
 // ---------------------------------------------------------------------------
