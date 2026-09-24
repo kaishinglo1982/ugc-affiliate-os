@@ -655,7 +655,7 @@ enum IntegrationCategory {
 model Integration {
   id            String              @id @default(uuid())
   workspaceId   String              @default("00000000-0000-0000-0000-000000000001")
-  providerKey   String              @unique
+  providerKey   String
   displayName   String
   category      IntegrationCategory
   mode          IntegrationMode     @default(MOCK)
@@ -669,6 +669,7 @@ model Integration {
   updatedAt     DateTime            @updatedAt
 
   @@index([workspaceId, category])
+  @@unique([workspaceId, providerKey])
 }
 
 model EncryptedCredential {
