@@ -205,13 +205,14 @@ describe("agents service — execution records", () => {
       startedAt: new Date("2026-01-01T00:00:00Z"),
     });
 
-    const run = await startAgentRun({ agentId: "a1", executionKey: "ek-1" });
+    const run = await startAgentRun({ agentId: "a1", executionKey: "ek-1" }, { workspaceId: "ws1" });
 
     expect(run.id).toBe("r1");
     expect(run.status).toBe("RUNNING");
     expect(prismaMock.agentRun.findFirst).toHaveBeenCalledWith({
       where: {
         agentId: "a1",
+        workspaceId: "ws1",
         status: "RUNNING",
         logs: { path: ["executionKey"], equals: "ek-1" },
       },
@@ -246,13 +247,13 @@ describe("agents service — execution records", () => {
   });
 
   it("is idempotent when re-finishing a terminal run", async () => {
-    prismaMock.agentRun.findUnique.mockResolvedValueOnce({
+    prismaMock.agentRun.findFirst.mockResolvedValueOnce({
       id: "r1",
       status: "SUCCESS",
       agentId: "a1",
     });
 
-    const result = await finishAgentRun("r1", { status: "SUCCESS" });
+    const result = await finishAgentRun("r1", { status: "SUCCESS" }, { workspaceId: "ws1" });
 
     expect(result.finishedAt).toBeNull();
     expect(prismaMock.agentRun.update).not.toHaveBeenCalled();
