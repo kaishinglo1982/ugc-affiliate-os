@@ -1587,6 +1587,7 @@ model ContentExperiment {
 
 model ExperimentVariant {
   id                      String                  @id @default(uuid())
+  workspaceId              String                  @default("00000000-0000-0000-0000-000000000001")
   experimentId            String
   contentVariantId        String?
   publishingConfigurationId String?
