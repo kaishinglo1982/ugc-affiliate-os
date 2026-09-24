@@ -1741,6 +1741,7 @@ model DataQualityReport {
 
 model DataQualityIssue {
   id                String               @id @default(uuid())
+  workspaceId       String               @default("00000000-0000-0000-0000-000000000001")
   reportId          String
   issueType         DataQualityIssueType
   severity          AnomalySeverity
@@ -1748,7 +1749,7 @@ model DataQualityIssue {
   detectedAt        DateTime             @default(now())
 
   report            DataQualityReport    @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  @@index([reportId])
+  @@index([workspaceId, reportId])
 }
 
 model AnalyticsAnomaly {
