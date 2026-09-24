@@ -229,7 +229,8 @@ describe("agents service — execution records", () => {
       status: "RUNNING",
       agentId: "a1",
     });
-    prismaMock.agentRun.update.mockResolvedValueOnce({
+        prismaMock.agent.findFirst.mockResolvedValueOnce({ id: "a1" });
+prismaMock.agentRun.update.mockResolvedValueOnce({
       id: "r1",
       status: "SUCCESS",
       finishedAt: new Date("2026-01-01T00:01:00Z"),
