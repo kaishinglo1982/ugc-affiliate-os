@@ -27,7 +27,7 @@ export async function POST(
     data: { workspaceId, agentId: id, status: "RUNNING" },
   });
 
-  await prisma.agent.update({ where: { id: agent.id }, data: { status: "RUNNING", lastRunAt: new Date() } });
+  await prisma.agent.update({ where: { id: agent.id, workspaceId }, data: { status: "RUNNING", lastRunAt: new Date() } });
 
   await writeAuditLog({
     action: "agent.run",
