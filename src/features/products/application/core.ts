@@ -290,7 +290,8 @@ export async function runDiscoveryForQuery(
 
         const existingOffer = await prisma.affiliateOffer.findUnique({
           where: {
-            provider_externalProductId_externalOfferId: {
+            workspaceId_provider_externalProductId_externalOfferId: {
+              workspaceId,
               provider,
               externalProductId: offer.externalProductId,
               externalOfferId: offer.externalOfferId ?? "",
