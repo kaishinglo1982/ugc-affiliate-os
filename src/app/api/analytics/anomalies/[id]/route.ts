@@ -40,7 +40,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
 
   const user = await getCurrentUser();
   const anomaly = await prisma.analyticsAnomaly.update({
-    where: { id: existing.id },
+    where: { id: existing.id, workspaceId },
     data: {
       status: parsed.data.status,
       resolvedAt: parsed.data.status === "RESOLVED" ? new Date() : null,
