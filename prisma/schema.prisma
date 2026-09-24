@@ -1621,7 +1621,7 @@ model ExperimentAssignment {
 
 model ExperimentResult {
   id                    String                @id @default(uuid())
-  workspaceId           String @default(uuid())
+  workspaceId           String
   experimentId          String
   analyzedAt            DateTime              @default(now())
   status                ExperimentResultStatus
