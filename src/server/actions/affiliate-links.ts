@@ -126,7 +126,7 @@ export async function testAffiliateLinkAction(id: string) {
 
       if (PRIVATE_HOST_PATTERN.test(url.hostname)) {
         return prisma.affiliateLink.update({
-          where: { id: link.id },
+          where: { id: link.id, workspaceId },
           data: { lastCheckedAt: new Date(), lastCheckStatus: "BLOCKED" },
         });
       }
