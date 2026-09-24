@@ -14,6 +14,7 @@ import { resolveStorageProvider } from "@/lib/providers/storage/registry";
 import { ok, fail, newRequestId, type Result } from "@/types/result";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 function splitTags(input?: string): string[] {
   if (!input) return [];
@@ -31,6 +32,7 @@ export async function uploadMediaAction(
 ): Promise<Result<{ uploaded: UploadedAssetSummary[] }>> {
   const requestId = newRequestId();
   const user = await getCurrentUser();
+  const workspaceId = await resolveWorkspaceId();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
   const metaParsed = mediaMetaSchema.safeParse({
@@ -63,6 +65,7 @@ export async function uploadMediaAction(
 
     const asset = await prisma.mediaAsset.create({
       data: {
+        workspaceId,
         kind: mimeToKind(file.type),
         fileName: file.name,
         storageKey: stored.storageKey,
@@ -109,8 +112,11 @@ export async function updateMediaAction(
   });
   if (!parsed.success) return fail("Eingabe ungültig.", requestId);
 
+  const existing = await prisma.mediaAsset.findFirst({ where: { id, workspaceId } });
+  if (!existing) return fail("Medienobjekt nicht gefunden.", requestId);
+
   const asset = await prisma.mediaAsset.update({
-    where: { id },
+    where: { id: existing.id },
     data: {
       tags: splitTags(parsed.data.tags),
       productId: parsed.data.productId || null,
@@ -137,7 +143,12 @@ export async function archiveMediaAction(id: string) {
     auditAction: "media.archive",
     entityType: "MediaAsset",
     handler: async (input) =>
-      prisma.mediaAsset.update({ where: { id: input.id }, data: { archivedAt: new Date() } }),
+      (async () => {
+        const workspaceId = await resolveWorkspaceId();
+        const existing = await prisma.mediaAsset.findFirst({ where: { id: input.id, workspaceId } });
+        if (!existing) throw new Error("MEDIA_NOT_FOUND");
+        return prisma.mediaAsset.update({ where: { id: existing.id }, data: { archivedAt: new Date() } });
+      })(),
     entityId: (output) => output.id,
   });
   revalidatePath("/app/media");
@@ -151,10 +162,12 @@ export async function deleteMediaAction(id: string) {
     auditAction: "media.delete",
     entityType: "MediaAsset",
     handler: async (input) => {
-      const asset = await prisma.mediaAsset.findUniqueOrThrow({ where: { id: input.id } });
+      const workspaceId = await resolveWorkspaceId();
+      const asset = await prisma.mediaAsset.findFirst({ where: { id: input.id, workspaceId } });
+      if (!asset) throw new Error("MEDIA_NOT_FOUND");
       const storage = await resolveStorageProvider();
       await storage.remove(asset.storageKey).catch(() => undefined);
-      await prisma.mediaAsset.delete({ where: { id: input.id } });
+      await prisma.mediaAsset.delete({ where: { id: asset.id } });
       return { id: input.id };
     },
     entityId: (output) => output.id,
