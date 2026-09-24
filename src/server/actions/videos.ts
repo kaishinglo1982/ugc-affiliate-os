@@ -6,6 +6,7 @@ import { videoJobFormSchema, idSchema } from "@/lib/validation/videos";
 import { resolveVideoProvider } from "@/lib/providers/video/registry";
 import { ok, fail, newRequestId, type Result } from "@/types/result";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/log";
 import type { VideoJob, VideoJobStatus } from "@/generated/prisma/client";
 
@@ -15,6 +16,7 @@ export async function createVideoJobAction(
 ): Promise<Result<{ id: string }>> {
   const requestId = newRequestId();
   const user = await getCurrentUser();
+  const workspaceId = await resolveWorkspaceId();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
   const parsed = videoJobFormSchema.safeParse(Object.fromEntries(formData.entries()));
@@ -26,6 +28,7 @@ export async function createVideoJobAction(
 
   const job = await prisma.videoJob.create({
     data: {
+      workspaceId,
       scriptId: input.scriptId || null,
       productId: input.productId || null,
       campaignId: input.campaignId || null,
@@ -72,7 +75,8 @@ export async function pollVideoJobAction(id: string): Promise<Result<VideoJob>> 
   const user = await getCurrentUser();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
-  const job = await prisma.videoJob.findUnique({ where: { id } });
+  const workspaceId = await resolveWorkspaceId();
+  const job = await prisma.videoJob.findFirst({ where: { id, workspaceId } });
   if (!job) return fail("Video-Job nicht gefunden.", requestId);
 
   if (job.status === "COMPLETED" || job.status === "FAILED" || job.status === "CANCELLED") {
@@ -94,10 +98,11 @@ export async function pollVideoJobAction(id: string): Promise<Result<VideoJob>> 
   });
 
   if (state.status === "COMPLETED" && state.resultUrl) {
-    const existingAsset = await prisma.mediaAsset.findFirst({ where: { videoJobId: id } });
+    const existingAsset = await prisma.mediaAsset.findFirst({ where: { videoJobId: id, workspaceId } });
     if (!existingAsset) {
       await prisma.mediaAsset.create({
         data: {
+          workspaceId,
           kind: "VIDEO",
           fileName: `video-job-${id}.svg`,
           storageKey: `mock/${id}`,
@@ -130,6 +135,7 @@ export async function pollVideoJobAction(id: string): Promise<Result<VideoJob>> 
 export async function retryVideoJobAction(id: string): Promise<Result<VideoJob>> {
   const requestId = newRequestId();
   const user = await getCurrentUser();
+  const workspaceId = await resolveWorkspaceId();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
   const job = await prisma.videoJob.findUnique({ where: { id } });
@@ -171,6 +177,7 @@ export async function retryVideoJobAction(id: string): Promise<Result<VideoJob>>
 export async function cancelVideoJobAction(id: string): Promise<Result<VideoJob>> {
   const requestId = newRequestId();
   const user = await getCurrentUser();
+  const workspaceId = await resolveWorkspaceId();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
   const job = await prisma.videoJob.findUnique({ where: { id } });
@@ -198,6 +205,7 @@ export async function deleteVideoJobAction(id: string) {
   const parsed = idSchema.safeParse({ id });
   const requestId = newRequestId();
   const user = await getCurrentUser();
+  const workspaceId = await resolveWorkspaceId();
   if (!user) return fail("Nicht authentifiziert.", requestId);
   if (!parsed.success) return fail("Ungültige ID.", requestId);
 
