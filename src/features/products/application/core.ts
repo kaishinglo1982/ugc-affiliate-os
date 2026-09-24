@@ -430,7 +430,7 @@ export async function runDiscoveryForQuery(
       const reason = error instanceof Error ? error.message : "unknown_error";
       const rateLimited = /rate.?limit/i.test(reason);
       await prisma.productDiscoveryProviderRun.update({
-        where: { id: providerRunId },
+        where: { id: providerRunId, workspaceId },
         data: {
           status: "FAILED",
           failureCode: rateLimited ? "RATE_LIMITED" : "UNKNOWN_ERROR",
