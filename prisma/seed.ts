@@ -598,9 +598,10 @@ async function seedIntegrations() {
 
   for (const entry of catalog) {
     await prisma.integration.upsert({
-      where: { providerKey: entry.providerKey },
+      where: { workspaceId_providerKey: { workspaceId: DEFAULT_WORKSPACE_ID, providerKey: entry.providerKey } },
       update: {},
       create: {
+        workspaceId: DEFAULT_WORKSPACE_ID,
         providerKey: entry.providerKey,
         displayName: entry.displayName,
         category: entry.category as never,
