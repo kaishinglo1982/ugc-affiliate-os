@@ -103,7 +103,7 @@ async function transitionPost(
   }
 
   const updated = await prisma.socialPost.update({
-    where: { id },
+    where: { id: post.id },
     data: { status: to, ...extraData },
   });
 
