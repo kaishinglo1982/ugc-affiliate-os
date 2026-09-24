@@ -139,7 +139,7 @@ export async function updateMediaAction(
   if (!existing) return fail("Medienobjekt nicht gefunden.", requestId);
 
   const asset = await prisma.mediaAsset.update({
-    where: { id: existing.id },
+    where: { id: existing.id, workspaceId },
     data: {
       tags: splitTags(parsed.data.tags),
       productId: parsed.data.productId || null,
@@ -190,7 +190,7 @@ export async function deleteMediaAction(id: string) {
       if (!asset) throw new Error("MEDIA_NOT_FOUND");
       const storage = await resolveStorageProvider();
       await storage.remove(asset.storageKey).catch(() => undefined);
-      await prisma.mediaAsset.delete({ where: { id: asset.id } });
+      await prisma.mediaAsset.delete({ where: { id: asset.id, workspaceId } });
       return { id: input.id };
     },
     entityId: (output) => output.id,
