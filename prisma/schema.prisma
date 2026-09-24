@@ -772,6 +772,7 @@ enum AutomationActionType {
 
 model Automation {
   id           String            @id @default(uuid())
+  workspaceId  String            @default("00000000-0000-0000-0000-000000000001")
   name         String
   isActive     Boolean           @default(true)
   trigger      AutomationTrigger
@@ -783,6 +784,8 @@ model Automation {
   updatedAt    DateTime          @updatedAt
 
   runs AutomationRun[]
+
+  @@index([workspaceId, isActive])
 }
 
 enum AutomationRunStatus {
@@ -793,13 +796,14 @@ enum AutomationRunStatus {
 
 model AutomationRun {
   id           String               @id @default(uuid())
+  workspaceId  String               @default("00000000-0000-0000-0000-000000000001")
   automationId String
   automation   Automation           @relation(fields: [automationId], references: [id], onDelete: Cascade)
   status       AutomationRunStatus
   runAt        DateTime             @default(now())
   message      String?
 
-  @@index([automationId])
+  @@index([workspaceId, automationId])
 }
 
 // ---------------------------------------------------------------------------
