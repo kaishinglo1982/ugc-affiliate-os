@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { prisma } from "@/lib/db/client";
 import { isLlmProviderConfigured, LLM_PROVIDER_KEYS } from "@/lib/providers/llm/registry";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export const metadata: Metadata = { title: "Einstellungen" };
 
@@ -20,8 +21,9 @@ const PROVIDER_LABELS: Record<string, string> = {
 };
 
 export default async function SettingsPage() {
-  const hfIntegration = await prisma.integration.findUnique({
-    where: { providerKey: "huggingface" },
+  const workspaceId = await resolveWorkspaceId();
+  const hfIntegration = await prisma.integration.findFirst({
+    where: { providerKey: "huggingface", workspaceId },
     select: { status: true, credentialId: true },
   });
 
