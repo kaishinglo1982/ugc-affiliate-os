@@ -160,7 +160,7 @@ export async function retryVideoJobAction(id: string): Promise<Result<VideoJob>>
   });
 
   const updated = await prisma.videoJob.update({
-    where: { id },
+    where: { id: job.id },
     data: {
       status: "QUEUED",
       progress: 0,
@@ -194,7 +194,7 @@ export async function cancelVideoJobAction(id: string): Promise<Result<VideoJob>
   const provider = resolveVideoProvider(job.provider);
   await provider.cancel(id);
 
-  const updated = await prisma.videoJob.update({ where: { id }, data: { status: "CANCELLED" } });
+  const updated = await prisma.videoJob.update({ where: { id: job.id }, data: { status: "CANCELLED" } });
 
   await writeAuditLog({
     action: "video_job.cancel",
