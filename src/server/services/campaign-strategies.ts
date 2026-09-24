@@ -107,7 +107,7 @@ export async function requestStrategyApproval(id: string, body: unknown, workspa
   const transition = canTransitionStrategy(strategy.status, "under_review");
   if (!transition.ok) throw new Error(transition.reason);
   const updated = await prisma.campaignStrategy.update({
-    where: { id },
+    where: { id, workspaceId },
     data: { status: "under_review" },
   });
   await createApprovalRequest(
