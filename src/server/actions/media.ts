@@ -170,7 +170,7 @@ export async function archiveMediaAction(id: string) {
         const workspaceId = await resolveWorkspaceId();
         const existing = await prisma.mediaAsset.findFirst({ where: { id: input.id, workspaceId } });
         if (!existing) throw new Error("MEDIA_NOT_FOUND");
-        return prisma.mediaAsset.update({ where: { id: existing.id }, data: { archivedAt: new Date() } });
+        return prisma.mediaAsset.update({ where: { id: existing.id, workspaceId }, data: { archivedAt: new Date() } });
       })(),
     entityId: (output) => output.id,
   });
