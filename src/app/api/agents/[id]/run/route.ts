@@ -4,6 +4,7 @@ import { Permission } from "@/lib/auth/rbac";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/db/client";
 import { writeAuditLog } from "@/lib/audit/log";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -15,14 +16,15 @@ export async function POST(
   if (guard) return guard.response;
 
   const { id } = await context.params;
-  const agent = await prisma.agent.findUnique({ where: { id } });
+  const workspaceId = await resolveWorkspaceId();
+  const agent = await prisma.agent.findFirst({ where: { id, workspaceId } });
   if (!agent) {
     return NextResponse.json({ error: "Agent nicht gefunden." }, { status: 404 });
   }
 
   const actor = (await getCurrentUser())?.id ?? "owner";
   const run = await prisma.agentRun.create({
-    data: { agentId: id, status: "RUNNING" },
+    data: { workspaceId, agentId: id, status: "RUNNING" },
   });
 
   await prisma.agent.update({ where: { id }, data: { status: "RUNNING", lastRunAt: new Date() } });
