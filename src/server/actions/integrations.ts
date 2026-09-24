@@ -27,7 +27,7 @@ export async function saveHuggingFaceSettingsAction(
   const workspaceId = await resolveWorkspaceId();
 
   const integration = await prisma.integration.upsert({
-    where: { providerKey: "huggingface", workspaceId },
+    where: { workspaceId_providerKey: { workspaceId, providerKey: "huggingface" } },
     update: {},
     create: {
       workspaceId,
@@ -44,7 +44,7 @@ export async function saveHuggingFaceSettingsAction(
     const encrypted = encryptSecret(apiKey);
     if (credentialId) {
       await prisma.encryptedCredential.update({
-        where: { id: credentialId, workspaceId },
+        where: { id: credentialId },
         data: {
           cipherText: encrypted.cipherText,
           iv: encrypted.iv,
@@ -66,7 +66,7 @@ export async function saveHuggingFaceSettingsAction(
   }
 
   await prisma.integration.update({
-    where: { id: integration.id, workspaceId },
+    where: { id: integration.id },
     data: {
       credentialId: credentialId,
       status: credentialId ? "CONNECTED" : integration.status,
@@ -89,10 +89,10 @@ export async function disconnectIntegrationAction(providerKey: string) {
       const integration = await prisma.integration.findFirst({ where: { providerKey: key, workspaceId } });
       if (!integration) return { providerKey: key };
       if (integration.credentialId) {
-        await prisma.encryptedCredential.delete({ where: { id: integration.credentialId, workspaceId } });
+        await prisma.encryptedCredential.delete({ where: { id: integration.credentialId } });
       }
       await prisma.integration.update({
-        where: { providerKey: key },
+        where: { id: integration.id },
         data: { credentialId: null, status: "DISCONNECTED" },
       });
       return { providerKey: key };
