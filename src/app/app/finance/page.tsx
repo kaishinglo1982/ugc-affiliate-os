@@ -5,18 +5,20 @@ import { estimateTaxReserve } from "@/lib/finance/calculations";
 import { FinancePageClient } from "@/components/finance/finance-page-client";
 import type { RevenueRow } from "@/components/finance/revenues-table";
 import type { ExpenseRow } from "@/components/finance/expenses-table";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export const metadata: Metadata = { title: "Finance" };
 
 export default async function FinancePage() {
+  const workspaceId = await resolveWorkspaceId();
   const [revenues, expenses, overview, taxSetting, programs, products, campaigns] = await Promise.all([
     listRevenues(),
     listExpenses(),
     getFinanceOverview(),
     getOrCreateTaxSetting(),
-    prisma.affiliateProgram.findMany({ select: { id: true, provider: true, customName: true }, orderBy: { provider: "asc" } }),
-    prisma.product.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
-    prisma.campaign.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.affiliateProgram.findMany({ where: { workspaceId }, select: { id: true, provider: true, customName: true }, orderBy: { provider: "asc" } }),
+    prisma.product.findMany({ where: { workspaceId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.campaign.findMany({ where: { workspaceId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
 
   const revenueRows: RevenueRow[] = revenues.map((r) => ({
