@@ -89,7 +89,7 @@ describe("agents service — lifecycle transitions", () => {
 
     expect(result).toBe("RUNNING");
     expect(prismaMock.agent.update).toHaveBeenCalledWith({
-      where: { id: "a1" },
+      where: { id: "a1", workspaceId: "ws1" },
       data: { status: "RUNNING" },
       select: { id: true, status: true },
     });
