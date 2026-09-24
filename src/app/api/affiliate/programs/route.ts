@@ -3,6 +3,7 @@ import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
 import { prisma } from "@/lib/db/client";
 import type { AffiliateProviderKey } from "@/generated/prisma/client";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export const dynamic = "force-dynamic";
 
@@ -10,12 +11,14 @@ export async function GET(request: Request) {
   const guard = await requireApiPermission(Permission.VIEW_AFFILIATE_PROGRAMS);
   if (guard) return guard.response;
 
+  const workspaceId = await resolveWorkspaceId();
   const { searchParams } = new URL(request.url);
   const provider = searchParams.get("provider");
   const status = searchParams.get("status");
 
   const programs = await prisma.affiliateProgram.findMany({
     where: {
+      workspaceId,
       ...(provider ? { provider: provider as AffiliateProviderKey } : {}),
       ...(status ? { status } : {}),
     },
