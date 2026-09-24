@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireApiPermission } from "@/lib/api/guard";
@@ -6,6 +7,7 @@ import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/db/client";
 import { writeAuditLog } from "@/lib/audit/log";
+import type { Prisma } from "@/generated/prisma/client";
 
 export const dynamic = "force-dynamic";
 
@@ -40,8 +42,9 @@ export async function POST(
   }
 
   const actor = (await getCurrentUser())?.id ?? "owner";
+  const steps = await prisma.workflowStepDefinition.findMany({ where: { workflowId: id, workspaceId }, orderBy: { stepOrder: "asc" } });
   const run = await prisma.workflowRun.create({
-    data: { workflowId: id, status: "RUNNING", context: payload },
+    data: { workspaceId, workflowId: id, workflowVersion: workflow.version, definitionSnapshot: JSON.parse(JSON.stringify({ workflow, steps })) as Prisma.InputJsonValue, definitionHash: workflow.definitionHash, correlationId: randomUUID(), status: "RUNNING", context: payload },
   });
 
   await writeAuditLog({
