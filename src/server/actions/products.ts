@@ -10,6 +10,7 @@ import { parseCsv } from "@/lib/csv";
 import { ok, fail, newRequestId, type Result } from "@/types/result";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 function splitTags(input?: string): string[] {
   if (!input) return [];
@@ -22,6 +23,7 @@ function splitTags(input?: string): string[] {
 async function persistProductWithScore(
   productId: string | undefined,
   input: z.infer<typeof productFormSchema>,
+  workspaceId: string,
 ) {
   const scoreResult = computeProductScore(input.dimensions);
 
@@ -47,11 +49,17 @@ async function persistProductWithScore(
     trend: input.trend,
     risk: input.risk,
     isFavorite: input.isFavorite ?? false,
+    workspaceId,
   };
 
-  const product = productId
-    ? await prisma.product.update({ where: { id: productId }, data })
-    : await prisma.product.create({ data });
+  let product;
+  if (productId) {
+    const existing = await prisma.product.findFirst({ where: { id: productId, workspaceId } });
+    if (!existing) throw new Error("PRODUCT_NOT_FOUND");
+    product = await prisma.product.update({ where: { id: existing.id }, data });
+  } else {
+    product = await prisma.product.create({ data });
+  }
 
   await prisma.productScore.create({
     data: {
@@ -83,7 +91,8 @@ export async function createProductAction(
     return fail("Eingabe ungültig.", requestId, parsed.error.flatten().fieldErrors);
   }
 
-  const product = await persistProductWithScore(undefined, parsed.data);
+  const workspaceId = await resolveWorkspaceId();
+  const product = await persistProductWithScore(undefined, parsed.data, workspaceId);
 
   await writeAuditLog({
     action: "product.create",
@@ -116,7 +125,8 @@ export async function updateProductAction(
     return fail("Eingabe ungültig.", requestId, parsed.error.flatten().fieldErrors);
   }
 
-  const product = await persistProductWithScore(productId, parsed.data);
+  const workspaceId = await resolveWorkspaceId();
+  const product = await persistProductWithScore(productId, parsed.data, workspaceId);
 
   await writeAuditLog({
     action: "product.update",
@@ -137,8 +147,12 @@ export async function toggleFavoriteAction(id: string, isFavorite: boolean) {
     input: { id },
     auditAction: "product.update",
     entityType: "Product",
-    handler: async (input) =>
-      prisma.product.update({ where: { id: input.id }, data: { isFavorite } }),
+    handler: async (input) => {
+      const workspaceId = await resolveWorkspaceId();
+      const existing = await prisma.product.findFirst({ where: { id: input.id, workspaceId } });
+      if (!existing) throw new Error("PRODUCT_NOT_FOUND");
+      return prisma.product.update({ where: { id: existing.id }, data: { isFavorite } });
+    },
     entityId: (output) => output.id,
   });
   revalidatePath("/app/products");
@@ -151,11 +165,15 @@ export async function archiveProductAction(id: string) {
     input: { id },
     auditAction: "product.archive",
     entityType: "Product",
-    handler: async (input) =>
-      prisma.product.update({
-        where: { id: input.id },
+    handler: async (input) => {
+      const workspaceId = await resolveWorkspaceId();
+      const existing = await prisma.product.findFirst({ where: { id: input.id, workspaceId } });
+      if (!existing) throw new Error("PRODUCT_NOT_FOUND");
+      return prisma.product.update({
+        where: { id: existing.id },
         data: { status: "ARCHIVED", archivedAt: new Date() },
-      }),
+      });
+    },
     entityId: (output) => output.id,
   });
   revalidatePath("/app/products");
@@ -169,7 +187,10 @@ export async function deleteProductAction(id: string) {
     auditAction: "product.delete",
     entityType: "Product",
     handler: async (input) => {
-      await prisma.product.delete({ where: { id: input.id } });
+      const workspaceId = await resolveWorkspaceId();
+      const existing = await prisma.product.findFirst({ where: { id: input.id, workspaceId } });
+      if (!existing) throw new Error("PRODUCT_NOT_FOUND");
+      await prisma.product.delete({ where: { id: existing.id } });
       return { id: input.id };
     },
     entityId: (output) => output.id,
@@ -187,6 +208,7 @@ export async function importProductsCsvAction(
   const requestId = newRequestId();
   const user = await getCurrentUser();
   if (!user) return fail("Nicht authentifiziert.", requestId);
+  const workspaceId = await resolveWorkspaceId();
 
   const parsed = importCsvSchema.safeParse({ csv: formData.get("csv") });
   if (!parsed.success) {
@@ -230,6 +252,7 @@ export async function importProductsCsvAction(
 
     const product = await prisma.product.create({
       data: {
+        workspaceId,
         name,
         canonicalName: name,
         categoryLabel: categoryIdx >= 0 ? row[categoryIdx]?.trim() || null : null,
