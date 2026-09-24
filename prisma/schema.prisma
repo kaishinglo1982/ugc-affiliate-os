@@ -830,6 +830,7 @@ model ContactRequest {
 
 model AuditLog {
   id         String   @id @default(uuid())
+  workspaceId String  @default("00000000-0000-0000-0000-000000000001")
   actor      String   @default("owner")
   action     String
   entityType String
@@ -838,8 +839,8 @@ model AuditLog {
   requestId  String?
   createdAt  DateTime @default(now())
 
-  @@index([entityType, entityId])
-  @@index([createdAt])
+  @@index([workspaceId, entityType, entityId])
+  @@index([workspaceId, createdAt])
 }
 
 // ===========================================================================
