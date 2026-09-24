@@ -294,3 +294,186 @@ describe("tenant isolation (MediaAsset + AffiliateLink)", () => {
     expect(result.count).toBe(0);
   });
 });
+
+describe("tenant isolation (Campaign + SocialPost)", () => {
+  let campaignA: { id: string };
+  let campaignB: { id: string };
+  let accountA: { id: string };
+  let accountB: { id: string };
+  let postA: { id: string };
+
+  beforeAll(async () => {
+    campaignA = await prisma.campaign.create({
+      data: { workspaceId: workspaceA, name: `Campaign-A-${randomUUID()}` },
+    });
+    campaignB = await prisma.campaign.create({
+      data: { workspaceId: workspaceB, name: `Campaign-B-${randomUUID()}` },
+    });
+    accountA = await prisma.socialAccount.create({
+      data: { workspaceId: workspaceA, platform: "TIKTOK", handle: `@tenant-a-${randomUUID()}` },
+    });
+    accountB = await prisma.socialAccount.create({
+      data: { workspaceId: workspaceB, platform: "TIKTOK", handle: `@tenant-b-${randomUUID()}` },
+    });
+    postA = await prisma.socialPost.create({
+      data: {
+        workspaceId: workspaceA,
+        accountId: accountA.id,
+        campaignId: campaignA.id,
+        caption: "Tenant A post",
+      },
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.socialPost.deleteMany({ where: { id: postA.id } });
+    await prisma.socialAccount.deleteMany({ where: { id: { in: [accountA.id, accountB.id] } } });
+    await prisma.campaign.deleteMany({ where: { id: { in: [campaignA.id, campaignB.id] } } });
+  });
+
+  it("blocks cross-workspace campaign lookup and update", async () => {
+    const foreign = await prisma.campaign.findFirst({
+      where: { id: campaignA.id, workspaceId: workspaceB },
+    });
+    const result = await prisma.campaign.updateMany({
+      where: { id: campaignA.id, workspaceId: workspaceB },
+      data: { name: "cross-tenant-write" },
+    });
+
+    expect(foreign).toBeNull();
+    expect(result.count).toBe(0);
+  });
+
+  it("blocks cross-workspace social-post lookup and update", async () => {
+    const foreign = await prisma.socialPost.findFirst({
+      where: { id: postA.id, workspaceId: workspaceB },
+    });
+    const result = await prisma.socialPost.updateMany({
+      where: { id: postA.id, workspaceId: workspaceB },
+      data: { caption: "cross-tenant-write" },
+    });
+
+    expect(foreign).toBeNull();
+    expect(result.count).toBe(0);
+  });
+
+  it("does not expose a workspace-A post through workspace-B account ownership", async () => {
+    const posts = await prisma.socialPost.findMany({
+      where: { workspaceId: workspaceB, accountId: accountB.id },
+    });
+    expect(posts.map((post) => post.id)).not.toContain(postA.id);
+  });
+});
+
+describe("tenant isolation (Agent + AgentRun)", () => {
+  let agentA: { id: string };
+  let agentB: { id: string };
+  let runA: { id: string };
+
+  beforeAll(async () => {
+    agentA = await prisma.agent.create({
+      data: {
+        workspaceId: workspaceA,
+        key: `tenant-a-${randomUUID()}`,
+        name: "Tenant A Agent",
+        role: "test",
+        description: "Tenant isolation test agent",
+      },
+    });
+    agentB = await prisma.agent.create({
+      data: {
+        workspaceId: workspaceB,
+        key: `tenant-b-${randomUUID()}`,
+        name: "Tenant B Agent",
+        role: "test",
+        description: "Tenant isolation test agent",
+      },
+    });
+    runA = await prisma.agentRun.create({
+      data: { workspaceId: workspaceA, agentId: agentA.id, status: "RUNNING" },
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.agentRun.deleteMany({ where: { id: runA.id } });
+    await prisma.agent.deleteMany({ where: { id: { in: [agentA.id, agentB.id] } } });
+  });
+
+  it("blocks cross-workspace agent and agent-run lookups", async () => {
+    const foreignAgent = await prisma.agent.findFirst({
+      where: { id: agentA.id, workspaceId: workspaceB },
+    });
+    const foreignRun = await prisma.agentRun.findFirst({
+      where: { id: runA.id, workspaceId: workspaceB },
+    });
+
+    expect(foreignAgent).toBeNull();
+    expect(foreignRun).toBeNull();
+  });
+
+  it("blocks cross-workspace agent and agent-run updates", async () => {
+    const agentResult = await prisma.agent.updateMany({
+      where: { id: agentA.id, workspaceId: workspaceB },
+      data: { name: "cross-tenant-write" },
+    });
+    const runResult = await prisma.agentRun.updateMany({
+      where: { id: runA.id, workspaceId: workspaceB },
+      data: { summary: "cross-tenant-write" },
+    });
+
+    expect(agentResult.count).toBe(0);
+    expect(runResult.count).toBe(0);
+  });
+});
+
+describe("tenant isolation (WorkflowDefinition + WorkflowRun)", () => {
+  let workflowA: { id: string };
+  let workflowB: { id: string };
+  let runA: { id: string };
+
+  beforeAll(async () => {
+    workflowA = await prisma.workflowDefinition.create({
+      data: { workspaceId: workspaceA, name: `Workflow-A-${randomUUID()}` },
+    });
+    workflowB = await prisma.workflowDefinition.create({
+      data: { workspaceId: workspaceB, name: `Workflow-B-${randomUUID()}` },
+    });
+    runA = await prisma.workflowRun.create({
+      data: { workspaceId: workspaceA, workflowId: workflowA.id, status: "RUNNING" },
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.workflowRun.deleteMany({ where: { id: runA.id } });
+    await prisma.workflowDefinition.deleteMany({
+      where: { id: { in: [workflowA.id, workflowB.id] } },
+    });
+  });
+
+  it("blocks cross-workspace workflow and workflow-run lookups", async () => {
+    const foreignWorkflow = await prisma.workflowDefinition.findFirst({
+      where: { id: workflowA.id, workspaceId: workspaceB },
+    });
+    const foreignRun = await prisma.workflowRun.findFirst({
+      where: { id: runA.id, workspaceId: workspaceB },
+    });
+
+    expect(foreignWorkflow).toBeNull();
+    expect(foreignRun).toBeNull();
+  });
+
+  it("blocks cross-workspace workflow and workflow-run updates", async () => {
+    const workflowResult = await prisma.workflowDefinition.updateMany({
+      where: { id: workflowA.id, workspaceId: workspaceB },
+      data: { name: "cross-tenant-write" },
+    });
+    const runResult = await prisma.workflowRun.updateMany({
+      where: { id: runA.id, workspaceId: workspaceB },
+      data: { triggeredBy: "cross-tenant-write" },
+    });
+
+    expect(workflowResult.count).toBe(0);
+    expect(runResult.count).toBe(0);
+  });
+});
+\n
