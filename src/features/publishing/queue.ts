@@ -4,6 +4,7 @@ import { resolveSocialProvider } from "@/lib/providers/social/mock-provider";
 import { featureFlags } from "@/lib/config/feature-flags";
 import { isValidPostTransition, type SocialPostStatus } from "@/features/publishing/status";
 import { writeAuditLog } from "@/lib/audit/log";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import {
   classifyAttempt,
   nextRetryAt,
@@ -41,7 +42,8 @@ function resolvePublisher(account: SocialAccount) {
  */
 export async function approvePost(postId: string, actor: string): Promise<SocialPost> {
   await assertPublishingEnabled();
-  const post = await prisma.socialPost.findUnique({ where: { id: postId } });
+  const workspaceId = await resolveWorkspaceId();
+  const post = await prisma.socialPost.findFirst({ where: { id: postId, workspaceId } });
   if (!post) throw new PublishError("Post nicht gefunden.");
   if (!isValidPostTransition(post.status as SocialPostStatus, "APPROVED")) {
     throw new PublishError(`Post kann aus Status "${post.status}" nicht freigegeben werden.`);
@@ -67,19 +69,20 @@ export async function approvePost(postId: string, actor: string): Promise<Social
  */
 export async function enqueuePublish(postId: string, actor: string): Promise<SocialPost> {
   await assertPublishingEnabled();
-  const post = await prisma.socialPost.findUnique({ where: { id: postId } });
+  const workspaceId = await resolveWorkspaceId();
+  const post = await prisma.socialPost.findFirst({ where: { id: postId, workspaceId } });
   if (!post) throw new PublishError("Post nicht gefunden.");
   if (post.status !== "APPROVED") {
     throw new PublishError("Nur freigegebene Posts können veröffentlicht werden.");
   }
   const active = await prisma.publishJob.findFirst({
-    where: { postId, status: { in: ["PENDING", "PROCESSING"] } },
+    where: { postId, workspaceId, status: { in: ["PENDING", "PROCESSING"] } },
     select: { id: true },
   });
   if (active) throw new PublishError("Für diesen Post läuft bereits ein Publish-Job.");
 
   await prisma.$transaction([
-    prisma.publishJob.create({ data: { postId, status: "PENDING" } }),
+    prisma.publishJob.create({ data: { workspaceId, postId, status: "PENDING" } }),
     prisma.socialPost.update({ where: { id: postId }, data: { status: "SCHEDULED" } }),
   ]);
   await writeAuditLog({
@@ -109,9 +112,11 @@ export interface PublishWorkerReport {
  */
 export async function processPublishQueue(limit = 10): Promise<PublishWorkerReport> {
   await assertPublishingEnabled();
+  const workspaceId = await resolveWorkspaceId();
   const now = new Date();
   const jobs = await prisma.publishJob.findMany({
     where: {
+      workspaceId,
       OR: [{ status: "PENDING" }, { status: "FAILED", nextAttemptAt: { lte: now } }],
     },
     orderBy: { createdAt: "asc" },
@@ -238,7 +243,8 @@ export async function processPublishQueue(limit = 10): Promise<PublishWorkerRepo
  * way back, preserving the "human intervention required" guarantee.
  */
 export async function retryDeadLetterJob(jobId: string, actor: string): Promise<void> {
-  const job = await prisma.publishJob.findUnique({ where: { id: jobId } });
+  const workspaceId = await resolveWorkspaceId();
+  const job = await prisma.publishJob.findFirst({ where: { id: jobId, workspaceId } });
   if (!job) throw new PublishError("Job nicht gefunden.");
   if (job.status !== "DEAD") {
     throw new PublishError("Nur tote Jobs können manuell wiederholt werden.");
