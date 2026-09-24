@@ -39,7 +39,7 @@ export async function PATCH(
   const existing = await prisma.workflowDefinition.findFirst({ where: { id, workspaceId } });
   if (!existing) return NextResponse.json({ error: "Workflow nicht gefunden." }, { status: 404 });
   const workflow = await prisma.workflowDefinition.update({
-    where: { id: existing.id },
+    where: { id: existing.id, workspaceId },
     data: { status: parsed.data.status as WorkflowStatus },
   });
 
