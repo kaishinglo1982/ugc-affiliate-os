@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { prisma } from "@/lib/db/client";
 import { writeAuditLog } from "@/lib/audit/log";
 
@@ -24,8 +25,17 @@ export async function PATCH(
   }
 
   const actor = (await getCurrentUser())?.id ?? "owner";
+  const workspaceId = await resolveWorkspaceId();
+  const existing = await prisma.agentToolDefinition.findFirst({
+    where: { id, workspaceId },
+    select: { id: true },
+  });
+  if (!existing) {
+    return NextResponse.json({ error: "Tool nicht gefunden." }, { status: 404 });
+  }
+
   const tool = await prisma.agentToolDefinition.update({
-    where: { id },
+    where: { id: existing.id },
     data: { enabled: parsed.data.enabled },
   });
 
