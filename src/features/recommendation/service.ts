@@ -1,5 +1,5 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 import { Decimal } from "@/lib/shared/decimal";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
@@ -14,11 +14,11 @@ function big(v: { toString(): string } | null | undefined): bigint {
 }
 
 async function buildContext(workspaceId: string): Promise<RecommendationContext> {
-  const content = await prisma.contentPerformanceSnapshot.findMany({
+  const content = await withWorkspaceTransaction(workspaceId, (tx) => tx.contentPerformanceSnapshot.findMany({
     where: { workspaceId },
     orderBy: { commissionRevenue: "desc" },
     take: 200,
-  });
+  }));
   const brandImpressions = content.reduce((s, c) => s + big(c.impressions), 0n);
   const brandClicks = content.reduce((s, c) => s + big(c.linkClicks), 0n);
   const brandConversions = content.reduce((s, c) => s + big(c.conversions), 0n);
@@ -36,7 +36,7 @@ async function buildContext(workspaceId: string): Promise<RecommendationContext>
     attributionErrors: 0,
   }));
 
-  const products = await prisma.productPerformanceSnapshot.findMany({ where: { workspaceId }, take: 200 });
+  const products = await withWorkspaceTransaction(workspaceId, (tx) => tx.productPerformanceSnapshot.findMany({ where: { workspaceId }, take: 200 }));
   const productPerf = products.map((p) => ({
     productId: p.productId,
     views: big(p.views),
@@ -57,7 +57,7 @@ export async function generateRecommendations(actor: string, workspaceId: string
 
   let created = 0;
   for (const d of drafts) {
-    const existing = await prisma.optimizationRecommendation.findFirst({
+    const existing = await withWorkspaceTransaction(workspaceId, (tx) => tx.optimizationRecommendation.findFirst({
       where: {
         workspaceId,
         recommendationType: d.recommendationType,
@@ -65,9 +65,9 @@ export async function generateRecommendations(actor: string, workspaceId: string
         scopeId: d.scopeId,
         status: { in: ["GENERATED", "REVIEWED", "ACCEPTED"] },
       },
-    });
+    }));
     if (existing) continue;
-    await prisma.optimizationRecommendation.create({
+    await withWorkspaceTransaction(workspaceId, (tx) => tx.optimizationRecommendation.create({
       data: {
         workspaceId,
         recommendationType: d.recommendationType,
@@ -83,7 +83,7 @@ export async function generateRecommendations(actor: string, workspaceId: string
         ruleId: d.ruleId,
         requiresApproval: true,
       },
-    });
+    }));
     created += 1;
   }
   await writeAuditLog({ action: "recommendation.generated", entityType: "OptimizationRecommendation", entityId: "batch", actor, metadata: { created } });
@@ -99,24 +99,24 @@ export async function listRecommendations(workspaceId: string, status?: string) 
 }
 
 export async function reviewRecommendation(id: string, actor: string, status: "REVIEWED" | "ACCEPTED" | "REJECTED", workspaceId: string, note?: string) {
-  const rec = await prisma.optimizationRecommendation.findFirst({ where: { id, workspaceId } });
+  const rec = await withWorkspaceTransaction(workspaceId, (tx) => tx.optimizationRecommendation.findFirst({ where: { id, workspaceId } }));
   if (!rec) throw new RecommendationError("Empfehlung nicht gefunden.");
-  const updated = await prisma.optimizationRecommendation.update({
+  const updated = await withWorkspaceTransaction(workspaceId, (tx) => tx.optimizationRecommendation.update({
     where: { id: rec.id, workspaceId },
     data: { status, reviewedAt: new Date(), reviewedBy: actor },
-  });
+  }));
   await writeAuditLog({ action: "recommendation.reviewed", entityType: "OptimizationRecommendation", entityId: id, actor, metadata: { status, note } });
   return updated;
 }
 
 export async function createVariantDraftFromRecommendation(id: string, actor: string, workspaceId: string) {
-  const rec = await prisma.optimizationRecommendation.findFirst({ where: { id, workspaceId } });
+  const rec = await withWorkspaceTransaction(workspaceId, (tx) => tx.optimizationRecommendation.findFirst({ where: { id, workspaceId } }));
   if (!rec) throw new RecommendationError("Empfehlung nicht gefunden.");
-  const asset = await prisma.contentAsset.findFirst({ where: { workspaceId } });
+  const asset = await withWorkspaceTransaction(workspaceId, (tx) => tx.contentAsset.findFirst({ where: { workspaceId } }));
   if (!asset) throw new RecommendationError("Kein Content-Asset für den Entwurf vorhanden.");
 
-  const version = (await prisma.contentVariant.count({ where: { workspaceId, parentContentAssetId: asset.id } })) + 1;
-  const variant = await prisma.contentVariant.create({
+  const version = (await withWorkspaceTransaction(workspaceId, (tx) => tx.contentVariant.count({ where: { workspaceId, parentContentAssetId: asset.id } }))) + 1;
+  const variant = await withWorkspaceTransaction(workspaceId, (tx) => tx.contentVariant.create({
     data: {
       workspaceId,
       parentContentAssetId: asset.id,
@@ -126,18 +126,18 @@ export async function createVariantDraftFromRecommendation(id: string, actor: st
       approvalStatus: "DRAFT",
       generatedBy: "HUMAN",
     },
-  });
+  }));
   await writeAuditLog({ action: "content_variant.created", entityType: "ContentVariant", entityId: variant.id, actor, metadata: { source: "recommendation", recommendationId: id } });
   return variant;
 }
 
 export async function createExperimentDraftFromRecommendation(id: string, actor: string, workspaceId: string) {
-  const rec = await prisma.optimizationRecommendation.findFirst({ where: { id, workspaceId } });
+  const rec = await withWorkspaceTransaction(workspaceId, (tx) => tx.optimizationRecommendation.findFirst({ where: { id, workspaceId } }));
   if (!rec) throw new RecommendationError("Empfehlung nicht gefunden.");
-  const brand = await prisma.brand.findFirst({ where: { workspaceId } });
+  const brand = await withWorkspaceTransaction(workspaceId, (tx) => tx.brand.findFirst({ where: { workspaceId } }));
   if (!brand) throw new RecommendationError("Keine Marke für das Experiment vorhanden.");
 
-  const experiment = await prisma.contentExperiment.create({
+  const experiment = await withWorkspaceTransaction(workspaceId, (tx) => tx.contentExperiment.create({
     data: {
       workspaceId,
       brandId: brand.id,
@@ -162,7 +162,7 @@ export async function createExperimentDraftFromRecommendation(id: string, actor:
       },
     },
     include: { variants: true },
-  });
+  }));
   await writeAuditLog({ action: "experiment.created", entityType: "ContentExperiment", entityId: experiment.id, actor, metadata: { source: "recommendation", recommendationId: id } });
   return experiment;
 }
