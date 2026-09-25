@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { listMediaAssets } from "@/server/services/media";
 import { listProductsForSelect } from "@/server/services/affiliate";
 import { prisma } from "@/lib/db/client";
@@ -13,10 +14,11 @@ interface MediaPageProps {
 
 export default async function MediaPage({ searchParams }: MediaPageProps) {
   const params = await searchParams;
+  const workspaceId = await resolveWorkspaceId();
   const [assets, products, campaigns] = await Promise.all([
     listMediaAssets({ search: params.search, kind: params.kind }),
     listProductsForSelect(),
-    prisma.campaign.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.campaign.findMany({ where: { workspaceId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
 
   const items: MediaAssetItem[] = assets.map((a) => ({
