@@ -71,7 +71,7 @@ export async function saveHuggingFaceSettingsAction(
   }
 
   await prisma.integration.update({
-    where: { id: integration.id },
+    where: { id: integration.id, workspaceId },
     data: {
       credentialId: credentialId,
       status: credentialId ? "CONNECTED" : integration.status,
