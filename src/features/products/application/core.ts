@@ -92,7 +92,7 @@ async function ensureProgram(
 
   const id = randomUUID();
   await tx.affiliateProgram.create({
-    data: { id, workspaceId, provider, mode: "MOCK" },
+    data: { id, workspaceId, provider, mode: "LIVE", status: "DISCONNECTED" },
   });
   return id;
 }
