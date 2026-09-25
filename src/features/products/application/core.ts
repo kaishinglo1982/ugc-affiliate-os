@@ -970,7 +970,7 @@ export async function scoreProductOpportunities(
     const scored = scoreOpportunity(input);
 
     await prisma.$transaction(async (tx: Tx) => {
-      await tx.productOpportunity.deleteMany({ where: { productId: product.id } });
+      await tx.productOpportunity.deleteMany({ where: { productId: product.id, workspaceId } });
       const opportunity = await tx.productOpportunity.create({
         data: {
           workspaceId,
