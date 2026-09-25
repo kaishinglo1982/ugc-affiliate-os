@@ -86,7 +86,8 @@ export async function analyzeContent(input: unknown, workspaceId: string) {
         data: { supersededByProfileId: profile.id },
       });
     }
-    });
+    return profile;
+  });
   const actor = (await getCurrentUser())?.id ?? "owner";
   await writeAuditLog({ action: "content_intelligence.analyzed", entityType: "ContentIntelligenceProfile", entityId: profile.id, actor, metadata: { confidence: classifyConfidence(data.confidenceScore ?? null) } });
   return profile;
