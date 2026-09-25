@@ -178,7 +178,7 @@ export async function convertCandidate(id: string, body: unknown, workspaceId: s
     },
   });
   const updated = await prisma.campaignCandidate.update({
-    where: { id: candidate.id },
+    where: { id: candidate.id, workspaceId },
     data: { status: "converted" },
   });
   await writeAuditLog({
