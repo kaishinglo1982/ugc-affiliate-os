@@ -1,5 +1,4 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
 import { Decimal } from "@/lib/shared/decimal";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
@@ -29,24 +28,24 @@ export async function analyzeContent(input: unknown, workspaceId: string) {
   }
   const data = parsed.data;
 
-  const contentAsset = await prisma.contentAsset.findFirst({
+  const contentAsset = await withWorkspaceTransaction(workspaceId, (tx) => tx.contentAsset.findFirst({
     where: { id: data.contentAssetId, workspaceId },
     select: { id: true },
-  });
+  }));
   if (!contentAsset) throw new ContentIntelligenceError("Content-Asset nicht gefunden.");
 
   if (data.contentVariantId) {
-    const contentVariant = await prisma.contentVariant.findFirst({
+    const contentVariant = await withWorkspaceTransaction(workspaceId, (tx) => tx.contentVariant.findFirst({
       where: { id: data.contentVariantId, workspaceId, parentContentAssetId: data.contentAssetId },
       select: { id: true },
-    });
+    }));
     if (!contentVariant) throw new ContentIntelligenceError("Content-Variante nicht gefunden.");
   }
 
-  const latest = await prisma.contentIntelligenceProfile.findFirst({
+  const latest = await withWorkspaceTransaction(workspaceId, (tx) => tx.contentIntelligenceProfile.findFirst({
     where: { workspaceId, contentAssetId: data.contentAssetId },
     orderBy: { analyzedAt: "desc" },
-  });
+  }));
   if (latest && !canSupersede(latest.analysisSource as "MANUAL" | "RULE_ENGINE" | "AI", data.analysisSource)) {
     throw new ContentIntelligenceError("Manuelles Profil wird nicht automatisch überschrieben.");
   }
@@ -106,17 +105,17 @@ export async function createVariant(input: unknown, workspaceId: string) {
     throw new ContentIntelligenceError("Ungültige Varianten-Eingabe.");
   }
   const data = parsed.data;
-  const parentAsset = await prisma.contentAsset.findFirst({
+  const parentAsset = await withWorkspaceTransaction(workspaceId, (tx) => tx.contentAsset.findFirst({
     where: { id: data.parentContentAssetId, workspaceId },
     select: { id: true },
-  });
+  }));
   if (!parentAsset) throw new ContentIntelligenceError("Content-Asset nicht gefunden.");
 
   if (data.sourceVariantId) {
-    const sourceVariant = await prisma.contentVariant.findFirst({
+    const sourceVariant = await withWorkspaceTransaction(workspaceId, (tx) => tx.contentVariant.findFirst({
       where: { id: data.sourceVariantId, workspaceId, parentContentAssetId: data.parentContentAssetId },
       select: { id: true },
-    });
+    }));
     if (!sourceVariant) throw new ContentIntelligenceError("Quellvariante nicht gefunden.");
   }
 
