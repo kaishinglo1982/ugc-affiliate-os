@@ -119,7 +119,7 @@ export async function createVariant(input: unknown, workspaceId: string) {
     if (!sourceVariant) throw new ContentIntelligenceError("Quellvariante nicht gefunden.");
   }
 
-  const variant = await withWorkspaceTransaction(workspaceId, async (tx) => {
+  const { variant, version } = await withWorkspaceTransaction(workspaceId, async (tx) => {
     const existing = await tx.contentVariant.findMany({
       where: { workspaceId, parentContentAssetId: data.parentContentAssetId },
       select: { version: true },
@@ -143,7 +143,8 @@ export async function createVariant(input: unknown, workspaceId: string) {
         approvalStatus: "DRAFT",
       },
     });
-    });
+    return { variant, version };
+  });
   const actor = (await getCurrentUser())?.id ?? "owner";
   await writeAuditLog({ action: "content_variant.created", entityType: "ContentVariant", entityId: variant.id, actor, metadata: { version } });
   return variant;
