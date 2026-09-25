@@ -278,7 +278,7 @@ export async function finishAgentRun(
     const owningAgent = await prisma.agent.findFirst({ where: { id: run.agentId, workspaceId }, select: { id: true } });
     if (!owningAgent) throw new Error("AGENT_NOT_FOUND");
     await prisma.agent.update({
-      where: { id: owningAgent.id },
+      where: { id: owningAgent.id, workspaceId },
       data: { status: "ERROR", errorCount: { increment: 1 } },
     });
   }
