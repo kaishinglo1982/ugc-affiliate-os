@@ -45,7 +45,7 @@ export async function saveAffiliateProgramAction(
     customName: parsed.data.customName || null,
     trackingId: parsed.data.trackingId || null,
     notes: parsed.data.notes || null,
-    mode: "MOCK" as const,
+    mode: "LIVE" as const,
     ...(credentialId ? { credentialId, status: "CONNECTED" } : {}),
   };
 
