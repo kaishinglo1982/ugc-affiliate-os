@@ -99,7 +99,7 @@ export async function disconnectIntegrationAction(providerKey: string) {
           select: { id: true },
         });
         if (credential) {
-          await prisma.encryptedCredential.delete({ where: { id: credential.id } });
+          await prisma.encryptedCredential.delete({ where: { id: credential.id, workspaceId } });
         }
       }
       await prisma.integration.update({
