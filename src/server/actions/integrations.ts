@@ -49,7 +49,7 @@ export async function saveHuggingFaceSettingsAction(
       });
       if (!credential) throw new Error("INTEGRATION_CREDENTIAL_NOT_FOUND");
       await prisma.encryptedCredential.update({
-        where: { id: credential.id },
+        where: { id: credential.id, workspaceId },
         data: {
           cipherText: encrypted.cipherText,
           iv: encrypted.iv,
