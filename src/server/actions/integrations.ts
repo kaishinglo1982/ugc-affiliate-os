@@ -103,7 +103,7 @@ export async function disconnectIntegrationAction(providerKey: string) {
         }
       }
       await prisma.integration.update({
-        where: { id: integration.id },
+        where: { id: integration.id, workspaceId },
         data: { credentialId: null, status: "DISCONNECTED" },
       });
       return { providerKey: key };
