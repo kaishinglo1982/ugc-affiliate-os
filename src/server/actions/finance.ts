@@ -188,7 +188,7 @@ export async function saveTaxSettingAction(
   };
 
   const setting = existing
-    ? await prisma.taxSetting.update({ where: { id: existing.id }, data })
+    ? await prisma.taxSetting.update({ where: { id: existing.id, workspaceId }, data })
     : await prisma.taxSetting.create({ data });
 
   await writeAuditLog({
