@@ -242,7 +242,7 @@ prismaMock.agentRun.update.mockResolvedValueOnce({
     expect(result.status).toBe("SUCCESS");
     expect(incrementMetric).toHaveBeenCalledWith("ugc_agent_runs_succeeded_total");
     expect(prismaMock.agent.update).toHaveBeenCalledWith({
-      where: { id: "a1" },
+      where: { id: "a1", workspaceId: "ws1" },
       data: { status: "IDLE", successCount: { increment: 1 } },
     });
   });
