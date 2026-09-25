@@ -26,7 +26,7 @@ export default async function AgentDetailPage({ params }: { params: Promise<{ id
 
   const memory = await listAgentMemory(workspaceId, { agentKey: agent.key });
   const audit = await prisma.auditLog.findMany({
-    where: { entityId: agent.id },
+    where: { entityId: agent.id, workspaceId },
     orderBy: { createdAt: "desc" },
     take: 10,
   });
