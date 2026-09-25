@@ -257,7 +257,7 @@ export async function finishAgentRun(
   }
 
   const updated = await prisma.agentRun.update({
-    where: { id: run.id },
+    where: { id: run.id, workspaceId },
     data: {
       status: input.status,
       summary: input.summary ?? undefined,
