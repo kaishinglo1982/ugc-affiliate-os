@@ -100,7 +100,7 @@ export async function deleteAffiliateLinkAction(id: string) {
       const workspaceId = await resolveWorkspaceId();
       const existing = await prisma.affiliateLink.findFirst({ where: { id: input.id, workspaceId } });
       if (!existing) throw new Error("AFFILIATE_LINK_NOT_FOUND");
-      await prisma.affiliateLink.delete({ where: { id: existing.id } });
+      await prisma.affiliateLink.delete({ where: { id: existing.id, workspaceId } });
       return { id: input.id };
     },
     entityId: (output) => output.id,
