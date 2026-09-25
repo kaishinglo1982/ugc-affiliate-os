@@ -90,7 +90,7 @@ export async function changeCampaignStatusAction(id: string, status: string) {
   }
 
   const updated = await prisma.campaign.update({
-    where: { id: current.id },
+    where: { id: current.id, workspaceId },
     data: { status: parsed.data.status },
   });
 
