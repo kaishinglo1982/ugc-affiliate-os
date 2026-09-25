@@ -13,6 +13,7 @@ import { prisma } from "@/lib/db/client";
 import { Prisma } from "@/generated/prisma/client";
 import { Decimal, type DecimalValue } from "@/lib/shared/decimal";
 import { DEFAULT_WORKSPACE_ID } from "@/lib/config/workspace";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 import { writeAuditLog } from "@/lib/audit/log";
 import {
   METRICS,
@@ -520,7 +521,7 @@ export async function recomputeMatchesForPendingOffers(
   }));
 
   let created = 0;
-  await prisma.$transaction(async (tx: Tx) => {
+  await withWorkspaceTransaction(workspaceId, async (tx: Tx) => {
     for (const offer of offers) {
       // Skip if a product already exists for the same external id.
       const alreadyMatched = existing.some(
@@ -688,7 +689,7 @@ export async function evaluateComplianceForProduct(
     brandName: product.brandName,
   });
 
-  await prisma.$transaction(async (tx: Tx) => {
+  await withWorkspaceTransaction(workspaceId, async (tx: Tx) => {
     await tx.productComplianceProfile.deleteMany({ where: { productId, workspaceId } });
     await tx.productComplianceProfile.create({
       data: {
@@ -791,7 +792,7 @@ export async function analyzeContentFitForProduct(
     evidence: ["heuristic"],
   });
 
-  await prisma.$transaction(async (tx: Tx) => {
+  await withWorkspaceTransaction(workspaceId, async (tx: Tx) => {
     await tx.productContentFitProfile.deleteMany({ where: { productId, workspaceId } });
     await tx.productContentFitProfile.create({
       data: {
@@ -969,7 +970,7 @@ export async function scoreProductOpportunities(
 
     const scored = scoreOpportunity(input);
 
-    await prisma.$transaction(async (tx: Tx) => {
+    await withWorkspaceTransaction(workspaceId, async (tx: Tx) => {
       await tx.productOpportunity.deleteMany({ where: { productId: product.id, workspaceId } });
       const opportunity = await tx.productOpportunity.create({
         data: {
@@ -1327,7 +1328,7 @@ export async function commitImport(
   if (!batch) throw new Error(`Import batch not found for token: ${previewToken}`);
 
   let committed = 0;
-  await prisma.$transaction(async (tx: Tx) => {
+  await withWorkspaceTransaction(workspaceId, async (tx: Tx) => {
     for (const row of batch.rows) {
       const normalized = row.normalizedData as unknown as NormalizedOffer | null;
       if (!normalized) continue;
@@ -1452,7 +1453,7 @@ export async function scanDataQualityForProduct(
         },
   });
 
-  await prisma.$transaction(async (tx: Tx) => {
+  await withWorkspaceTransaction(workspaceId, async (tx: Tx) => {
     await tx.productDataQualityReport.deleteMany({ where: { productId, workspaceId } });
     const report = await tx.productDataQualityReport.create({
       data: {
