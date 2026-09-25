@@ -217,7 +217,7 @@ export async function startAgentRun(
   });
 
   await prisma.agent.update({
-    where: { id: agent.id },
+    where: { id: agent.id, workspaceId },
     data: { status: "RUNNING", lastRunAt: new Date() },
   });
 
