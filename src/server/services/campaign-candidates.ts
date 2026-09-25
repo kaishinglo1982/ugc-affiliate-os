@@ -115,7 +115,7 @@ export async function requestCandidateApproval(id: string, body: unknown, worksp
   }
   const actor = (await getCurrentUser())?.id ?? "owner";
   const updated = await prisma.campaignCandidate.update({
-    where: { id: candidate.id },
+    where: { id: candidate.id, workspaceId },
     data: { status: "under_review" },
   });
   await createApprovalRequest(
