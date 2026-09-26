@@ -3,8 +3,22 @@ import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
 import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
 import { generateRecommendations, listRecommendations } from "@/features/recommendation/service";
+import type { RecommendationStatus } from "@/generated/prisma/client";
+
+const recommendationStatuses = new Set<RecommendationStatus>([
+  "GENERATED",
+  "REVIEWED",
+  "ACCEPTED",
+  "REJECTED",
+  "IMPLEMENTED",
+  "EXPIRED",
+]);
+
+function parseRecommendationStatus(value: string | null): RecommendationStatus | undefined {
+  if (!value) return undefined;
+  return recommendationStatuses.has(value as RecommendationStatus) ? (value as RecommendationStatus) : undefined;
+}
 
 export async function GET(request: Request) {
   const guard = await requireApiPermission(Permission.VIEW_RECOMMENDATIONS);
@@ -19,8 +33,14 @@ export async function GET(request: Request) {
     }
     throw e;
   }
+
   const { searchParams } = new URL(request.url);
-  const status = searchParams.get("status") ?? undefined;
+  const rawStatus = searchParams.get("status");
+  const status = parseRecommendationStatus(rawStatus);
+  if (rawStatus && !status) {
+    return NextResponse.json({ error: "Ungültiger Recommendation-Status." }, { status: 400 });
+  }
+
   const recommendations = await listRecommendations(workspaceId, status);
   return NextResponse.json({ recommendations });
 }
@@ -38,6 +58,7 @@ export async function POST(request: Request) {
     }
     throw e;
   }
+
   const actor = (await getCurrentUser())?.id ?? "owner";
   const { searchParams } = new URL(request.url);
   if (searchParams.get("action") === "generate") {
