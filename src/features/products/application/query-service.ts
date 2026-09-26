@@ -7,7 +7,6 @@
 import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 import { Prisma } from "@/generated/prisma/client";
 import { Decimal, type DecimalValue } from "@/lib/shared/decimal";
-import { DEFAULT_WORKSPACE_ID } from "@/lib/config/workspace";
 import { writeAuditLog } from "@/lib/audit/log";
 import {
   DISCOVERY_QUERY_STATUS_TO_PRISMA,
