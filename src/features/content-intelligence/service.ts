@@ -23,9 +23,7 @@ export class ContentIntelligenceError extends Error {}
 
 export async function analyzeContent(input: unknown, workspaceId: string) {
   const parsed = contentIntelligenceProfileSchema.safeParse(input);
-  if (!parsed.success) {
-    throw new ContentIntelligenceError("Ungültige Profil-Eingabe.");
-  }
+  if (!parsed.success) throw new ContentIntelligenceError("Ungültige Profil-Eingabe.");
   const data = parsed.data;
 
   const contentAsset = await withWorkspaceTransaction(workspaceId, (tx) => tx.contentAsset.findFirst({
@@ -34,9 +32,10 @@ export async function analyzeContent(input: unknown, workspaceId: string) {
   }));
   if (!contentAsset) throw new ContentIntelligenceError("Content-Asset nicht gefunden.");
 
-  if (data.contentVariantId) {
+  const contentVariantId = data.contentVariantId;
+  if (contentVariantId) {
     const contentVariant = await withWorkspaceTransaction(workspaceId, (tx) => tx.contentVariant.findFirst({
-      where: { id: data.contentVariantId, workspaceId, parentContentAssetId: data.contentAssetId },
+      where: { id: contentVariantId, workspaceId, parentContentAssetId: data.contentAssetId },
       select: { id: true },
     }));
     if (!contentVariant) throw new ContentIntelligenceError("Content-Variante nicht gefunden.");
@@ -55,7 +54,7 @@ export async function analyzeContent(input: unknown, workspaceId: string) {
       data: {
         workspaceId,
         contentAssetId: data.contentAssetId,
-        contentVariantId: data.contentVariantId ?? null,
+        contentVariantId: contentVariantId ?? null,
         language: data.language,
         durationSeconds: data.durationSeconds != null ? new Decimal(data.durationSeconds.toString()) : null,
         aspectRatio: data.aspectRatio ?? null,
@@ -78,7 +77,6 @@ export async function analyzeContent(input: unknown, workspaceId: string) {
         supersededByProfileId: null,
       },
     });
-  
     if (latest) {
       await tx.contentIntelligenceProfile.update({
         where: { id: latest.id, workspaceId },
@@ -93,17 +91,15 @@ export async function analyzeContent(input: unknown, workspaceId: string) {
 }
 
 export async function listVariants(contentAssetId: string, workspaceId: string) {
-  return prisma.contentVariant.findMany({
+  return withWorkspaceTransaction(workspaceId, (tx) => tx.contentVariant.findMany({
     where: { workspaceId, parentContentAssetId: contentAssetId },
     orderBy: { version: "desc" },
-  });
+  }));
 }
 
 export async function createVariant(input: unknown, workspaceId: string) {
   const parsed = newVariantSchema.safeParse(input);
-  if (!parsed.success) {
-    throw new ContentIntelligenceError("Ungültige Varianten-Eingabe.");
-  }
+  if (!parsed.success) throw new ContentIntelligenceError("Ungültige Varianten-Eingabe.");
   const data = parsed.data;
   const parentAsset = await withWorkspaceTransaction(workspaceId, (tx) => tx.contentAsset.findFirst({
     where: { id: data.parentContentAssetId, workspaceId },
@@ -111,9 +107,10 @@ export async function createVariant(input: unknown, workspaceId: string) {
   }));
   if (!parentAsset) throw new ContentIntelligenceError("Content-Asset nicht gefunden.");
 
-  if (data.sourceVariantId) {
+  const sourceVariantId = data.sourceVariantId;
+  if (sourceVariantId) {
     const sourceVariant = await withWorkspaceTransaction(workspaceId, (tx) => tx.contentVariant.findFirst({
-      where: { id: data.sourceVariantId, workspaceId, parentContentAssetId: data.parentContentAssetId },
+      where: { id: sourceVariantId, workspaceId, parentContentAssetId: data.parentContentAssetId },
       select: { id: true },
     }));
     if (!sourceVariant) throw new ContentIntelligenceError("Quellvariante nicht gefunden.");
@@ -125,7 +122,6 @@ export async function createVariant(input: unknown, workspaceId: string) {
       select: { version: true },
     });
     const version = nextVersion(existing.map((v) => v.version));
-  
     const variant = await tx.contentVariant.create({
       data: {
         workspaceId,
@@ -139,7 +135,7 @@ export async function createVariant(input: unknown, workspaceId: string) {
         titleText: data.titleText ?? null,
         callToActionText: data.callToActionText ?? null,
         generatedBy: data.generatedBy,
-        sourceVariantId: data.sourceVariantId ?? null,
+        sourceVariantId: sourceVariantId ?? null,
         approvalStatus: "DRAFT",
       },
     });
