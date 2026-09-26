@@ -1053,7 +1053,7 @@ export function nextProductStatus(action: "approve" | "reject" | "archive"): Pro
 export async function approveProduct(
   productId: string,
   actor: string,
-  reason?: string,
+  reason: string | undefined,
   workspaceId: string,
 ): Promise<unknown> {
   return applyProductDecision(productId, actor, "approve", reason, workspaceId);
@@ -1062,7 +1062,7 @@ export async function approveProduct(
 export async function rejectProduct(
   productId: string,
   actor: string,
-  reason?: string,
+  reason: string | undefined,
   workspaceId: string,
 ): Promise<unknown> {
   return applyProductDecision(productId, actor, "reject", reason, workspaceId);
