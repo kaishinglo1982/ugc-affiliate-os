@@ -733,7 +733,7 @@ export async function overrideCompliance(
   profileId: string,
   actor: string,
   decision: "approve" | "reject",
-  reason?: string,
+  reason: string | undefined,
   workspaceId: string,
 ): Promise<unknown> {
   const newStatus = decision === "approve" ? "PASSED" : "FAILED";
