@@ -56,7 +56,7 @@ export async function createExperiment(input: CreateExperimentInput, actor: stri
       trafficAllocationMode: input.trafficAllocationMode, approvalStatus: "DRAFT",
       variants: { create: variants.map((v) => ({
         workspaceId, name: v.name, isControl: v.isControl, trafficWeight: v.trafficWeight,
-        contentVariantId: v.contentVariantId, status: "DRAFT",
+        contentVariantId: v.contentVariantId ?? null, status: "DRAFT",
       })) },
     },
     include: { variants: true },
