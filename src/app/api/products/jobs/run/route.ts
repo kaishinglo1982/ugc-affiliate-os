@@ -8,7 +8,7 @@ async function runProductResearch(request: Request, allowUserFallback: boolean) 
   if ("response" in auth) return auth.response;
   try {
     const workspaceId = await resolveWorkspaceId();
-    const summary = await runAll(auth.actor, crypto.randomUUID());
+    const summary = await runAll(auth.actor, crypto.randomUUID(), workspaceId);
     return ok({ summary, workspaceId });
   } catch (error) {
     if (error instanceof InvalidTenantTokenError) {
