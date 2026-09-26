@@ -186,7 +186,7 @@ interface DiscoveryCounters {
 export async function runDiscoveryForQuery(
   queryId: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<{
   runId: string;
   status: string;
@@ -496,7 +496,7 @@ export async function runDiscoveryForQuery(
 
 export async function recomputeMatchesForPendingOffers(
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<number> {
   const offers = await prisma.affiliateOffer.findMany({
     where: { workspaceId },
@@ -605,7 +605,7 @@ function classifyFirstMatch(offer: NormalizedOffer, existing: ExistingProductLik
 export async function confirmMatch(
   candidateId: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<void> {
   const candidate = await prisma.productMatchCandidate.findFirst({ where: { id: candidateId, workspaceId } });
   if (!candidate) throw new Error("ProductMatchCandidate not found");
@@ -629,7 +629,7 @@ export async function confirmMatch(
 export async function rejectMatch(
   candidateId: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<void> {
   const candidate = await prisma.productMatchCandidate.findFirst({ where: { id: candidateId, workspaceId } });
   if (!candidate) throw new Error("ProductMatchCandidate not found");
@@ -657,7 +657,7 @@ export async function rejectMatch(
 export async function evaluateComplianceForProduct(
   productId: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown> {
   const product = await prisma.product.findFirst({
     where: { id: productId, workspaceId },
@@ -735,7 +735,7 @@ export async function overrideCompliance(
   actor: string,
   decision: "approve" | "reject",
   reason?: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown> {
   const newStatus = decision === "approve" ? "PASSED" : "FAILED";
   const profile = await prisma.productComplianceProfile.findFirst({ where: { id: profileId, workspaceId } });
@@ -775,7 +775,7 @@ export async function overrideCompliance(
 export async function analyzeContentFitForProduct(
   productId: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown> {
   const product = await prisma.product.findFirst({
     where: { id: productId, workspaceId },
@@ -830,7 +830,7 @@ export async function analyzeContentFitForProduct(
 export async function estimateProfitabilityForOffer(
   offerId: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown> {
   const offer = await prisma.affiliateOffer.findFirst({
     where: { id: offerId, workspaceId },
@@ -888,7 +888,7 @@ export async function estimateProfitabilityForOffer(
 export async function scoreProductOpportunities(
   productId: string | null,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<number> {
   const statusFilter = ["DISCOVERED", "UNDER_REVIEW", "APPROVED"] as const;
   const products = await prisma.product.findMany({
@@ -1025,7 +1025,7 @@ export async function scoreProductOpportunities(
 
 export async function expireOpportunities(
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<number> {
   const now = new Date();
   const result = await prisma.productOpportunity.updateMany({
@@ -1055,7 +1055,7 @@ export async function approveProduct(
   productId: string,
   actor: string,
   reason?: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown> {
   return applyProductDecision(productId, actor, "approve", reason, workspaceId);
 }
@@ -1064,7 +1064,7 @@ export async function rejectProduct(
   productId: string,
   actor: string,
   reason?: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown> {
   return applyProductDecision(productId, actor, "reject", reason, workspaceId);
 }
@@ -1072,7 +1072,7 @@ export async function rejectProduct(
 export async function archiveProduct(
   productId: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown> {
   return applyProductDecision(productId, actor, "archive", undefined, workspaceId);
 }
@@ -1117,7 +1117,7 @@ async function applyProductDecision(
 export async function approveOpportunity(
   opportunityId: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown> {
   return applyOpportunityDecision(opportunityId, actor, "approve", workspaceId);
 }
@@ -1125,7 +1125,7 @@ export async function approveOpportunity(
 export async function rejectOpportunity(
   opportunityId: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown> {
   return applyOpportunityDecision(opportunityId, actor, "reject", workspaceId);
 }
@@ -1171,7 +1171,7 @@ async function applyOpportunityDecision(
 export async function convertOpportunityToCampaign(
   opportunityId: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<string> {
   const opportunity = await prisma.productOpportunity.findFirst({
     where: { id: opportunityId, workspaceId },
@@ -1220,7 +1220,7 @@ export interface ImportPreview {
 export async function previewImport(
   content: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<ImportPreview> {
   const categories = await prisma.productCategory.findMany({
     where: { workspaceId },
@@ -1319,7 +1319,7 @@ function buildNormalizedFromRow(row: ProductCsvRow): NormalizedOffer {
 export async function commitImport(
   previewToken: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<number> {
   const batch = await prisma.productImportBatch.findFirst({
     where: { previewToken, workspaceId },
@@ -1408,7 +1408,7 @@ export async function commitImport(
 export async function scanDataQualityForProduct(
   productId: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown> {
   const product = await prisma.product.findFirst({
     where: { id: productId, workspaceId },
@@ -1501,7 +1501,7 @@ export async function scanDataQualityForProduct(
 
 export async function refreshOffers(
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<{ updated: number; unavailable: number }> {
   const offers = await prisma.affiliateOffer.findMany({
     where: { workspaceId, status: { in: ["ACTIVE", "PAUSED"] } },
