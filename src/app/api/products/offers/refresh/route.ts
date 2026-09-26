@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApiPermission } from "@/lib/api/guard";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/log";
 import { refreshOffers } from "@/features/products/application/core";
 
@@ -10,9 +11,10 @@ export async function POST(_request: Request) {
 
   const user = await getCurrentUser();
   const actor = user?.id ?? "owner";
+  const workspaceId = await resolveWorkspaceId();
 
   try {
-    const summary = await refreshOffers(actor);
+    const summary = await refreshOffers(actor, workspaceId);
     await writeAuditLog({
       action: "product_offer.refresh",
       entityType: "AffiliateOffer",
