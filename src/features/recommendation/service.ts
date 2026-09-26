@@ -1,3 +1,4 @@
+import { prisma } from "@/lib/db/client";
 import "server-only";
 import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 import { Decimal } from "@/lib/shared/decimal";
