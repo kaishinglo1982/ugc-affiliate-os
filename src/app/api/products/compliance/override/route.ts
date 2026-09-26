@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireApiPermission } from "@/lib/api/guard";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { overrideCompliance } from "@/features/products/application/core";
 
 const schema = z.object({
@@ -26,6 +27,7 @@ export async function POST(request: Request) {
 
   const user = await getCurrentUser();
   const actor = user?.id ?? "owner";
+  const workspaceId = await resolveWorkspaceId();
 
   try {
     const profile = await overrideCompliance(
@@ -33,6 +35,7 @@ export async function POST(request: Request) {
       actor,
       parsed.data.decision,
       parsed.data.reason,
+      workspaceId,
     );
     await writeAuditLog({
       action: "product_compliance.override",
