@@ -3,7 +3,7 @@
  *
  * Orchestrates discovery, deduplication, compliance, content-fit, profitability,
  * opportunity scoring, import and refresh. Every DB write is scoped by
- * `workspaceId` (default `DEFAULT_WORKSPACE_ID`), wrapped in audit logging that
+ * `workspaceId`, wrapped in audit logging that
  * never throws, and emits metrics via the observability module.
  *
  * No `any` is used; all inputs are typed or narrowed with Zod/type guards.
@@ -12,7 +12,6 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db/client";
 import { Prisma } from "@/generated/prisma/client";
 import { Decimal, type DecimalValue } from "@/lib/shared/decimal";
-import { DEFAULT_WORKSPACE_ID } from "@/lib/config/workspace";
 import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 import { writeAuditLog } from "@/lib/audit/log";
 import {
