@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireApiPermission } from "@/lib/api/guard";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/log";
 import { rejectOpportunity } from "@/features/products/application/core";
 
@@ -25,11 +26,12 @@ export async function POST(request: Request) {
 
   const user = await getCurrentUser();
   const actor = user?.id ?? "owner";
+  const workspaceId = await resolveWorkspaceId();
 
   try {
     const results = [];
     for (const opportunityId of parsed.data.opportunityIds) {
-      results.push(await rejectOpportunity(opportunityId, actor));
+      results.push(await rejectOpportunity(opportunityId, actor, workspaceId));
     }
     await writeAuditLog({
       action: "product_opportunity.reject",
