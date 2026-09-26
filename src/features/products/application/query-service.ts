@@ -68,7 +68,7 @@ function toCreateData(
 }
 
 export async function listQueries(
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown[]> {
   return withWorkspaceTransaction(workspaceId, (tx) => tx.productDiscoveryQuery.findMany({
     where: { workspaceId },
@@ -78,7 +78,7 @@ export async function listQueries(
 
 export async function getQuery(
   id: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown | null> {
   return withWorkspaceTransaction(workspaceId, (tx) => tx.productDiscoveryQuery.findFirst({
     where: { id, workspaceId },
@@ -89,7 +89,7 @@ export async function getQuery(
 export async function createQuery(
   input: ProductDiscoveryQueryInput,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown> {
   const query = await withWorkspaceTransaction(workspaceId, async (tx) => { const query = await tx.productDiscoveryQuery.create({
     data: toCreateData(input, workspaceId),
@@ -121,7 +121,7 @@ export async function updateQuery(
   id: string,
   input: ProductDiscoveryQueryInput,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown> {
   const query = await withWorkspaceTransaction(workspaceId, async (tx) => {
     const existing = await tx.productDiscoveryQuery.findFirst({
@@ -164,7 +164,7 @@ export async function updateQuery(
 }
 
 export async function listRuns(
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown[]> {
   return withWorkspaceTransaction(workspaceId, (tx) => tx.productDiscoveryRun.findMany({
     where: { workspaceId },
@@ -175,7 +175,7 @@ export async function listRuns(
 
 export async function getRun(
   id: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown | null> {
   return withWorkspaceTransaction(workspaceId, (tx) => tx.productDiscoveryRun.findFirst({
     where: { id, workspaceId },

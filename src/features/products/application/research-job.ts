@@ -90,7 +90,7 @@ async function runStep(
 export async function runAll(
   actor: string,
   correlationId: string = randomUUID(),
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<{ status: string; steps: StepResult[] }> {
   const startedAt = Date.now();
   const steps: StepResult[] = [];
