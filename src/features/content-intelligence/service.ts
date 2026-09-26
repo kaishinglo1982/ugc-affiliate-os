@@ -1,3 +1,4 @@
+import { prisma } from "@/lib/db/client";
 import "server-only";
 import { Decimal } from "@/lib/shared/decimal";
 import { getCurrentUser } from "@/lib/auth/current-user";
