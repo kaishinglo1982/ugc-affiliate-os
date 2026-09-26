@@ -2,7 +2,7 @@
  * Phase 7 — Product Discovery Query application service.
  *
  * CRUD for `ProductDiscoveryQuery` plus versioned snapshots on update. All reads
- * are scoped by `workspaceId` (default `DEFAULT_WORKSPACE_ID`).
+ * are explicitly scoped by the caller-provided `workspaceId`.
  */
 import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 import { Prisma } from "@/generated/prisma/client";
