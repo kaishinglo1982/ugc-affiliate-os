@@ -236,6 +236,7 @@ async function seedProducts() {
     });
     await prisma.productScore.create({
       data: {
+        workspaceId: DEFAULT_WORKSPACE_ID,
         productId: product.id,
         demand: p.dims.demand,
         commission: p.dims.commission,
