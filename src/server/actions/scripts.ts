@@ -114,6 +114,7 @@ export async function regenerateScriptVersionAction(
 
   await prisma.scriptVersion.create({
     data: {
+      workspaceId,
       scriptId: script.id,
       versionNumber: nextVersion,
       ...generated,
