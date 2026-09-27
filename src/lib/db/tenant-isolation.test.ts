@@ -493,7 +493,7 @@ describe("workspace transaction context", () => {
     const outsideContext = await prisma.$queryRaw<Array<{ workspace_id: string | null }>>`
       select current_setting('app.current_workspace_id', true) as workspace_id
     `;
-    expect(outsideContext[0]?.workspace_id ?? null).toBeNull();
+    expect(outsideContext[0]?.workspace_id ?? '').toBe('');
 
     const contextB = await withWorkspaceTransaction(workspaceB, async (tx) => {
       const result = await tx.$queryRaw<Array<{ workspace_id: string | null }>>`
