@@ -324,8 +324,8 @@ model Script {
   versions  ScriptVersion[]
   videoJobs VideoJob[]
 
-  @@index([status])
-  @@index([campaignId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, campaignId])
 }
 
 model ScriptVersion {
@@ -589,8 +589,8 @@ model Revenue {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
-  @@index([date])
-  @@index([campaignId])
+  @@index([workspaceId, date])
+  @@index([workspaceId, campaignId])
 }
 
 enum ExpenseCategory {
@@ -626,8 +626,8 @@ model Expense {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 
-  @@index([date])
-  @@index([campaignId])
+  @@index([workspaceId, date])
+  @@index([workspaceId, campaignId])
 }
 
 model TaxSetting {
@@ -639,6 +639,8 @@ model TaxSetting {
   tradeTaxReservePercent Decimal @db.Decimal(5, 2) @default(15)
   incomeTaxReservePercent Decimal @db.Decimal(5, 2) @default(25)
   updatedAt             DateTime @updatedAt
+
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -1601,7 +1603,7 @@ model ExperimentVariant {
   contentVariant          ContentVariant?         @relation(fields: [contentVariantId], references: [id])
   assignments             ExperimentAssignment[]
 
-  @@index([experimentId])
+  @@index([workspaceId, experimentId])
 }
 
 model ExperimentAssignment {
