@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { randomUUID } from "node:crypto";
 import { prisma } from "./client";
+import { withWorkspaceTransaction } from "./workspace-transaction";
 
 const workspaceA = randomUUID();
 const workspaceB = randomUUID();
@@ -474,5 +475,39 @@ describe("tenant isolation (WorkflowDefinition + WorkflowRun)", () => {
 
     expect(workflowResult.count).toBe(0);
     expect(runResult.count).toBe(0);
+  });
+});
+
+
+describe("workspace transaction context", () => {
+  it("binds the workspace setting only for the transaction", async () => {
+    const contextA = await withWorkspaceTransaction(workspaceA, async (tx) => {
+      const result = await tx.$queryRaw<Array<{ workspace_id: string | null }>>`
+        select current_setting('app.current_workspace_id', true) as workspace_id
+      `;
+      return result[0]?.workspace_id ?? null;
+    });
+
+    expect(contextA).toBe(workspaceA);
+
+    const outsideContext = await prisma.$queryRaw<Array<{ workspace_id: string | null }>>`
+      select current_setting('app.current_workspace_id', true) as workspace_id
+    `;
+    expect(outsideContext[0]?.workspace_id ?? null).toBeNull();
+
+    const contextB = await withWorkspaceTransaction(workspaceB, async (tx) => {
+      const result = await tx.$queryRaw<Array<{ workspace_id: string | null }>>`
+        select current_setting('app.current_workspace_id', true) as workspace_id
+      `;
+      return result[0]?.workspace_id ?? null;
+    });
+
+    expect(contextB).toBe(workspaceB);
+  });
+
+  it("rejects malformed workspace ids before opening a transaction", async () => {
+    await expect(
+      withWorkspaceTransaction("not-a-uuid", async () => "unreachable"),
+    ).rejects.toThrow("INVALID_WORKSPACE_ID");
   });
 });
