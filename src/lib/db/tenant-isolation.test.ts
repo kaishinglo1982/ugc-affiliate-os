@@ -529,6 +529,7 @@ describe("RLS enforcement (Product canary)", () => {
       ).rejects.toThrow();
     } finally {
       await prisma.$executeRawUnsafe(`REVOKE ALL ON TABLE "Product" FROM ugc_rls_test_role`);
+      await prisma.$executeRawUnsafe(`REVOKE USAGE ON SCHEMA public FROM ugc_rls_test_role`);
       await prisma.$executeRawUnsafe(`DROP ROLE IF EXISTS ugc_rls_test_role`);
     }
   });
