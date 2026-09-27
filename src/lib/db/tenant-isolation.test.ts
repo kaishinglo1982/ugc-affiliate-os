@@ -479,6 +479,62 @@ describe("tenant isolation (WorkflowDefinition + WorkflowRun)", () => {
 });
 
 
+describe("RLS enforcement (Product canary)", () => {
+  const role = "ugc_rls_test_role";
+
+  it("enforces the workspace policy for a non-owner database role", async () => {
+    await prisma.$executeRawUnsafe(`DO $
+    BEGIN
+      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ugc_rls_test_role') THEN
+        CREATE ROLE ugc_rls_test_role;
+      END IF;
+    END
+    $`);
+    await prisma.$executeRawUnsafe(`GRANT USAGE ON SCHEMA public TO ugc_rls_test_role`);
+    await prisma.$executeRawUnsafe(`GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "Product" TO ugc_rls_test_role`);
+
+    try {
+      const own = await prisma.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(`SET LOCAL ROLE ugc_rls_test_role`);
+        await tx.$executeRaw`select set_config('app.current_workspace_id', ${workspaceA}, true)`;
+
+        const visible = await tx.$queryRaw<Array<{ id: string; workspace_id: string }>>`
+          select "id", "workspaceId" as workspace_id
+          from "Product"
+          where "id" in (${productA.id}, ${productB.id})
+          order by "id"
+        `;
+
+        const crossUpdate = await tx.$executeRaw`
+          update "Product"
+          set "description" = 'cross-tenant-rds-test'
+          where "id" = ${productB.id}
+        `;
+
+        return { visible, crossUpdate };
+      });
+
+      expect(own.visible.map((row) => row.id)).toEqual([productA.id]);
+      expect(own.visible[0]?.workspace_id).toBe(workspaceA);
+      expect(own.crossUpdate).toBe(0);
+
+      await expect(
+        prisma.$transaction(async (tx) => {
+          await tx.$executeRawUnsafe(`SET LOCAL ROLE ugc_rls_test_role`);
+          await tx.$executeRaw`select set_config('app.current_workspace_id', ${workspaceA}, true)`;
+          await tx.$executeRaw`
+            insert into "Product" ("id", "workspaceId", "canonicalName")
+            values (${randomUUID()}, ${workspaceB}, 'rls-cross-tenant-insert')
+          `;
+        }),
+      ).rejects.toThrow();
+    } finally {
+      await prisma.$executeRawUnsafe(`REVOKE ALL ON TABLE "Product" FROM ugc_rls_test_role`);
+      await prisma.$executeRawUnsafe(`DROP ROLE IF EXISTS ugc_rls_test_role`);
+    }
+  });
+});
+
 describe("workspace transaction context", () => {
   it("binds the workspace setting only for the transaction", async () => {
     const contextA = await withWorkspaceTransaction(workspaceA, async (tx) => {
