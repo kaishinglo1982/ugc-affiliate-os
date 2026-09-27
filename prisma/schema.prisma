@@ -156,7 +156,7 @@ model ProductScore {
   breakdown             Json
   createdAt             DateTime @default(now())
 
-  @@index([productId])
+  @@index([workspaceId, productId])
 }
 
 // ---------------------------------------------------------------------------
@@ -351,6 +351,7 @@ model ScriptVersion {
   generatedBy    String   @default("template")
   createdAt      DateTime @default(now())
 
+  @@index([workspaceId, scriptId])
   @@unique([scriptId, versionNumber])
 }
 
