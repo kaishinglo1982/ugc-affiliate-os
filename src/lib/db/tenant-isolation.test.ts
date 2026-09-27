@@ -483,13 +483,12 @@ describe("RLS enforcement (Product canary)", () => {
   const role = "ugc_rls_test_role";
 
   it("enforces the workspace policy for a non-owner database role", async () => {
-    await prisma.$executeRawUnsafe(`DO $
-    BEGIN
-      IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'ugc_rls_test_role') THEN
-        CREATE ROLE ugc_rls_test_role;
-      END IF;
-    END
-    $`);
+    const roleExists = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+      select exists(select 1 from pg_roles where rolname = 'ugc_rls_test_role') as exists
+    `;
+    if (!roleExists[0]?.exists) {
+      await prisma.$executeRawUnsafe(`CREATE ROLE ugc_rls_test_role`);
+    }
     await prisma.$executeRawUnsafe(`GRANT USAGE ON SCHEMA public TO ugc_rls_test_role`);
     await prisma.$executeRawUnsafe(`GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "Product" TO ugc_rls_test_role`);
 
