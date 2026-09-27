@@ -31,3 +31,6 @@ CREATE POLICY "ScriptVersion_workspace_isolation" ON "ScriptVersion"
   WITH CHECK ("workspaceId" = current_workspace_id());
 
 -- ProductScore and ScriptVersion are now tenant-bearing and joinable by workspace.
+
+-- Canary activation: Product is covered by a workspace policy and is enforced by RLS.
+ALTER TABLE "Product" ENABLE ROW LEVEL SECURITY;
