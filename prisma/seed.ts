@@ -374,6 +374,7 @@ async function seedScripts(
     });
     await prisma.scriptVersion.create({
       data: {
+        workspaceId: DEFAULT_WORKSPACE_ID,
         scriptId: script.id,
         versionNumber: 1,
         hook: `Niemand sagt dir, dass ${product.name} genau DAS Problem löst...`,
