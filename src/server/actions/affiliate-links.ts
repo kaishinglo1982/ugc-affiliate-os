@@ -9,6 +9,7 @@ import { ok, fail, newRequestId, type Result } from "@/types/result";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
 import { resolveWorkspaceId } from "@/lib/auth/tenant";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 
 export async function saveAffiliateLinkAction(
   linkId: string | null,
@@ -68,14 +69,22 @@ export async function saveAffiliateLinkAction(
   };
 
   let link;
-  if (linkId) {
-    const existing = await prisma.affiliateLink.findFirst({ where: { id: linkId, workspaceId } });
-    if (!existing) return fail("Affiliate-Link nicht gefunden.", requestId);
-    link = await prisma.affiliateLink.update({ where: { id: existing.id, workspaceId }, data });
-  } else {
-    link = await prisma.affiliateLink.create({
-      data: { ...data, workspaceId, shortSlug: generateShortSlug() },
+  try {
+    link = await withWorkspaceTransaction(workspaceId, async (tx) => {
+      if (linkId) {
+        const existing = await tx.affiliateLink.findFirst({ where: { id: linkId, workspaceId } });
+        if (!existing) throw new Error("AFFILIATE_LINK_NOT_FOUND");
+        return tx.affiliateLink.update({ where: { id: existing.id, workspaceId }, data });
+      }
+      return tx.affiliateLink.create({
+        data: { ...data, workspaceId, shortSlug: generateShortSlug() },
+      });
     });
+  } catch (error) {
+    if (error instanceof Error && error.message === "AFFILIATE_LINK_NOT_FOUND") {
+      return fail("Affiliate-Link nicht gefunden.", requestId);
+    }
+    throw error;
   }
 
   await writeAuditLog({
@@ -100,7 +109,9 @@ export async function deleteAffiliateLinkAction(id: string) {
       const workspaceId = await resolveWorkspaceId();
       const existing = await prisma.affiliateLink.findFirst({ where: { id: input.id, workspaceId } });
       if (!existing) throw new Error("AFFILIATE_LINK_NOT_FOUND");
-      await prisma.affiliateLink.delete({ where: { id: existing.id, workspaceId } });
+      await withWorkspaceTransaction(workspaceId, async (tx) => {
+        await tx.affiliateLink.delete({ where: { id: existing.id, workspaceId } });
+      });
       return { id: input.id };
     },
     entityId: (output) => output.id,
@@ -147,10 +158,12 @@ export async function testAffiliateLinkAction(id: string) {
         status = "UNREACHABLE";
       }
 
-      return prisma.affiliateLink.update({
-        where: { id: link.id, workspaceId },
-        data: { lastCheckedAt: new Date(), lastCheckStatus: status },
-      });
+      return withWorkspaceTransaction(workspaceId, async (tx) =>
+        tx.affiliateLink.update({
+          where: { id: link.id, workspaceId },
+          data: { lastCheckedAt: new Date(), lastCheckStatus: status },
+        }),
+      );
     },
     entityId: (output) => output.id,
   });
