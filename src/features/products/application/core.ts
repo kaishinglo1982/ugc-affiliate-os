@@ -1088,18 +1088,23 @@ async function applyProductDecision(
   if (action === "archive") data.archivedAt = new Date();
   const product = await prisma.product.findFirst({ where: { id: productId, workspaceId } });
   if (!product) throw new Error("Product not found");
-  const updatedProduct = await prisma.product.update({ where: { id: product.id, workspaceId }, data });
-
-  await prisma.approval.create({
-    data: {
-      workspaceId,
-      resourceType: APPROVAL_RESOURCE_TO_PRISMA.product,
-      resourceId: productId,
-      status: APPROVAL_STATUS_TO_PRISMA.approved,
-      decidedBy: actor,
-      decisionReason: reason ?? null,
-      decidedAt: new Date(),
-    },
+  const updatedProduct = await withWorkspaceTransaction(workspaceId, async (tx: Tx) => {
+    const updated = await tx.product.update({
+      where: { id: product.id, workspaceId },
+      data,
+    });
+    await tx.approval.create({
+      data: {
+        workspaceId,
+        resourceType: APPROVAL_RESOURCE_TO_PRISMA.product,
+        resourceId: productId,
+        status: APPROVAL_STATUS_TO_PRISMA.approved,
+        decidedBy: actor,
+        decisionReason: reason ?? null,
+        decidedAt: new Date(),
+      },
+    });
+    return updated;
   });
 
   safeAudit({
@@ -1138,20 +1143,22 @@ async function applyOpportunityDecision(
   const prismaStatus = OPPORTUNITY_STATUS_TO_PRISMA[action === "approve" ? "approved" : "rejected"];
   const opportunity = await prisma.productOpportunity.findFirst({ where: { id: opportunityId, workspaceId } });
   if (!opportunity) throw new Error("ProductOpportunity not found");
-  const updatedOpportunity = await prisma.productOpportunity.update({
-    where: { id: opportunity.id, workspaceId },
-    data: { status: prismaStatus },
-  });
-
-  await prisma.approval.create({
-    data: {
-      workspaceId,
-      resourceType: "product_opportunity",
-      resourceId: opportunityId,
-      status: "APPROVED",
-      decidedBy: actor,
-      decidedAt: new Date(),
-    },
+  const updatedOpportunity = await withWorkspaceTransaction(workspaceId, async (tx: Tx) => {
+    const updated = await tx.productOpportunity.update({
+      where: { id: opportunity.id, workspaceId },
+      data: { status: prismaStatus },
+    });
+    await tx.approval.create({
+      data: {
+        workspaceId,
+        resourceType: "product_opportunity",
+        resourceId: opportunityId,
+        status: "APPROVED",
+        decidedBy: actor,
+        decidedAt: new Date(),
+      },
+    });
+    return updated;
   });
 
   if (action === "approve") incrementMetric(METRICS.productOpportunitiesApprovedTotal);
@@ -1178,20 +1185,22 @@ export async function convertOpportunityToCampaign(
   });
   if (!opportunity) throw new Error(`ProductOpportunity not found: ${opportunityId}`);
 
-  const campaign = await prisma.campaign.create({
-    data: {
-      workspaceId,
-      name: opportunity.product.canonicalName,
-      productId: opportunity.productId,
-      status: "DRAFT",
-      budget: null,
-      currency: opportunity.offer.currency ?? "EUR",
-    },
-  });
-
-  await prisma.productOpportunity.update({
-    where: { id: opportunity.id, workspaceId },
-    data: { status: "CONVERTED_TO_CAMPAIGN" },
+  const campaign = await withWorkspaceTransaction(workspaceId, async (tx: Tx) => {
+    const created = await tx.campaign.create({
+      data: {
+        workspaceId,
+        name: opportunity.product.canonicalName,
+        productId: opportunity.productId,
+        status: "DRAFT",
+        budget: null,
+        currency: opportunity.offer.currency ?? "EUR",
+      },
+    });
+    await tx.productOpportunity.update({
+      where: { id: opportunity.id, workspaceId },
+      data: { status: "CONVERTED_TO_CAMPAIGN" },
+    });
+    return created;
   });
 
   safeAudit({
