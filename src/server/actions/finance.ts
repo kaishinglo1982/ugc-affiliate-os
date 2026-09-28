@@ -13,6 +13,7 @@ import { ok, fail, newRequestId, type Result } from "@/types/result";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
 import { resolveWorkspaceId } from "@/lib/auth/tenant";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 
 export async function saveRevenueAction(
   revenueId: string | null,
@@ -29,35 +30,38 @@ export async function saveRevenueAction(
     return fail("Eingabe ungültig.", requestId, parsed.error.flatten().fieldErrors);
   }
 
-  const relationChecks = await Promise.all([
-    parsed.data.programId ? prisma.affiliateProgram.findFirst({ where: { id: parsed.data.programId, workspaceId }, select: { id: true } }) : null,
-    parsed.data.productId ? prisma.product.findFirst({ where: { id: parsed.data.productId, workspaceId }, select: { id: true } }) : null,
-    parsed.data.campaignId ? prisma.campaign.findFirst({ where: { id: parsed.data.campaignId, workspaceId }, select: { id: true } }) : null,
-  ]);
-  if (relationChecks.some((value) => value === null || value === undefined)) return fail("Zugehörige Daten nicht gefunden.", requestId);
-
-  const data = {
-    date: new Date(parsed.data.date),
-    programId: parsed.data.programId || null,
-    productId: parsed.data.productId || null,
-    campaignId: parsed.data.campaignId || null,
-    workspaceId,
-    platform: parsed.data.platform || null,
-    grossAmount: parsed.data.grossAmount,
-    status: parsed.data.status,
-    reference: parsed.data.reference || null,
-    notes: parsed.data.notes || null,
-  };
-
-  let revenue;
-  if (revenueId) {
-    const existing = await prisma.revenue.findFirst({ where: { id: revenueId, workspaceId } });
-    if (!existing) return fail("Umsatz nicht gefunden.", requestId);
-    revenue = await prisma.revenue.update({ where: { id: existing.id, workspaceId }, data });
-  } else {
-    revenue = await prisma.revenue.create({ data });
-  }
-
+  const revenue = await withWorkspaceTransaction(workspaceId, async (tx) => {
+    const relationChecks = await Promise.all([
+      parsed.data.programId ? tx.affiliateProgram.findFirst({ where: { id: parsed.data.programId, workspaceId }, select: { id: true } }) : null,
+      parsed.data.productId ? tx.product.findFirst({ where: { id: parsed.data.productId, workspaceId }, select: { id: true } }) : null,
+      parsed.data.campaignId ? tx.campaign.findFirst({ where: { id: parsed.data.campaignId, workspaceId }, select: { id: true } }) : null,
+    ]);
+    if (relationChecks.some((value) => value === null || value === undefined)) return fail("Zugehörige Daten nicht gefunden.", requestId);
+  
+    const data = {
+      date: new Date(parsed.data.date),
+      programId: parsed.data.programId || null,
+      productId: parsed.data.productId || null,
+      campaignId: parsed.data.campaignId || null,
+      workspaceId,
+      platform: parsed.data.platform || null,
+      grossAmount: parsed.data.grossAmount,
+      status: parsed.data.status,
+      reference: parsed.data.reference || null,
+      notes: parsed.data.notes || null,
+    };
+  
+    let revenue;
+    if (revenueId) {
+      const existing = await tx.revenue.findFirst({ where: { id: revenueId, workspaceId } });
+      if (!existing) return fail("Umsatz nicht gefunden.", requestId);
+      revenue = await tx.revenue.update({ where: { id: existing.id, workspaceId }, data });
+    } else {
+      revenue = await tx.revenue.create({ data });
+    }
+  
+    return revenue;
+  });
   await writeAuditLog({
     action: revenueId ? "revenue.update" : "revenue.create",
     entityType: "Revenue",
@@ -104,34 +108,37 @@ export async function saveExpenseAction(
     return fail("Eingabe ungültig.", requestId, parsed.error.flatten().fieldErrors);
   }
 
-  const relationChecks = await Promise.all([
-    parsed.data.productId ? prisma.product.findFirst({ where: { id: parsed.data.productId, workspaceId }, select: { id: true } }) : null,
-    parsed.data.campaignId ? prisma.campaign.findFirst({ where: { id: parsed.data.campaignId, workspaceId }, select: { id: true } }) : null,
-  ]);
-  if (relationChecks.some((value) => value === null || value === undefined)) return fail("Zugehörige Daten nicht gefunden.", requestId);
-
-  const data = {
-    date: new Date(parsed.data.date),
-    workspaceId,
-    category: parsed.data.category,
-    vendor: parsed.data.vendor || null,
-    campaignId: parsed.data.campaignId || null,
-    productId: parsed.data.productId || null,
-    amount: parsed.data.amount,
-    isRecurring: parsed.data.isRecurring ?? false,
-    isTaxRelevant: parsed.data.isTaxRelevant ?? true,
-    notes: parsed.data.notes || null,
-  };
-
-  let expense;
-  if (expenseId) {
-    const existing = await prisma.expense.findFirst({ where: { id: expenseId, workspaceId } });
-    if (!existing) return fail("Ausgabe nicht gefunden.", requestId);
-    expense = await prisma.expense.update({ where: { id: existing.id, workspaceId }, data });
-  } else {
-    expense = await prisma.expense.create({ data });
-  }
-
+  const expense = await withWorkspaceTransaction(workspaceId, async (tx) => {
+    const relationChecks = await Promise.all([
+      parsed.data.productId ? tx.product.findFirst({ where: { id: parsed.data.productId, workspaceId }, select: { id: true } }) : null,
+      parsed.data.campaignId ? tx.campaign.findFirst({ where: { id: parsed.data.campaignId, workspaceId }, select: { id: true } }) : null,
+    ]);
+    if (relationChecks.some((value) => value === null || value === undefined)) return fail("Zugehörige Daten nicht gefunden.", requestId);
+  
+    const data = {
+      date: new Date(parsed.data.date),
+      workspaceId,
+      category: parsed.data.category,
+      vendor: parsed.data.vendor || null,
+      campaignId: parsed.data.campaignId || null,
+      productId: parsed.data.productId || null,
+      amount: parsed.data.amount,
+      isRecurring: parsed.data.isRecurring ?? false,
+      isTaxRelevant: parsed.data.isTaxRelevant ?? true,
+      notes: parsed.data.notes || null,
+    };
+  
+    let expense;
+    if (expenseId) {
+      const existing = await tx.expense.findFirst({ where: { id: expenseId, workspaceId } });
+      if (!existing) return fail("Ausgabe nicht gefunden.", requestId);
+      expense = await tx.expense.update({ where: { id: existing.id, workspaceId }, data });
+    } else {
+      expense = await tx.expense.create({ data });
+    }
+  
+    return expense;
+  });
   await writeAuditLog({
     action: expenseId ? "expense.update" : "expense.create",
     entityType: "Expense",
@@ -177,19 +184,22 @@ export async function saveTaxSettingAction(
   }
 
   const workspaceId = await resolveWorkspaceId();
-  const existing = await prisma.taxSetting.findFirst({ where: { workspaceId } });
-  const data = {
-    workspaceId,
-    reserveRatePercent: parsed.data.reserveRatePercent,
-    vatRatePercent: parsed.data.vatRatePercent,
-    vatEnabled: parsed.data.vatEnabled ?? false,
-    tradeTaxReservePercent: parsed.data.tradeTaxReservePercent,
-    incomeTaxReservePercent: parsed.data.incomeTaxReservePercent,
-  };
-
-  const setting = existing
-    ? await prisma.taxSetting.update({ where: { id: existing.id, workspaceId }, data })
-    : await prisma.taxSetting.create({ data });
+  const setting = await withWorkspaceTransaction(workspaceId, async (tx) => {
+    const existing = await tx.taxSetting.findFirst({ where: { workspaceId } });
+    const data = {
+      workspaceId,
+      reserveRatePercent: parsed.data.reserveRatePercent,
+      vatRatePercent: parsed.data.vatRatePercent,
+      vatEnabled: parsed.data.vatEnabled ?? false,
+      tradeTaxReservePercent: parsed.data.tradeTaxReservePercent,
+      incomeTaxReservePercent: parsed.data.incomeTaxReservePercent,
+    };
+  
+    const setting = existing
+      ? await tx.taxSetting.update({ where: { id: existing.id, workspaceId }, data })
+      : await tx.taxSetting.create({ data });
+    return setting;
+  });
 
   await writeAuditLog({
     action: "tax_setting.update",
