@@ -9,6 +9,7 @@ import { encryptSecret } from "@/lib/encryption/aes";
 import { runMutation } from "@/server/actions/action-helpers";
 import { revalidatePath } from "next/cache";
 import { resolveWorkspaceId } from "@/lib/auth/tenant";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 
 export async function saveHuggingFaceSettingsAction(
   _prevState: unknown,
@@ -93,20 +94,23 @@ export async function disconnectIntegrationAction(providerKey: string) {
     entityType: "Integration",
     handler: async ({ providerKey: key }) => {
       const workspaceId = await resolveWorkspaceId();
-      const integration = await prisma.integration.findFirst({ where: { providerKey: key, workspaceId } });
-      if (!integration) return { providerKey: key };
-      if (integration.credentialId) {
-        const credential = await prisma.encryptedCredential.findFirst({
-          where: { id: integration.credentialId, workspaceId },
-          select: { id: true },
-        });
-        if (credential) {
-          await prisma.encryptedCredential.delete({ where: { id: credential.id, workspaceId } });
+      return withWorkspaceTransaction(workspaceId, async (tx) => {
+        const integration = await tx.integration.findFirst({ where: { providerKey: key, workspaceId } });
+        if (!integration) return { providerKey: key };
+        if (integration.credentialId) {
+          const credential = await tx.encryptedCredential.findFirst({
+            where: { id: integration.credentialId, workspaceId },
+            select: { id: true },
+          });
+          if (credential) {
+            await tx.encryptedCredential.delete({ where: { id: credential.id, workspaceId } });
+          }
         }
-      }
-      await prisma.integration.update({
-        where: { id: integration.id, workspaceId },
-        data: { credentialId: null, status: "DISCONNECTED" },
+        await tx.integration.update({
+          where: { id: integration.id, workspaceId },
+          data: { credentialId: null, status: "DISCONNECTED" },
+        });
+        return { providerKey: key };
       });
       return { providerKey: key };
     },
