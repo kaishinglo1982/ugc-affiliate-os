@@ -85,4 +85,17 @@ describe("tenant schema/RLS coverage", () => {
 
     expect(violations).toEqual([]);
   });
+
+  it("keeps RLS activation staged until application context coverage is complete", () => {
+    const sql = migrationSql();
+    const enabled = [
+      ...sql.matchAll(/ALTER TABLE "([^"]+)" ENABLE ROW LEVEL SECURITY/g),
+    ].map((match) => match[1]);
+    const forced = [
+      ...sql.matchAll(/ALTER TABLE "([^"]+)" FORCE ROW LEVEL SECURITY/g),
+    ].map((match) => match[1]);
+
+    expect([...new Set(enabled)].sort()).toEqual(["Product"]);
+    expect([...new Set(forced)]).toEqual([]);
+  });
 });
