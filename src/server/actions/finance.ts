@@ -65,7 +65,9 @@ export async function saveRevenueAction(
       return revenue;
     });
   } catch (error) {
-    return fail(error instanceof Error && error.message === "REVENUE_NOT_FOUND" ? "Umsatz nicht gefunden." : "Zugehörige Daten nicht gefunden.", requestId);
+    if (error instanceof Error && error.message === "REVENUE_NOT_FOUND") return fail("Umsatz nicht gefunden.", requestId);
+    if (error instanceof Error && error.message === "RELATED_DATA_NOT_FOUND") return fail("Zugehörige Daten nicht gefunden.", requestId);
+    throw error;
   }
   await writeAuditLog({
     action: revenueId ? "revenue.update" : "revenue.create",
@@ -147,7 +149,9 @@ export async function saveExpenseAction(
       return expense;
     });
   } catch (error) {
-    return fail(error instanceof Error && error.message === "EXPENSE_NOT_FOUND" ? "Ausgabe nicht gefunden." : "Zugehörige Daten nicht gefunden.", requestId);
+    if (error instanceof Error && error.message === "EXPENSE_NOT_FOUND") return fail("Ausgabe nicht gefunden.", requestId);
+    if (error instanceof Error && error.message === "RELATED_DATA_NOT_FOUND") return fail("Zugehörige Daten nicht gefunden.", requestId);
+    throw error;
   }
   await writeAuditLog({
     action: expenseId ? "expense.update" : "expense.create",
