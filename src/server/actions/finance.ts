@@ -30,13 +30,15 @@ export async function saveRevenueAction(
     return fail("Eingabe ungültig.", requestId, parsed.error.flatten().fieldErrors);
   }
 
-  const revenue = await withWorkspaceTransaction(workspaceId, async (tx) => {
+  let revenue;
+  try {
+    revenue = await withWorkspaceTransaction(workspaceId, async (tx) => {
     const relationChecks = await Promise.all([
       parsed.data.programId ? tx.affiliateProgram.findFirst({ where: { id: parsed.data.programId, workspaceId }, select: { id: true } }) : null,
       parsed.data.productId ? tx.product.findFirst({ where: { id: parsed.data.productId, workspaceId }, select: { id: true } }) : null,
       parsed.data.campaignId ? tx.campaign.findFirst({ where: { id: parsed.data.campaignId, workspaceId }, select: { id: true } }) : null,
     ]);
-    if (relationChecks.some((value) => value === null || value === undefined)) return fail("Zugehörige Daten nicht gefunden.", requestId);
+    if (relationChecks.some((value) => value === null || value === undefined)) throw new Error("RELATED_DATA_NOT_FOUND");
   
     const data = {
       date: new Date(parsed.data.date),
@@ -54,14 +56,17 @@ export async function saveRevenueAction(
     let revenue;
     if (revenueId) {
       const existing = await tx.revenue.findFirst({ where: { id: revenueId, workspaceId } });
-      if (!existing) return fail("Umsatz nicht gefunden.", requestId);
+      if (!existing) throw new Error("REVENUE_NOT_FOUND");
       revenue = await tx.revenue.update({ where: { id: existing.id, workspaceId }, data });
     } else {
       revenue = await tx.revenue.create({ data });
     }
   
-    return revenue;
-  });
+      return revenue;
+    });
+  } catch (error) {
+    return fail(error instanceof Error && error.message === "REVENUE_NOT_FOUND" ? "Umsatz nicht gefunden." : "Zugehörige Daten nicht gefunden.", requestId);
+  }
   await writeAuditLog({
     action: revenueId ? "revenue.update" : "revenue.create",
     entityType: "Revenue",
@@ -108,12 +113,14 @@ export async function saveExpenseAction(
     return fail("Eingabe ungültig.", requestId, parsed.error.flatten().fieldErrors);
   }
 
-  const expense = await withWorkspaceTransaction(workspaceId, async (tx) => {
+  let expense;
+  try {
+    expense = await withWorkspaceTransaction(workspaceId, async (tx) => {
     const relationChecks = await Promise.all([
       parsed.data.productId ? tx.product.findFirst({ where: { id: parsed.data.productId, workspaceId }, select: { id: true } }) : null,
       parsed.data.campaignId ? tx.campaign.findFirst({ where: { id: parsed.data.campaignId, workspaceId }, select: { id: true } }) : null,
     ]);
-    if (relationChecks.some((value) => value === null || value === undefined)) return fail("Zugehörige Daten nicht gefunden.", requestId);
+    if (relationChecks.some((value) => value === null || value === undefined)) throw new Error("RELATED_DATA_NOT_FOUND");
   
     const data = {
       date: new Date(parsed.data.date),
@@ -131,14 +138,17 @@ export async function saveExpenseAction(
     let expense;
     if (expenseId) {
       const existing = await tx.expense.findFirst({ where: { id: expenseId, workspaceId } });
-      if (!existing) return fail("Ausgabe nicht gefunden.", requestId);
+      if (!existing) throw new Error("EXPENSE_NOT_FOUND");
       expense = await tx.expense.update({ where: { id: existing.id, workspaceId }, data });
     } else {
       expense = await tx.expense.create({ data });
     }
   
-    return expense;
-  });
+      return expense;
+    });
+  } catch (error) {
+    return fail(error instanceof Error && error.message === "EXPENSE_NOT_FOUND" ? "Ausgabe nicht gefunden." : "Zugehörige Daten nicht gefunden.", requestId);
+  }
   await writeAuditLog({
     action: expenseId ? "expense.update" : "expense.create",
     entityType: "Expense",
