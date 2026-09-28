@@ -239,18 +239,22 @@ export async function processPublishQueue(limit = 10): Promise<PublishWorkerRepo
       });
       report.failed += 1;
     } else {
-      await prisma.publishJob.update({
-        where: { id: job.id, workspaceId },
-        data: {
-          status: "DEAD",
-          attempts,
-          lastError: errorMessage ?? "Endgültig fehlgeschlagen",
-          nextAttemptAt: null,
-        },
-      });
-      await prisma.socialPost.update({
-        where: { id: post.id, workspaceId },
-        data: { status: "FAILED", errorMessage: errorMessage ?? "Endgültig fehlgeschlagen" },
+      await withWorkspaceTransaction(workspaceId, async (tx) => {
+        await Promise.all([
+          tx.publishJob.update({
+            where: { id: job.id, workspaceId },
+            data: {
+              status: "DEAD",
+              attempts,
+              lastError: errorMessage ?? "Endgültig fehlgeschlagen",
+              nextAttemptAt: null,
+            },
+          }),
+          tx.socialPost.update({
+            where: { id: post.id, workspaceId },
+            data: { status: "FAILED", errorMessage: errorMessage ?? "Endgültig fehlgeschlagen" },
+          }),
+        ]);
       });
       await writeAuditLog({
         action: "social_post.publish_dead",
@@ -277,9 +281,11 @@ export async function retryDeadLetterJob(jobId: string, actor: string): Promise<
   if (job.status !== "DEAD") {
     throw new PublishError("Nur tote Jobs können manuell wiederholt werden.");
   }
-  await prisma.publishJob.update({
-    where: { id: job.id, workspaceId },
-    data: { status: "PENDING", attempts: 0, lastError: null, nextAttemptAt: null },
+  await withWorkspaceTransaction(workspaceId, async (tx) => {
+    await tx.publishJob.update({
+      where: { id: job.id, workspaceId },
+      data: { status: "PENDING", attempts: 0, lastError: null, nextAttemptAt: null },
+    });
   });
   await writeAuditLog({
     action: "social_post.job_retry",
