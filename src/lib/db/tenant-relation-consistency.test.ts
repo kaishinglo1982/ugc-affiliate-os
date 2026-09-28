@@ -36,7 +36,11 @@ function parseTenantRelations() {
           .split(",")
           .map((field) => field.trim());
 
-        if (fields?.length !== 1 || references?.length !== 1) {
+        // Back-relation sides intentionally omit fields/references because the
+        // foreign key is declared on the opposite side. Only FK-bearing
+        // relation definitions can be checked by this SQL consistency test.
+        if (!fields && !references) return [];
+        if (!fields || !references || fields.length !== 1 || references.length !== 1) {
           throw new Error(
             `Unsupported tenant relation shape: ${model.name}->${relation[1]}`,
           );
@@ -61,13 +65,13 @@ describe("tenant relation integrity", () => {
 
     for (const relation of relations) {
       const table = (value: string) => `"${value.replace(/"/g, '""')}"`;
-      const result = await prisma.$queryRawUnsafe<Array<{ count: bigint }>>(`
+      const result = await prisma.$queryRawUnsafe<Array<{ count: bigint }>>(\`
         select count(*)::bigint as count
         from ${table(relation.from)} child
         join ${table(relation.to)} parent
           on child.${table(relation.field)} = parent.${table(relation.reference)}
         where child."workspaceId" is distinct from parent."workspaceId"
-      `);
+      \`);
       if ((result[0]?.count ?? 0n) > 0n) {
         violations.push(`${relation.from}.${relation.field}->${relation.to}.${relation.reference}`);
       }
