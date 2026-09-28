@@ -136,10 +136,12 @@ export async function testAffiliateLinkAction(id: string) {
       const url = new URL(target);
 
       if (PRIVATE_HOST_PATTERN.test(url.hostname)) {
-        return prisma.affiliateLink.update({
-          where: { id: link.id, workspaceId },
-          data: { lastCheckedAt: new Date(), lastCheckStatus: "BLOCKED" },
-        });
+        return withWorkspaceTransaction(workspaceId, async (tx) =>
+          tx.affiliateLink.update({
+            where: { id: link.id, workspaceId },
+            data: { lastCheckedAt: new Date(), lastCheckStatus: "BLOCKED" },
+          }),
+        );
       }
 
       let status: string;
