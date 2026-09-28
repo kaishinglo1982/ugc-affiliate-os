@@ -17,6 +17,7 @@ import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
 import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import type { SocialPost } from "@/generated/prisma/client";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 
 export async function savePostAction(
   postId: string | null,
@@ -65,14 +66,14 @@ export async function savePostAction(
     disclosure: parsed.data.disclosure || null,
   };
 
-  let post;
-  if (postId) {
-    const existing = await prisma.socialPost.findFirst({ where: { id: postId, workspaceId } });
-    if (!existing) return fail("Post nicht gefunden.", requestId);
-    post = await prisma.socialPost.update({ where: { id: existing.id, workspaceId }, data });
-  } else {
-    post = await prisma.socialPost.create({ data: { ...data, workspaceId, status: "DRAFT" } });
-  }
+  const post = await withWorkspaceTransaction(workspaceId, async (tx) => {
+    if (postId) {
+      const existing = await tx.socialPost.findFirst({ where: { id: postId, workspaceId } });
+      if (!existing) throw new Error("SOCIAL_POST_NOT_FOUND");
+      return tx.socialPost.update({ where: { id: existing.id, workspaceId }, data });
+    }
+    return tx.socialPost.create({ data: { ...data, workspaceId, status: "DRAFT" } });
+  });
 
   await writeAuditLog({
     action: postId ? "social_post.update" : "social_post.create",
@@ -102,10 +103,12 @@ async function transitionPost(
     return fail(`Statuswechsel von "${current.status}" zu "${to}" ist nicht zulässig.`, requestId);
   }
 
-  const updated = await prisma.socialPost.update({
-    where: { id: current.id, workspaceId },
-    data: { status: to, ...extraData },
-  });
+  const updated = await withWorkspaceTransaction(workspaceId, async (tx) =>
+    tx.socialPost.update({
+      where: { id: current.id, workspaceId },
+      data: { status: to, ...extraData },
+    }),
+  );
 
   await writeAuditLog({
     action: "social_post.status_change",
@@ -224,7 +227,7 @@ export async function duplicatePostAction(id: string): Promise<Result<{ id: stri
   const source = await prisma.socialPost.findFirst({ where: { id, workspaceId } });
   if (!source) return fail("Post nicht gefunden.", requestId);
 
-  const copy = await prisma.socialPost.create({
+  const copy = await withWorkspaceTransaction(workspaceId, async (tx) => tx.socialPost.create({
     data: {
       workspaceId,
       campaignId: source.campaignId,
@@ -236,7 +239,7 @@ export async function duplicatePostAction(id: string): Promise<Result<{ id: stri
       disclosure: source.disclosure,
       status: "DRAFT",
     },
-  });
+  }));
 
   await writeAuditLog({
     action: "social_post.duplicate",
