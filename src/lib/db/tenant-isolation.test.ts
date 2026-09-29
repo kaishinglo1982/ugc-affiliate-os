@@ -535,6 +535,84 @@ describe("RLS enforcement (Product canary)", () => {
   });
 });
 
+describe("RLS enforcement (AnalyticsSyncJob canary)", () => {
+  const role = "ugc_rls_test_role";
+  let jobA: { id: string };
+  let jobB: { id: string };
+
+  beforeAll(async () => {
+    jobA = await prisma.analyticsSyncJob.create({
+      data: {
+        workspaceId: workspaceA,
+        jobType: "ACCOUNT_SYNC",
+        idempotencyKey: `rls-sync-a-${randomUUID()}`,
+        correlationId: randomUUID(),
+      },
+      select: { id: true },
+    });
+    jobB = await prisma.analyticsSyncJob.create({
+      data: {
+        workspaceId: workspaceB,
+        jobType: "ACCOUNT_SYNC",
+        idempotencyKey: `rls-sync-b-${randomUUID()}`,
+        correlationId: randomUUID(),
+      },
+      select: { id: true },
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.analyticsSyncJob.deleteMany({ where: { id: { in: [jobA.id, jobB.id] } } });
+  });
+
+  it("enforces workspace isolation for SELECT, UPDATE and INSERT", async () => {
+    const roleExists = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+      select exists(select 1 from pg_roles where rolname = 'ugc_rls_test_role') as exists
+    `;
+    if (!roleExists[0]?.exists) {
+      await prisma.$executeRawUnsafe(`CREATE ROLE ugc_rls_test_role`);
+    }
+    await prisma.$executeRawUnsafe(`GRANT USAGE ON SCHEMA public TO ugc_rls_test_role`);
+    await prisma.$executeRawUnsafe(`GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "AnalyticsSyncJob" TO ugc_rls_test_role`);
+
+    try {
+      const result = await prisma.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(`SET LOCAL ROLE ugc_rls_test_role`);
+        await tx.$executeRaw`select set_config('app.current_workspace_id', ${workspaceA}, true)`;
+        const visible = await tx.$queryRaw<Array<{ id: string }>>`
+          select "id" from "AnalyticsSyncJob"
+          where "id" in (${jobA.id}, ${jobB.id})
+          order by "id"
+        `;
+        const crossUpdate = await tx.$executeRaw`
+          update "AnalyticsSyncJob"
+          set "lastError" = 'cross-tenant-rds-test'
+          where "id" = ${jobB.id}
+        `;
+        return { visible, crossUpdate };
+      });
+
+      expect(result.visible.map((row) => row.id)).toEqual([jobA.id]);
+      expect(result.crossUpdate).toBe(0);
+
+      await expect(
+        prisma.$transaction(async (tx) => {
+          await tx.$executeRawUnsafe(`SET LOCAL ROLE ugc_rls_test_role`);
+          await tx.$executeRaw`select set_config('app.current_workspace_id', ${workspaceA}, true)`;
+          await tx.$executeRaw`
+            insert into "AnalyticsSyncJob" ("id", "workspaceId", "jobType", "idempotencyKey", "correlationId")
+            values (${randomUUID()}, ${workspaceB}, 'ACCOUNT_SYNC', ${`rls-sync-cross-${randomUUID()}`}, ${randomUUID()})
+          `;
+        }),
+      ).rejects.toThrow();
+    } finally {
+      await prisma.$executeRawUnsafe(`REVOKE ALL ON TABLE "AnalyticsSyncJob" FROM ugc_rls_test_role`);
+      await prisma.$executeRawUnsafe(`REVOKE USAGE ON SCHEMA public FROM ugc_rls_test_role`);
+      await prisma.$executeRawUnsafe(`DROP ROLE IF EXISTS ugc_rls_test_role`);
+    }
+  });
+});
+
 describe("workspace transaction context", () => {
   it("binds the workspace setting only for the transaction", async () => {
     const contextA = await withWorkspaceTransaction(workspaceA, async (tx) => {
