@@ -9,7 +9,6 @@
 import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db/client";
 import { Prisma } from "@/generated/prisma/client";
-import { DEFAULT_WORKSPACE_ID } from "@/lib/config/workspace";
 import { featureFlags } from "@/lib/config/feature-flags";
 import { writeAuditLog } from "@/lib/audit/log";
 import { METRICS, incrementMetric, logStructured } from "@/lib/observability/metrics";
@@ -90,7 +89,7 @@ async function runStep(
 export async function runAll(
   actor: string,
   correlationId: string = randomUUID(),
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<{ status: string; steps: StepResult[] }> {
   const startedAt = Date.now();
   const steps: StepResult[] = [];

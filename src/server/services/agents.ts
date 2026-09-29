@@ -217,7 +217,7 @@ export async function startAgentRun(
   });
 
   await prisma.agent.update({
-    where: { id: agent.id },
+    where: { id: agent.id, workspaceId },
     data: { status: "RUNNING", lastRunAt: new Date() },
   });
 
@@ -237,9 +237,9 @@ export async function startAgentRun(
 export async function finishAgentRun(
   runId: string,
   input: AgentRunFinishInput,
-  options: { incrementObservability?: boolean } = {},
+  options: { workspaceId?: string; incrementObservability?: boolean } = {},
 ): Promise<{ id: string; status: AgentRunStatus; finishedAt: Date | null }> {
-  const workspaceId = await resolveWorkspaceId();
+  const workspaceId = options.workspaceId ?? (await resolveWorkspaceId());
   const run = await prisma.agentRun.findFirst({
     where: { id: runId, workspaceId },
     select: { id: true, status: true, agentId: true },
@@ -257,7 +257,7 @@ export async function finishAgentRun(
   }
 
   const updated = await prisma.agentRun.update({
-    where: { id: run.id },
+    where: { id: run.id, workspaceId },
     data: {
       status: input.status,
       summary: input.summary ?? undefined,
@@ -271,14 +271,14 @@ export async function finishAgentRun(
     const owningAgent = await prisma.agent.findFirst({ where: { id: run.agentId, workspaceId }, select: { id: true } });
     if (!owningAgent) throw new Error("AGENT_NOT_FOUND");
     await prisma.agent.update({
-      where: { id: owningAgent.id },
+      where: { id: owningAgent.id, workspaceId },
       data: { status: "IDLE", successCount: { increment: 1 } },
     });
   } else {
     const owningAgent = await prisma.agent.findFirst({ where: { id: run.agentId, workspaceId }, select: { id: true } });
     if (!owningAgent) throw new Error("AGENT_NOT_FOUND");
     await prisma.agent.update({
-      where: { id: owningAgent.id },
+      where: { id: owningAgent.id, workspaceId },
       data: { status: "ERROR", errorCount: { increment: 1 } },
     });
   }

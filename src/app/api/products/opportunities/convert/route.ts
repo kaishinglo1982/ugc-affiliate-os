@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireApiPermission } from "@/lib/api/guard";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/log";
 import { convertOpportunityToCampaign } from "@/features/products/application/core";
 
@@ -24,9 +25,10 @@ export async function POST(request: Request) {
 
   const user = await getCurrentUser();
   const actor = user?.id ?? "owner";
+  const workspaceId = await resolveWorkspaceId();
 
   try {
-    const campaignId = await convertOpportunityToCampaign(parsed.data.opportunityId, actor);
+    const campaignId = await convertOpportunityToCampaign(parsed.data.opportunityId, actor, workspaceId);
     await writeAuditLog({
       action: "product_opportunity.convert",
       entityType: "Campaign",

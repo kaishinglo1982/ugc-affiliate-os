@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireApiPermission } from "@/lib/api/guard";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { evaluateComplianceForProduct } from "@/features/products/application/core";
 
 const schema = z.object({
@@ -24,9 +25,10 @@ export async function POST(request: Request) {
 
   const user = await getCurrentUser();
   const actor = user?.id ?? "owner";
+  const workspaceId = await resolveWorkspaceId();
 
   try {
-    const result = await evaluateComplianceForProduct(parsed.data.productId, actor);
+    const result = await evaluateComplianceForProduct(parsed.data.productId, actor, workspaceId);
     await writeAuditLog({
       action: "product_compliance.evaluate",
       entityType: "ProductComplianceProfile",

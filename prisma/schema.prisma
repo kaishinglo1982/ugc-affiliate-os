@@ -139,6 +139,7 @@ model Product {
 
 model ProductScore {
   id                    String   @id @default(uuid())
+  workspaceId           String
   productId             String
   product               Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   demand                Int      @default(0)
@@ -155,7 +156,7 @@ model ProductScore {
   breakdown             Json
   createdAt             DateTime @default(now())
 
-  @@index([productId])
+  @@index([workspaceId, productId])
 }
 
 // ---------------------------------------------------------------------------
@@ -324,12 +325,13 @@ model Script {
   versions  ScriptVersion[]
   videoJobs VideoJob[]
 
-  @@index([status])
-  @@index([campaignId])
+  @@index([workspaceId, status])
+  @@index([workspaceId, campaignId])
 }
 
 model ScriptVersion {
   id             String   @id @default(uuid())
+  workspaceId    String
   scriptId       String
   script         Script   @relation(fields: [scriptId], references: [id], onDelete: Cascade)
   versionNumber  Int
@@ -349,6 +351,7 @@ model ScriptVersion {
   generatedBy    String   @default("template")
   createdAt      DateTime @default(now())
 
+  @@index([workspaceId, scriptId])
   @@unique([scriptId, versionNumber])
 }
 
@@ -589,8 +592,8 @@ model Revenue {
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
-  @@index([date])
-  @@index([campaignId])
+  @@index([workspaceId, date])
+  @@index([workspaceId, campaignId])
 }
 
 enum ExpenseCategory {
@@ -626,8 +629,8 @@ model Expense {
   createdAt    DateTime        @default(now())
   updatedAt    DateTime        @updatedAt
 
-  @@index([date])
-  @@index([campaignId])
+  @@index([workspaceId, date])
+  @@index([workspaceId, campaignId])
 }
 
 model TaxSetting {
@@ -639,6 +642,8 @@ model TaxSetting {
   tradeTaxReservePercent Decimal @db.Decimal(5, 2) @default(15)
   incomeTaxReservePercent Decimal @db.Decimal(5, 2) @default(25)
   updatedAt             DateTime @updatedAt
+
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -1587,6 +1592,7 @@ model ContentExperiment {
 
 model ExperimentVariant {
   id                      String                  @id @default(uuid())
+  workspaceId              String                  @default("00000000-0000-0000-0000-000000000001")
   experimentId            String
   contentVariantId        String?
   publishingConfigurationId String?
@@ -1600,7 +1606,7 @@ model ExperimentVariant {
   contentVariant          ContentVariant?         @relation(fields: [contentVariantId], references: [id])
   assignments             ExperimentAssignment[]
 
-  @@index([experimentId])
+  @@index([workspaceId, experimentId])
 }
 
 model ExperimentAssignment {
@@ -1740,6 +1746,7 @@ model DataQualityReport {
 
 model DataQualityIssue {
   id                String               @id @default(uuid())
+  workspaceId       String               @default("00000000-0000-0000-0000-000000000001")
   reportId          String
   issueType         DataQualityIssueType
   severity          AnomalySeverity
@@ -1747,7 +1754,7 @@ model DataQualityIssue {
   detectedAt        DateTime             @default(now())
 
   report            DataQualityReport    @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  @@index([reportId])
+  @@index([workspaceId, reportId])
 }
 
 model AnalyticsAnomaly {
@@ -2461,26 +2468,6 @@ enum WorkflowStatus {
   ARCHIVED
 }
 
-model WorkflowDefinition {
-  id           String         @id @default(uuid())
-  workspaceId  String         @default("00000000-0000-0000-0000-000000000001")
-  name         String
-  description  String?
-  trigger      String         @default("manual")
-  scheduleCron String?
-  status       WorkflowStatus @default(DRAFT)
-  enabled      Boolean        @default(false)
-  ownerId      String?
-  config       Json?
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-
-  steps WorkflowStepDefinition[]
-  runs  WorkflowRun[]
-
-  @@index([workspaceId, status])
-}
-
 enum WorkflowStepType {
   AGENT
   TOOL
@@ -2488,42 +2475,84 @@ enum WorkflowStepType {
   CONDITION
 }
 
-model WorkflowStepDefinition {
-  id          String             @id @default(uuid())
-  workspaceId String             @default("00000000-0000-0000-0000-000000000001")
-  workflowId  String
-  workflow    WorkflowDefinition @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  stepOrder   Int
-  type        WorkflowStepType
-  name        String
-  config      Json?
-
-  runs WorkflowStepRun[]
-
-  @@index([workspaceId, workflowId])
-}
-
 enum WorkflowRunStatus {
   RUNNING
   COMPLETED
   FAILED
   CANCELLED
+  QUEUED
+  WAITING_FOR_APPROVAL
+  PAUSED
+  RETRYING
+  COMPENSATING
+}
+
+model WorkflowDefinition {
+  id             String         @id @default(uuid())
+  workspaceId    String         @default("00000000-0000-0000-0000-000000000001")
+  name           String
+  key            String
+  version        Int            @default(1)
+  definitionHash String?
+  activatedAt    DateTime?
+  supersededAt   DateTime?
+  description    String?
+  trigger        String         @default("manual")
+  scheduleCron   String?
+  status         WorkflowStatus @default(DRAFT)
+  enabled        Boolean        @default(false)
+  ownerId        String?
+  config         Json?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  steps WorkflowStepDefinition[]
+  runs  WorkflowRun[]
+
+  @@index([workspaceId, key, status])
+  @@unique([workspaceId, key, version])
+}
+
+model WorkflowStepDefinition {
+  id          String             @id @default(uuid())
+  workspaceId String             @default("00000000-0000-0000-0000-000000000001")
+  workflowId  String
+  workflow    WorkflowDefinition @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  key         String
+  stepOrder   Int
+  type        WorkflowStepType
+  name        String
+  config      Json?
+  dependsOn  String[]            @default([])
+
+  runs WorkflowStepRun[]
+
+  @@index([workspaceId, workflowId])
+  @@unique([workflowId, key])
+  @@unique([workflowId, stepOrder])
 }
 
 model WorkflowRun {
-  id          String            @id @default(uuid())
-  workspaceId String            @default("00000000-0000-0000-0000-000000000001")
-  workflowId  String
-  workflow    WorkflowDefinition @relation(fields: [workflowId], references: [id], onDelete: Cascade)
-  triggeredBy String?
-  status      WorkflowRunStatus @default(RUNNING)
-  context     Json?
-  startedAt   DateTime          @default(now())
-  finishedAt  DateTime?
+  id                 String            @id @default(uuid())
+  workspaceId        String            @default("00000000-0000-0000-0000-000000000001")
+  workflowId         String
+  workflow           WorkflowDefinition @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  workflowVersion    Int               @default(1)
+  definitionSnapshot Json
+  definitionHash     String?
+  correlationId      String
+  idempotencyKey     String?
+  triggeredBy        String?
+  status             WorkflowRunStatus @default(RUNNING)
+  context            Json?
+  startedAt          DateTime          @default(now())
+  finishedAt         DateTime?
 
   steps WorkflowStepRun[]
 
   @@index([workspaceId, workflowId, status])
+  @@index([workspaceId, correlationId])
+  @@unique([workspaceId, idempotencyKey])
 }
 
 model WorkflowStepRun {

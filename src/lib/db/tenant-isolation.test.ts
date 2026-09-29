@@ -5,6 +5,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { randomUUID } from "node:crypto";
 import { prisma } from "./client";
+import { withWorkspaceTransaction } from "./workspace-transaction";
 
 const workspaceA = randomUUID();
 const workspaceB = randomUUID();
@@ -433,13 +434,13 @@ describe("tenant isolation (WorkflowDefinition + WorkflowRun)", () => {
 
   beforeAll(async () => {
     workflowA = await prisma.workflowDefinition.create({
-      data: { workspaceId: workspaceA, name: `Workflow-A-${randomUUID()}` },
+      data: { workspaceId: workspaceA, key: `workflow-a-${randomUUID()}`, name: `Workflow-A-${randomUUID()}`, description: "Tenant isolation workflow" },
     });
     workflowB = await prisma.workflowDefinition.create({
-      data: { workspaceId: workspaceB, name: `Workflow-B-${randomUUID()}` },
+      data: { workspaceId: workspaceB, key: `workflow-b-${randomUUID()}`, name: `Workflow-B-${randomUUID()}`, description: "Tenant isolation workflow" },
     });
     runA = await prisma.workflowRun.create({
-      data: { workspaceId: workspaceA, workflowId: workflowA.id, status: "RUNNING" },
+      data: { workspaceId: workspaceA, workflowId: workflowA.id, status: "RUNNING", definitionSnapshot: {}, correlationId: randomUUID() },
     });
   });
 
@@ -476,4 +477,171 @@ describe("tenant isolation (WorkflowDefinition + WorkflowRun)", () => {
     expect(runResult.count).toBe(0);
   });
 });
-\n
+
+
+describe("RLS enforcement (Product canary)", () => {
+  const role = "ugc_rls_test_role";
+
+  it("enforces the workspace policy for a non-owner database role", async () => {
+    const roleExists = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+      select exists(select 1 from pg_roles where rolname = 'ugc_rls_test_role') as exists
+    `;
+    if (!roleExists[0]?.exists) {
+      await prisma.$executeRawUnsafe(`CREATE ROLE ugc_rls_test_role`);
+    }
+    await prisma.$executeRawUnsafe(`GRANT USAGE ON SCHEMA public TO ugc_rls_test_role`);
+    await prisma.$executeRawUnsafe(`GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "Product" TO ugc_rls_test_role`);
+
+    try {
+      const own = await prisma.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(`SET LOCAL ROLE ugc_rls_test_role`);
+        await tx.$executeRaw`select set_config('app.current_workspace_id', ${workspaceA}, true)`;
+
+        const visible = await tx.$queryRaw<Array<{ id: string; workspace_id: string }>>`
+          select "id", "workspaceId" as workspace_id
+          from "Product"
+          where "id" in (${productA.id}, ${productB.id})
+          order by "id"
+        `;
+
+        const crossUpdate = await tx.$executeRaw`
+          update "Product"
+          set "description" = 'cross-tenant-rds-test'
+          where "id" = ${productB.id}
+        `;
+
+        return { visible, crossUpdate };
+      });
+
+      expect(own.visible.map((row) => row.id)).toEqual([productA.id]);
+      expect(own.visible[0]?.workspace_id).toBe(workspaceA);
+      expect(own.crossUpdate).toBe(0);
+
+      await expect(
+        prisma.$transaction(async (tx) => {
+          await tx.$executeRawUnsafe(`SET LOCAL ROLE ugc_rls_test_role`);
+          await tx.$executeRaw`select set_config('app.current_workspace_id', ${workspaceA}, true)`;
+          await tx.$executeRaw`
+            insert into "Product" ("id", "workspaceId", "canonicalName")
+            values (${randomUUID()}, ${workspaceB}, 'rls-cross-tenant-insert')
+          `;
+        }),
+      ).rejects.toThrow();
+    } finally {
+      await prisma.$executeRawUnsafe(`REVOKE ALL ON TABLE "Product" FROM ugc_rls_test_role`);
+      await prisma.$executeRawUnsafe(`REVOKE USAGE ON SCHEMA public FROM ugc_rls_test_role`);
+      await prisma.$executeRawUnsafe(`DROP ROLE IF EXISTS ugc_rls_test_role`);
+    }
+  });
+});
+
+describe("RLS enforcement (AnalyticsSyncJob canary)", () => {
+  const role = "ugc_rls_test_role";
+  let jobA: { id: string };
+  let jobB: { id: string };
+
+  beforeAll(async () => {
+    jobA = await prisma.analyticsSyncJob.create({
+      data: {
+        workspaceId: workspaceA,
+        jobType: "ACCOUNT_SYNC",
+        idempotencyKey: `rls-sync-a-${randomUUID()}`,
+        correlationId: randomUUID(),
+      },
+      select: { id: true },
+    });
+    jobB = await prisma.analyticsSyncJob.create({
+      data: {
+        workspaceId: workspaceB,
+        jobType: "ACCOUNT_SYNC",
+        idempotencyKey: `rls-sync-b-${randomUUID()}`,
+        correlationId: randomUUID(),
+      },
+      select: { id: true },
+    });
+  });
+
+  afterAll(async () => {
+    await prisma.analyticsSyncJob.deleteMany({ where: { id: { in: [jobA.id, jobB.id] } } });
+  });
+
+  it("enforces workspace isolation for SELECT, UPDATE and INSERT", async () => {
+    const roleExists = await prisma.$queryRaw<Array<{ exists: boolean }>>`
+      select exists(select 1 from pg_roles where rolname = 'ugc_rls_test_role') as exists
+    `;
+    if (!roleExists[0]?.exists) {
+      await prisma.$executeRawUnsafe(`CREATE ROLE ugc_rls_test_role`);
+    }
+    await prisma.$executeRawUnsafe(`GRANT USAGE ON SCHEMA public TO ugc_rls_test_role`);
+    await prisma.$executeRawUnsafe(`GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "AnalyticsSyncJob" TO ugc_rls_test_role`);
+
+    try {
+      const result = await prisma.$transaction(async (tx) => {
+        await tx.$executeRawUnsafe(`SET LOCAL ROLE ugc_rls_test_role`);
+        await tx.$executeRaw`select set_config('app.current_workspace_id', ${workspaceA}, true)`;
+        const visible = await tx.$queryRaw<Array<{ id: string }>>`
+          select "id" from "AnalyticsSyncJob"
+          where "id" in (${jobA.id}, ${jobB.id})
+          order by "id"
+        `;
+        const crossUpdate = await tx.$executeRaw`
+          update "AnalyticsSyncJob"
+          set "lastError" = 'cross-tenant-rds-test'
+          where "id" = ${jobB.id}
+        `;
+        return { visible, crossUpdate };
+      });
+
+      expect(result.visible.map((row) => row.id)).toEqual([jobA.id]);
+      expect(result.crossUpdate).toBe(0);
+
+      await expect(
+        prisma.$transaction(async (tx) => {
+          await tx.$executeRawUnsafe(`SET LOCAL ROLE ugc_rls_test_role`);
+          await tx.$executeRaw`select set_config('app.current_workspace_id', ${workspaceA}, true)`;
+          await tx.$executeRaw`
+            insert into "AnalyticsSyncJob" ("id", "workspaceId", "jobType", "idempotencyKey", "correlationId")
+            values (${randomUUID()}, ${workspaceB}, 'ACCOUNT_SYNC', ${`rls-sync-cross-${randomUUID()}`}, ${randomUUID()})
+          `;
+        }),
+      ).rejects.toThrow();
+    } finally {
+      await prisma.$executeRawUnsafe(`REVOKE ALL ON TABLE "AnalyticsSyncJob" FROM ugc_rls_test_role`);
+      await prisma.$executeRawUnsafe(`REVOKE USAGE ON SCHEMA public FROM ugc_rls_test_role`);
+      await prisma.$executeRawUnsafe(`DROP ROLE IF EXISTS ugc_rls_test_role`);
+    }
+  });
+});
+
+describe("workspace transaction context", () => {
+  it("binds the workspace setting only for the transaction", async () => {
+    const contextA = await withWorkspaceTransaction(workspaceA, async (tx) => {
+      const result = await tx.$queryRaw<Array<{ workspace_id: string | null }>>`
+        select current_setting('app.current_workspace_id', true) as workspace_id
+      `;
+      return result[0]?.workspace_id ?? null;
+    });
+
+    expect(contextA).toBe(workspaceA);
+
+    const outsideContext = await prisma.$queryRaw<Array<{ workspace_id: string | null }>>`
+      select current_setting('app.current_workspace_id', true) as workspace_id
+    `;
+    expect(outsideContext[0]?.workspace_id ?? '').toBe('');
+
+    const contextB = await withWorkspaceTransaction(workspaceB, async (tx) => {
+      const result = await tx.$queryRaw<Array<{ workspace_id: string | null }>>`
+        select current_setting('app.current_workspace_id', true) as workspace_id
+      `;
+      return result[0]?.workspace_id ?? null;
+    });
+
+    expect(contextB).toBe(workspaceB);
+  });
+
+  it("rejects malformed workspace ids before opening a transaction", async () => {
+    await expect(
+      withWorkspaceTransaction("not-a-uuid", async () => "unreachable"),
+    ).rejects.toThrow("INVALID_WORKSPACE_ID");
+  });
+});

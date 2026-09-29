@@ -9,6 +9,7 @@ import { ok, fail, newRequestId, type Result } from "@/types/result";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
 import { resolveWorkspaceId } from "@/lib/auth/tenant";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 
 export async function saveCampaignAction(
   campaignId: string | null,
@@ -49,14 +50,14 @@ export async function saveCampaignAction(
     notes: parsed.data.notes || null,
   };
 
-  let campaign;
-  if (campaignId) {
-    const existing = await prisma.campaign.findFirst({ where: { id: campaignId, workspaceId } });
-    if (!existing) return fail("Kampagne nicht gefunden.", requestId);
-    campaign = await prisma.campaign.update({ where: { id: existing.id, workspaceId }, data });
-  } else {
-    campaign = await prisma.campaign.create({ data });
-  }
+  const campaign = await withWorkspaceTransaction(workspaceId, async (tx) => {
+    if (campaignId) {
+      const existing = await tx.campaign.findFirst({ where: { id: campaignId, workspaceId } });
+      if (!existing) throw new Error("CAMPAIGN_NOT_FOUND");
+      return tx.campaign.update({ where: { id: existing.id, workspaceId }, data });
+    }
+    return tx.campaign.create({ data });
+  });
 
   await writeAuditLog({
     action: campaignId ? "campaign.update" : "campaign.create",
@@ -89,10 +90,12 @@ export async function changeCampaignStatusAction(id: string, status: string) {
     );
   }
 
-  const updated = await prisma.campaign.update({
-    where: { id: current.id },
-    data: { status: parsed.data.status },
-  });
+  const updated = await withWorkspaceTransaction(workspaceId, async (tx) =>
+    tx.campaign.update({
+      where: { id: current.id, workspaceId },
+      data: { status: parsed.data.status },
+    }),
+  );
 
   await writeAuditLog({
     action: "campaign.status_change",

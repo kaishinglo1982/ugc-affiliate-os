@@ -61,6 +61,7 @@ export async function generateScriptAction(
       status: "DRAFT",
       versions: {
         create: {
+          workspaceId,
           versionNumber: 1,
           ...generated,
           sceneList: generated.sceneList,
@@ -114,6 +115,7 @@ export async function regenerateScriptVersionAction(
 
   await prisma.scriptVersion.create({
     data: {
+      workspaceId,
       scriptId: script.id,
       versionNumber: nextVersion,
       ...generated,
@@ -164,6 +166,7 @@ export async function duplicateScriptAction(id: string): Promise<Result<{ id: st
       versions: latest
         ? {
             create: {
+              workspaceId,
               versionNumber: 1,
               hook: latest.hook,
               problem: latest.problem,

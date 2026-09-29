@@ -12,6 +12,10 @@ AS $$
   SELECT NULLIF(current_setting('app.current_workspace_id', true), '')
 $$;
 
+ALTER TABLE "ExperimentVariant" ADD COLUMN "workspaceId" TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001';
+ALTER TABLE "ExperimentResult" ADD COLUMN "workspaceId" TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001';
+ALTER TABLE "DataQualityIssue" ADD COLUMN "workspaceId" TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001';
+
 DROP POLICY IF EXISTS "Brand_workspace_isolation" ON "Brand";
 CREATE POLICY "Brand_workspace_isolation" ON "Brand"
   USING ("workspaceId" = current_workspace_id())

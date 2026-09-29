@@ -45,7 +45,7 @@ export async function saveAffiliateProgramAction(
     customName: parsed.data.customName || null,
     trackingId: parsed.data.trackingId || null,
     notes: parsed.data.notes || null,
-    mode: "MOCK" as const,
+    mode: "LIVE" as const,
     ...(credentialId ? { credentialId, status: "CONNECTED" } : {}),
   };
 
@@ -82,7 +82,7 @@ export async function deleteAffiliateProgramAction(id: string) {
       const workspaceId = await resolveWorkspaceId();
       const existing = await prisma.affiliateProgram.findFirst({ where: { id: input.id, workspaceId } });
       if (!existing) throw new Error("AFFILIATE_PROGRAM_NOT_FOUND");
-      await prisma.affiliateProgram.delete({ where: { id: existing.id } });
+      await prisma.affiliateProgram.delete({ where: { id: existing.id, workspaceId } });
       return { id: input.id };
     },
     entityId: (output) => output.id,

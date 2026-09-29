@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireApiPermission } from "@/lib/api/guard";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/log";
 import { archiveProduct } from "@/features/products/application/core";
 
@@ -24,11 +25,12 @@ export async function POST(request: Request) {
 
   const user = await getCurrentUser();
   const actor = user?.id ?? "owner";
+  const workspaceId = await resolveWorkspaceId();
 
   try {
     const results = [];
     for (const productId of parsed.data.productIds) {
-      results.push(await archiveProduct(productId, actor));
+      results.push(await archiveProduct(productId, actor, workspaceId));
     }
     await writeAuditLog({
       action: "product.archive",

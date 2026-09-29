@@ -115,7 +115,7 @@ export async function requestCandidateApproval(id: string, body: unknown, worksp
   }
   const actor = (await getCurrentUser())?.id ?? "owner";
   const updated = await prisma.campaignCandidate.update({
-    where: { id: candidate.id },
+    where: { id: candidate.id, workspaceId },
     data: { status: "under_review" },
   });
   await createApprovalRequest(
@@ -146,7 +146,7 @@ export async function decideCandidate(id: string, body: unknown, workspaceId: st
     throw new Error("Statusübergang nicht erlaubt.");
   }
   const actor = (await getCurrentUser())?.id ?? "owner";
-  const updated = await prisma.campaignCandidate.update({ where: { id: candidate.id }, data: { status: to } });
+  const updated = await prisma.campaignCandidate.update({ where: { id: candidate.id, workspaceId }, data: { status: to } });
   await writeAuditLog({
     action: parsed.decision === "approved" ? "campaign_candidate.approved" : "campaign_candidate.rejected",
     entityType: "CampaignCandidate",
@@ -178,7 +178,7 @@ export async function convertCandidate(id: string, body: unknown, workspaceId: s
     },
   });
   const updated = await prisma.campaignCandidate.update({
-    where: { id: candidate.id },
+    where: { id: candidate.id, workspaceId },
     data: { status: "converted" },
   });
   await writeAuditLog({
@@ -199,7 +199,7 @@ export async function recalculateCandidate(id: string, workspaceId: string) {
   });
   if (!opportunity) throw new Error("Opportunity nicht gefunden.");
   const updated = await prisma.campaignCandidate.update({
-    where: { id: candidate.id },
+    where: { id: candidate.id, workspaceId },
     data: {
       opportunityScore: opportunity.totalScore,
       opportunityConfidence: opportunity.confidenceScore,
@@ -221,7 +221,7 @@ export async function expireCandidate(id: string, workspaceId: string) {
   const candidate = await getCampaignCandidate(id, workspaceId);
   if (!candidate) return null;
   if (!["new", "under_review", "approved"].includes(candidate.status)) return candidate;
-  const updated = await prisma.campaignCandidate.update({ where: { id: candidate.id }, data: { status: "expired" } });
+  const updated = await prisma.campaignCandidate.update({ where: { id: candidate.id, workspaceId }, data: { status: "expired" } });
   const actor = (await getCurrentUser())?.id ?? "owner";
   await writeAuditLog({
     action: "campaign_candidate.expired",

@@ -8,8 +8,9 @@ export async function POST() {
   const guard = await requireApiPermission(Permission.MANAGE_ANALYTICS);
   if (guard) return guard.response;
   const actor = (await getCurrentUser())?.id ?? "owner";
+  const workspaceId = process.env.DEFAULT_WORKSPACE_ID ?? "00000000-0000-0000-0000-000000000001";
   try {
-    const result = await runDataQualityScan(actor);
+    const result = await runDataQualityScan(workspaceId, actor);
     return NextResponse.json(result);
   } catch (error) {
     return NextResponse.json({ error: error instanceof Error ? error.message : "Qualitäts-Scan fehlgeschlagen." }, { status: 400 });

@@ -5,6 +5,7 @@ import { featureFlags } from "@/lib/config/feature-flags";
 import { isValidPostTransition, type SocialPostStatus } from "@/features/publishing/status";
 import { writeAuditLog } from "@/lib/audit/log";
 import { resolveWorkspaceId } from "@/lib/auth/tenant";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 import {
   classifyAttempt,
   nextRetryAt,
@@ -103,10 +104,12 @@ export async function enqueuePublish(postId: string, actor: string): Promise<Soc
   });
   if (active) throw new PublishError("Für diesen Post läuft bereits ein Publish-Job.");
 
-  await prisma.$transaction([
-    prisma.publishJob.create({ data: { workspaceId, postId, status: "PENDING" } }),
-    prisma.socialPost.update({ where: { id: post.id, workspaceId }, data: { status: "SCHEDULED" } }),
-  ]);
+  await withWorkspaceTransaction(workspaceId, async (tx) => {
+    await Promise.all([
+      tx.publishJob.create({ data: { workspaceId, postId, status: "PENDING" } }),
+      tx.socialPost.update({ where: { id: post.id, workspaceId }, data: { status: "SCHEDULED" } }),
+    ]);
+  });
   await writeAuditLog({
     action: "social_post.enqueue",
     entityType: "SocialPost",
@@ -183,8 +186,9 @@ export async function processPublishQueue(limit = 10): Promise<PublishWorkerRepo
     const outcome = classifyAttempt(success, job.attempts);
 
     if (outcome === "succeeded") {
-      await prisma.$transaction([
-        prisma.publishJob.update({
+      await withWorkspaceTransaction(workspaceId, async (tx) => {
+        await Promise.all([
+          tx.publishJob.update({
           where: { id: job.id, workspaceId },
           data: {
             status: "SUCCEEDED",
@@ -193,8 +197,8 @@ export async function processPublishQueue(limit = 10): Promise<PublishWorkerRepo
             lastError: null,
             nextAttemptAt: null,
           },
-        }),
-        prisma.socialPost.update({
+          }),
+          tx.socialPost.update({
           where: { id: post.id, workspaceId },
           data: {
             status: "PUBLISHED",
@@ -202,8 +206,9 @@ export async function processPublishQueue(limit = 10): Promise<PublishWorkerRepo
             errorMessage: null,
             attempts: { increment: 1 },
           },
-        }),
-      ]);
+          }),
+        ]);
+      });
       await writeAuditLog({
         action: "social_post.publish",
         entityType: "SocialPost",
@@ -234,18 +239,22 @@ export async function processPublishQueue(limit = 10): Promise<PublishWorkerRepo
       });
       report.failed += 1;
     } else {
-      await prisma.publishJob.update({
-        where: { id: job.id, workspaceId },
-        data: {
-          status: "DEAD",
-          attempts,
-          lastError: errorMessage ?? "Endgültig fehlgeschlagen",
-          nextAttemptAt: null,
-        },
-      });
-      await prisma.socialPost.update({
-        where: { id: post.id, workspaceId },
-        data: { status: "FAILED", errorMessage: errorMessage ?? "Endgültig fehlgeschlagen" },
+      await withWorkspaceTransaction(workspaceId, async (tx) => {
+        await Promise.all([
+          tx.publishJob.update({
+            where: { id: job.id, workspaceId },
+            data: {
+              status: "DEAD",
+              attempts,
+              lastError: errorMessage ?? "Endgültig fehlgeschlagen",
+              nextAttemptAt: null,
+            },
+          }),
+          tx.socialPost.update({
+            where: { id: post.id, workspaceId },
+            data: { status: "FAILED", errorMessage: errorMessage ?? "Endgültig fehlgeschlagen" },
+          }),
+        ]);
       });
       await writeAuditLog({
         action: "social_post.publish_dead",
@@ -272,9 +281,11 @@ export async function retryDeadLetterJob(jobId: string, actor: string): Promise<
   if (job.status !== "DEAD") {
     throw new PublishError("Nur tote Jobs können manuell wiederholt werden.");
   }
-  await prisma.publishJob.update({
-    where: { id: job.id, workspaceId },
-    data: { status: "PENDING", attempts: 0, lastError: null, nextAttemptAt: null },
+  await withWorkspaceTransaction(workspaceId, async (tx) => {
+    await tx.publishJob.update({
+      where: { id: job.id, workspaceId },
+      data: { status: "PENDING", attempts: 0, lastError: null, nextAttemptAt: null },
+    });
   });
   await writeAuditLog({
     action: "social_post.job_retry",

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApiPermission } from "@/lib/api/guard";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { rejectMatch } from "@/features/products/application/core";
 
 export async function POST(
@@ -14,9 +15,10 @@ export async function POST(
   const { id } = await context.params;
   const user = await getCurrentUser();
   const actor = user?.id ?? "owner";
+  const workspaceId = await resolveWorkspaceId();
 
   try {
-    await rejectMatch(id, actor);
+    await rejectMatch(id, actor, workspaceId);
     await writeAuditLog({
       action: "product_match.reject",
       entityType: "ProductMatchCandidate",

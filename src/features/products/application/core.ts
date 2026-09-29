@@ -3,7 +3,7 @@
  *
  * Orchestrates discovery, deduplication, compliance, content-fit, profitability,
  * opportunity scoring, import and refresh. Every DB write is scoped by
- * `workspaceId` (default `DEFAULT_WORKSPACE_ID`), wrapped in audit logging that
+ * `workspaceId`, wrapped in audit logging that
  * never throws, and emits metrics via the observability module.
  *
  * No `any` is used; all inputs are typed or narrowed with Zod/type guards.
@@ -12,7 +12,7 @@ import { randomUUID } from "node:crypto";
 import { prisma } from "@/lib/db/client";
 import { Prisma } from "@/generated/prisma/client";
 import { Decimal, type DecimalValue } from "@/lib/shared/decimal";
-import { DEFAULT_WORKSPACE_ID } from "@/lib/config/workspace";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 import { writeAuditLog } from "@/lib/audit/log";
 import {
   METRICS,
@@ -92,7 +92,7 @@ async function ensureProgram(
 
   const id = randomUUID();
   await tx.affiliateProgram.create({
-    data: { id, workspaceId, provider, mode: "MOCK" },
+    data: { id, workspaceId, provider, mode: "LIVE", status: "DISCONNECTED" },
   });
   return id;
 }
@@ -185,7 +185,7 @@ interface DiscoveryCounters {
 export async function runDiscoveryForQuery(
   queryId: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<{
   runId: string;
   status: string;
@@ -495,7 +495,7 @@ export async function runDiscoveryForQuery(
 
 export async function recomputeMatchesForPendingOffers(
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<number> {
   const offers = await prisma.affiliateOffer.findMany({
     where: { workspaceId },
@@ -520,7 +520,7 @@ export async function recomputeMatchesForPendingOffers(
   }));
 
   let created = 0;
-  await prisma.$transaction(async (tx: Tx) => {
+  await withWorkspaceTransaction(workspaceId, async (tx: Tx) => {
     for (const offer of offers) {
       // Skip if a product already exists for the same external id.
       const alreadyMatched = existing.some(
@@ -604,7 +604,7 @@ function classifyFirstMatch(offer: NormalizedOffer, existing: ExistingProductLik
 export async function confirmMatch(
   candidateId: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<void> {
   const candidate = await prisma.productMatchCandidate.findFirst({ where: { id: candidateId, workspaceId } });
   if (!candidate) throw new Error("ProductMatchCandidate not found");
@@ -628,7 +628,7 @@ export async function confirmMatch(
 export async function rejectMatch(
   candidateId: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<void> {
   const candidate = await prisma.productMatchCandidate.findFirst({ where: { id: candidateId, workspaceId } });
   if (!candidate) throw new Error("ProductMatchCandidate not found");
@@ -656,7 +656,7 @@ export async function rejectMatch(
 export async function evaluateComplianceForProduct(
   productId: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown> {
   const product = await prisma.product.findFirst({
     where: { id: productId, workspaceId },
@@ -688,7 +688,7 @@ export async function evaluateComplianceForProduct(
     brandName: product.brandName,
   });
 
-  await prisma.$transaction(async (tx: Tx) => {
+  await withWorkspaceTransaction(workspaceId, async (tx: Tx) => {
     await tx.productComplianceProfile.deleteMany({ where: { productId, workspaceId } });
     await tx.productComplianceProfile.create({
       data: {
@@ -733,8 +733,8 @@ export async function overrideCompliance(
   profileId: string,
   actor: string,
   decision: "approve" | "reject",
-  reason?: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  reason: string | undefined,
+  workspaceId: string,
 ): Promise<unknown> {
   const newStatus = decision === "approve" ? "PASSED" : "FAILED";
   const profile = await prisma.productComplianceProfile.findFirst({ where: { id: profileId, workspaceId } });
@@ -774,7 +774,7 @@ export async function overrideCompliance(
 export async function analyzeContentFitForProduct(
   productId: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown> {
   const product = await prisma.product.findFirst({
     where: { id: productId, workspaceId },
@@ -791,7 +791,7 @@ export async function analyzeContentFitForProduct(
     evidence: ["heuristic"],
   });
 
-  await prisma.$transaction(async (tx: Tx) => {
+  await withWorkspaceTransaction(workspaceId, async (tx: Tx) => {
     await tx.productContentFitProfile.deleteMany({ where: { productId, workspaceId } });
     await tx.productContentFitProfile.create({
       data: {
@@ -829,7 +829,7 @@ export async function analyzeContentFitForProduct(
 export async function estimateProfitabilityForOffer(
   offerId: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown> {
   const offer = await prisma.affiliateOffer.findFirst({
     where: { id: offerId, workspaceId },
@@ -887,7 +887,7 @@ export async function estimateProfitabilityForOffer(
 export async function scoreProductOpportunities(
   productId: string | null,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<number> {
   const statusFilter = ["DISCOVERED", "UNDER_REVIEW", "APPROVED"] as const;
   const products = await prisma.product.findMany({
@@ -969,8 +969,8 @@ export async function scoreProductOpportunities(
 
     const scored = scoreOpportunity(input);
 
-    await prisma.$transaction(async (tx: Tx) => {
-      await tx.productOpportunity.deleteMany({ where: { productId: product.id } });
+    await withWorkspaceTransaction(workspaceId, async (tx: Tx) => {
+      await tx.productOpportunity.deleteMany({ where: { productId: product.id, workspaceId } });
       const opportunity = await tx.productOpportunity.create({
         data: {
           workspaceId,
@@ -1024,7 +1024,7 @@ export async function scoreProductOpportunities(
 
 export async function expireOpportunities(
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<number> {
   const now = new Date();
   const result = await prisma.productOpportunity.updateMany({
@@ -1053,8 +1053,8 @@ export function nextProductStatus(action: "approve" | "reject" | "archive"): Pro
 export async function approveProduct(
   productId: string,
   actor: string,
-  reason?: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  reason: string | undefined,
+  workspaceId: string,
 ): Promise<unknown> {
   return applyProductDecision(productId, actor, "approve", reason, workspaceId);
 }
@@ -1062,8 +1062,8 @@ export async function approveProduct(
 export async function rejectProduct(
   productId: string,
   actor: string,
-  reason?: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  reason: string | undefined,
+  workspaceId: string,
 ): Promise<unknown> {
   return applyProductDecision(productId, actor, "reject", reason, workspaceId);
 }
@@ -1071,7 +1071,7 @@ export async function rejectProduct(
 export async function archiveProduct(
   productId: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown> {
   return applyProductDecision(productId, actor, "archive", undefined, workspaceId);
 }
@@ -1088,18 +1088,23 @@ async function applyProductDecision(
   if (action === "archive") data.archivedAt = new Date();
   const product = await prisma.product.findFirst({ where: { id: productId, workspaceId } });
   if (!product) throw new Error("Product not found");
-  const updatedProduct = await prisma.product.update({ where: { id: product.id, workspaceId }, data });
-
-  await prisma.approval.create({
-    data: {
-      workspaceId,
-      resourceType: APPROVAL_RESOURCE_TO_PRISMA.product,
-      resourceId: productId,
-      status: APPROVAL_STATUS_TO_PRISMA.approved,
-      decidedBy: actor,
-      decisionReason: reason ?? null,
-      decidedAt: new Date(),
-    },
+  const updatedProduct = await withWorkspaceTransaction(workspaceId, async (tx: Tx) => {
+    const updated = await tx.product.update({
+      where: { id: product.id, workspaceId },
+      data,
+    });
+    await tx.approval.create({
+      data: {
+        workspaceId,
+        resourceType: APPROVAL_RESOURCE_TO_PRISMA.product,
+        resourceId: productId,
+        status: APPROVAL_STATUS_TO_PRISMA.approved,
+        decidedBy: actor,
+        decisionReason: reason ?? null,
+        decidedAt: new Date(),
+      },
+    });
+    return updated;
   });
 
   safeAudit({
@@ -1116,7 +1121,7 @@ async function applyProductDecision(
 export async function approveOpportunity(
   opportunityId: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown> {
   return applyOpportunityDecision(opportunityId, actor, "approve", workspaceId);
 }
@@ -1124,7 +1129,7 @@ export async function approveOpportunity(
 export async function rejectOpportunity(
   opportunityId: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown> {
   return applyOpportunityDecision(opportunityId, actor, "reject", workspaceId);
 }
@@ -1138,20 +1143,22 @@ async function applyOpportunityDecision(
   const prismaStatus = OPPORTUNITY_STATUS_TO_PRISMA[action === "approve" ? "approved" : "rejected"];
   const opportunity = await prisma.productOpportunity.findFirst({ where: { id: opportunityId, workspaceId } });
   if (!opportunity) throw new Error("ProductOpportunity not found");
-  const updatedOpportunity = await prisma.productOpportunity.update({
-    where: { id: opportunity.id, workspaceId },
-    data: { status: prismaStatus },
-  });
-
-  await prisma.approval.create({
-    data: {
-      workspaceId,
-      resourceType: "product_opportunity",
-      resourceId: opportunityId,
-      status: "APPROVED",
-      decidedBy: actor,
-      decidedAt: new Date(),
-    },
+  const updatedOpportunity = await withWorkspaceTransaction(workspaceId, async (tx: Tx) => {
+    const updated = await tx.productOpportunity.update({
+      where: { id: opportunity.id, workspaceId },
+      data: { status: prismaStatus },
+    });
+    await tx.approval.create({
+      data: {
+        workspaceId,
+        resourceType: "product_opportunity",
+        resourceId: opportunityId,
+        status: "APPROVED",
+        decidedBy: actor,
+        decidedAt: new Date(),
+      },
+    });
+    return updated;
   });
 
   if (action === "approve") incrementMetric(METRICS.productOpportunitiesApprovedTotal);
@@ -1170,7 +1177,7 @@ async function applyOpportunityDecision(
 export async function convertOpportunityToCampaign(
   opportunityId: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<string> {
   const opportunity = await prisma.productOpportunity.findFirst({
     where: { id: opportunityId, workspaceId },
@@ -1178,20 +1185,22 @@ export async function convertOpportunityToCampaign(
   });
   if (!opportunity) throw new Error(`ProductOpportunity not found: ${opportunityId}`);
 
-  const campaign = await prisma.campaign.create({
-    data: {
-      workspaceId,
-      name: opportunity.product.canonicalName,
-      productId: opportunity.productId,
-      status: "DRAFT",
-      budget: null,
-      currency: opportunity.offer.currency ?? "EUR",
-    },
-  });
-
-  await prisma.productOpportunity.update({
-    where: { id: opportunity.id, workspaceId },
-    data: { status: "CONVERTED_TO_CAMPAIGN" },
+  const campaign = await withWorkspaceTransaction(workspaceId, async (tx: Tx) => {
+    const created = await tx.campaign.create({
+      data: {
+        workspaceId,
+        name: opportunity.product.canonicalName,
+        productId: opportunity.productId,
+        status: "DRAFT",
+        budget: null,
+        currency: opportunity.offer.currency ?? "EUR",
+      },
+    });
+    await tx.productOpportunity.update({
+      where: { id: opportunity.id, workspaceId },
+      data: { status: "CONVERTED_TO_CAMPAIGN" },
+    });
+    return created;
   });
 
   safeAudit({
@@ -1219,7 +1228,7 @@ export interface ImportPreview {
 export async function previewImport(
   content: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<ImportPreview> {
   const categories = await prisma.productCategory.findMany({
     where: { workspaceId },
@@ -1318,7 +1327,7 @@ function buildNormalizedFromRow(row: ProductCsvRow): NormalizedOffer {
 export async function commitImport(
   previewToken: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<number> {
   const batch = await prisma.productImportBatch.findFirst({
     where: { previewToken, workspaceId },
@@ -1327,7 +1336,7 @@ export async function commitImport(
   if (!batch) throw new Error(`Import batch not found for token: ${previewToken}`);
 
   let committed = 0;
-  await prisma.$transaction(async (tx: Tx) => {
+  await withWorkspaceTransaction(workspaceId, async (tx: Tx) => {
     for (const row of batch.rows) {
       const normalized = row.normalizedData as unknown as NormalizedOffer | null;
       if (!normalized) continue;
@@ -1407,7 +1416,7 @@ export async function commitImport(
 export async function scanDataQualityForProduct(
   productId: string,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown> {
   const product = await prisma.product.findFirst({
     where: { id: productId, workspaceId },
@@ -1452,7 +1461,7 @@ export async function scanDataQualityForProduct(
         },
   });
 
-  await prisma.$transaction(async (tx: Tx) => {
+  await withWorkspaceTransaction(workspaceId, async (tx: Tx) => {
     await tx.productDataQualityReport.deleteMany({ where: { productId, workspaceId } });
     const report = await tx.productDataQualityReport.create({
       data: {
@@ -1500,7 +1509,7 @@ export async function scanDataQualityForProduct(
 
 export async function refreshOffers(
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<{ updated: number; unavailable: number }> {
   const offers = await prisma.affiliateOffer.findMany({
     where: { workspaceId, status: { in: ["ACTIVE", "PAUSED"] } },

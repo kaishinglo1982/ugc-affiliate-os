@@ -32,6 +32,7 @@ vi.mock("@/lib/db/client", () => ({
     agentMemoryEntry: {
       create: vi.fn(),
       findMany: vi.fn(),
+      findFirst: vi.fn(),
       update: vi.fn(),
       deleteMany: vi.fn(),
     },
@@ -54,6 +55,7 @@ const prismaMock = prisma as unknown as {
   agentMemoryEntry: {
     create: ReturnType<typeof vi.fn>;
     findMany: ReturnType<typeof vi.fn>;
+    findFirst: ReturnType<typeof vi.fn>;
     update: ReturnType<typeof vi.fn>;
     deleteMany: ReturnType<typeof vi.fn>;
   };
@@ -110,7 +112,7 @@ describe("agents service — lifecycle transitions", () => {
   it("is idempotent for same status", async () => {
     prismaMock.agent.findFirst.mockResolvedValueOnce({ id: "a1", status: "RUNNING" });
 
-    const result = await setAgentStatus("a1", "running");
+    const result = await setAgentStatus("a1", "running", { workspaceId: "ws1" });
 
     expect(result).toBe("RUNNING");
     expect(prismaMock.agent.update).not.toHaveBeenCalled();
@@ -119,7 +121,7 @@ describe("agents service — lifecycle transitions", () => {
   it("throws on illegal transition", async () => {
     prismaMock.agent.findFirst.mockResolvedValueOnce({ id: "a1", status: "ERROR" });
 
-    await expect(setAgentStatus("a1", "running")).rejects.toThrow(
+    await expect(setAgentStatus("a1", "running", { workspaceId: "ws1" })).rejects.toThrow(
       "ILLEGAL_AGENT_TRANSITION",
     );
   });
@@ -127,7 +129,7 @@ describe("agents service — lifecycle transitions", () => {
   it("throws when agent not found", async () => {
     prismaMock.agent.findFirst.mockResolvedValueOnce(null);
 
-    await expect(setAgentStatus("missing", "running")).rejects.toThrow("AGENT_NOT_FOUND");
+    await expect(setAgentStatus("missing", "running", { workspaceId: "ws1" })).rejects.toThrow("AGENT_NOT_FOUND");
   });
 });
 
@@ -181,7 +183,7 @@ describe("agents service — execution records", () => {
     });
     prismaMock.agent.update.mockResolvedValueOnce({});
 
-    const run = await startAgentRun({ agentId: "a1", executionKey: "ek-1" });
+    const run = await startAgentRun({ agentId: "a1", executionKey: "ek-1" }, { workspaceId: "ws1" });
 
     expect(run.status).toBe("RUNNING");
     expect(incrementMetric).toHaveBeenCalledWith("ugc_agent_runs_total");
@@ -203,13 +205,14 @@ describe("agents service — execution records", () => {
       startedAt: new Date("2026-01-01T00:00:00Z"),
     });
 
-    const run = await startAgentRun({ agentId: "a1", executionKey: "ek-1" });
+    const run = await startAgentRun({ agentId: "a1", executionKey: "ek-1" }, { workspaceId: "ws1" });
 
     expect(run.id).toBe("r1");
     expect(run.status).toBe("RUNNING");
     expect(prismaMock.agentRun.findFirst).toHaveBeenCalledWith({
       where: {
         agentId: "a1",
+        workspaceId: "ws1",
         status: "RUNNING",
         logs: { path: ["executionKey"], equals: "ek-1" },
       },
@@ -221,36 +224,37 @@ describe("agents service — execution records", () => {
   });
 
   it("finishes a running run and marks agent success", async () => {
-    prismaMock.agentRun.findUnique.mockResolvedValueOnce({
+    prismaMock.agentRun.findFirst.mockResolvedValueOnce({
       id: "r1",
       status: "RUNNING",
       agentId: "a1",
     });
-    prismaMock.agentRun.update.mockResolvedValueOnce({
+        prismaMock.agent.findFirst.mockResolvedValueOnce({ id: "a1" });
+prismaMock.agentRun.update.mockResolvedValueOnce({
       id: "r1",
       status: "SUCCESS",
       finishedAt: new Date("2026-01-01T00:01:00Z"),
     });
     prismaMock.agent.update.mockResolvedValueOnce({});
 
-    const result = await finishAgentRun("r1", { status: "SUCCESS" });
+    const result = await finishAgentRun("r1", { status: "SUCCESS" }, { workspaceId: "ws1" });
 
     expect(result.status).toBe("SUCCESS");
     expect(incrementMetric).toHaveBeenCalledWith("ugc_agent_runs_succeeded_total");
     expect(prismaMock.agent.update).toHaveBeenCalledWith({
-      where: { id: "a1" },
+      where: { id: "a1", workspaceId: "ws1" },
       data: { status: "IDLE", successCount: { increment: 1 } },
     });
   });
 
   it("is idempotent when re-finishing a terminal run", async () => {
-    prismaMock.agentRun.findUnique.mockResolvedValueOnce({
+    prismaMock.agentRun.findFirst.mockResolvedValueOnce({
       id: "r1",
       status: "SUCCESS",
       agentId: "a1",
     });
 
-    const result = await finishAgentRun("r1", { status: "SUCCESS" });
+    const result = await finishAgentRun("r1", { status: "SUCCESS" }, { workspaceId: "ws1" });
 
     expect(result.finishedAt).toBeNull();
     expect(prismaMock.agentRun.update).not.toHaveBeenCalled();
@@ -258,9 +262,9 @@ describe("agents service — execution records", () => {
   });
 
   it("throws when finishing a missing run", async () => {
-    prismaMock.agentRun.findUnique.mockResolvedValueOnce(null);
+    prismaMock.agentRun.findFirst.mockResolvedValueOnce(null);
 
-    await expect(finishAgentRun("missing", { status: "SUCCESS" })).rejects.toThrow(
+    await expect(finishAgentRun("missing", { status: "SUCCESS" }, { workspaceId: "ws1" })).rejects.toThrow(
       "AGENT_RUN_NOT_FOUND",
     );
   });
@@ -302,12 +306,13 @@ describe("agents service — memory CRUD", () => {
   });
 
   it("updates an entry tenant-isolated", async () => {
+    prismaMock.agentMemoryEntry.findFirst.mockResolvedValueOnce({ id: "m1" });
     prismaMock.agentMemoryEntry.update.mockResolvedValueOnce({ id: "m1" });
 
     await updateAgentMemoryEntry("m1", "ws1", { importance: 5 });
 
     expect(prismaMock.agentMemoryEntry.update).toHaveBeenCalledWith({
-      where: { id: "m1" },
+      where: { id: "m1", workspaceId: "ws1" },
       data: { importance: 5 },
     });
   });

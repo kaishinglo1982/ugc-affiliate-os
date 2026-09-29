@@ -2,14 +2,16 @@ import type { Metadata } from "next";
 import { prisma } from "@/lib/db/client";
 import { VideoJobForm } from "@/components/videos/video-job-form";
 import { listProductsForSelect } from "@/server/services/affiliate";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export const metadata: Metadata = { title: "Neuer Videoauftrag" };
 
 export default async function NewVideoJobPage() {
+  const workspaceId = await resolveWorkspaceId();
   const [scripts, products, campaigns] = await Promise.all([
-    prisma.script.findMany({ select: { id: true, title: true }, orderBy: { createdAt: "desc" } }),
+    prisma.script.findMany({ where: { workspaceId }, select: { id: true, title: true }, orderBy: { createdAt: "desc" } }),
     listProductsForSelect(),
-    prisma.campaign.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.campaign.findMany({ where: { workspaceId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
 
   return (

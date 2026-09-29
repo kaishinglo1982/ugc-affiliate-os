@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { prisma } from "@/lib/db/client";
 import { listScripts } from "@/server/services/scripts";
 import { listProductsForSelect } from "@/server/services/affiliate";
@@ -10,10 +11,11 @@ import type { ScriptDetailData } from "@/components/scripts/script-detail-sheet"
 export const metadata: Metadata = { title: "UGC-Skriptgenerator" };
 
 export default async function ScriptsPage() {
+  const workspaceId = await resolveWorkspaceId();
   const [scripts, products, campaigns] = await Promise.all([
     listScripts(),
     listProductsForSelect(),
-    prisma.campaign.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.campaign.findMany({ where: { workspaceId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
   ]);
 
   const rows: ScriptRow[] = scripts.map((s) => ({
@@ -28,8 +30,8 @@ export default async function ScriptsPage() {
 
   const scriptDetails: Record<string, ScriptDetailData> = {};
   for (const s of scripts) {
-    const full = await prisma.script.findUnique({
-      where: { id: s.id },
+    const full = await prisma.script.findFirst({
+      where: { id: s.id, workspaceId },
       include: { versions: { orderBy: { versionNumber: "desc" } } },
     });
     if (!full) continue;

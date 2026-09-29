@@ -23,6 +23,12 @@ const sourceRoot = join(repositoryRoot, architecture.sourceRoot);
 if (existsSync(sourceRoot)) {
   for (const entry of readdirSync(sourceRoot, { withFileTypes: true })) {
     if (entry.name.startsWith(".")) continue;
+    if (entry.isFile()) {
+      if (entry.name !== "instrumentation.ts") {
+        fail(`Unregistered source file: src/${entry.name}. Add it to architecture.config.mjs or move it.`);
+      }
+      continue;
+    }
     if (!architecture.allowedSourceAreas.includes(entry.name)) {
       fail(`Unregistered source area: src/${entry.name}. Add it to architecture.config.mjs or move it.`);
     }
@@ -36,7 +42,12 @@ function walk(directory) {
     const repositoryPath = relative(repositoryRoot, absolutePath).split(sep).join("/");
 
     if (entry.isDirectory()) {
-      if (architecture.forbiddenSourceDirectoryNames.includes(entry.name.toLowerCase())) {
+      const isExplicitAppRoute =
+        /^src\/app\/app\/(campaigns|products|videos)\/new$/.test(repositoryPath);
+      if (
+        architecture.forbiddenSourceDirectoryNames.includes(entry.name.toLowerCase()) &&
+        !isExplicitAppRoute
+      ) {
         fail(`Ambiguous directory name is forbidden: ${repositoryPath}`);
       }
       const depth = repositoryPath.split("/").length;

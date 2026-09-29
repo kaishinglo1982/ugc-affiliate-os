@@ -7,6 +7,8 @@ import { computeProductScore, type ScoreDimensions } from "../src/features/produ
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
+const DEFAULT_WORKSPACE_ID = "00000000-0000-0000-0000-000000000001";
+
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
 const ALLOW_DEMO_SEED = process.env.ALLOW_DEMO_SEED === "true";
 
@@ -234,6 +236,7 @@ async function seedProducts() {
     });
     await prisma.productScore.create({
       data: {
+        workspaceId: DEFAULT_WORKSPACE_ID,
         productId: product.id,
         demand: p.dims.demand,
         commission: p.dims.commission,
@@ -372,6 +375,7 @@ async function seedScripts(
     });
     await prisma.scriptVersion.create({
       data: {
+        workspaceId: DEFAULT_WORKSPACE_ID,
         scriptId: script.id,
         versionNumber: 1,
         hook: `Niemand sagt dir, dass ${product.name} genau DAS Problem löst...`,
@@ -631,7 +635,7 @@ const AGENT_CATALOG = [
 async function seedAgents() {
   for (const [i, a] of AGENT_CATALOG.entries()) {
     const agent = await prisma.agent.upsert({
-      where: { key: a.key },
+      where: { workspaceId_key: { workspaceId: DEFAULT_WORKSPACE_ID, key: a.key } },
       update: {},
       create: {
         key: a.key,

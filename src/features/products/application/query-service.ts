@@ -2,12 +2,11 @@
  * Phase 7 — Product Discovery Query application service.
  *
  * CRUD for `ProductDiscoveryQuery` plus versioned snapshots on update. All reads
- * are scoped by `workspaceId` (default `DEFAULT_WORKSPACE_ID`).
+ * are explicitly scoped by the caller-provided `workspaceId`.
  */
 import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 import { Prisma } from "@/generated/prisma/client";
 import { Decimal, type DecimalValue } from "@/lib/shared/decimal";
-import { DEFAULT_WORKSPACE_ID } from "@/lib/config/workspace";
 import { writeAuditLog } from "@/lib/audit/log";
 import {
   DISCOVERY_QUERY_STATUS_TO_PRISMA,
@@ -68,7 +67,7 @@ function toCreateData(
 }
 
 export async function listQueries(
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown[]> {
   return withWorkspaceTransaction(workspaceId, (tx) => tx.productDiscoveryQuery.findMany({
     where: { workspaceId },
@@ -78,7 +77,7 @@ export async function listQueries(
 
 export async function getQuery(
   id: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown | null> {
   return withWorkspaceTransaction(workspaceId, (tx) => tx.productDiscoveryQuery.findFirst({
     where: { id, workspaceId },
@@ -89,7 +88,7 @@ export async function getQuery(
 export async function createQuery(
   input: ProductDiscoveryQueryInput,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown> {
   const query = await withWorkspaceTransaction(workspaceId, async (tx) => { const query = await tx.productDiscoveryQuery.create({
     data: toCreateData(input, workspaceId),
@@ -121,18 +120,18 @@ export async function updateQuery(
   id: string,
   input: ProductDiscoveryQueryInput,
   actor: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown> {
   const query = await withWorkspaceTransaction(workspaceId, async (tx) => {
     const existing = await tx.productDiscoveryQuery.findFirst({
       where: { id, workspaceId },
-      select: { currentVersion: true },
+      select: { id: true, currentVersion: true },
     });
     if (!existing) throw new Error(`ProductDiscoveryQuery not found: ${id}`);
 
     const nextVersion = existing.currentVersion + 1;
     const updated = await tx.productDiscoveryQuery.update({
-      where: { id: existing.id },
+      where: { id: existing.id, workspaceId },
       data: {
         ...toCreateData(input, workspaceId),
         id,
@@ -164,7 +163,7 @@ export async function updateQuery(
 }
 
 export async function listRuns(
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown[]> {
   return withWorkspaceTransaction(workspaceId, (tx) => tx.productDiscoveryRun.findMany({
     where: { workspaceId },
@@ -175,7 +174,7 @@ export async function listRuns(
 
 export async function getRun(
   id: string,
-  workspaceId: string = DEFAULT_WORKSPACE_ID,
+  workspaceId: string,
 ): Promise<unknown | null> {
   return withWorkspaceTransaction(workspaceId, (tx) => tx.productDiscoveryRun.findFirst({
     where: { id, workspaceId },

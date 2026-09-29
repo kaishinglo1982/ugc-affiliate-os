@@ -63,6 +63,7 @@ async function persistProductWithScore(
 
   await prisma.productScore.create({
     data: {
+      workspaceId,
       productId: product.id,
       ...input.dimensions,
       totalScore: scoreResult.totalScore,
@@ -269,6 +270,7 @@ export async function importProductsCsvAction(
 
     await prisma.productScore.create({
       data: {
+        workspaceId,
         productId: product.id,
         ...dimensions,
         totalScore: scoreResult.totalScore,

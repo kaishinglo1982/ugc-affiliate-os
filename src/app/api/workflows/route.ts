@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireApiPermission } from "@/lib/api/guard";
@@ -78,15 +79,19 @@ export async function POST(request: Request) {
 
   const actor = (await getCurrentUser())?.id ?? "owner";
   const { steps, ...rest } = parsed.data;
+  const key = rest.name.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "workflow-" + randomUUID();
 
   const workflow = await prisma.workflowDefinition.create({
     data: {
       workspaceId: workspaceId,
+      key,
       ...rest,
       config: rest.config as Prisma.InputJsonValue | undefined,
       steps: steps
         ? {
             create: steps.map((s, index) => ({
+              workspaceId,
+              key: "step-" + (index + 1),
               stepOrder: index,
               type: s.type as WorkflowStepType,
               name: s.name,

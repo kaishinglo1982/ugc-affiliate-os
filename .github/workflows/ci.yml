@@ -62,7 +62,7 @@ jobs:
           corepack prepare pnpm@${PNPM_VERSION} --activate
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: corepack enable && corepack prepare pnpm@9.15.9 --activate && pnpm install --frozen-lockfile
 
       - name: Validate project structure
         run: pnpm run architecture:check
@@ -130,7 +130,7 @@ jobs:
           corepack prepare pnpm@${PNPM_VERSION} --activate
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: corepack enable && corepack prepare pnpm@9.15.9 --activate && pnpm install --frozen-lockfile
 
       - name: Validate project structure
         run: pnpm run architecture:check

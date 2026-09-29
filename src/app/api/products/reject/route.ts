@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireApiPermission } from "@/lib/api/guard";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { rejectProduct } from "@/features/products/application/core";
 
 const schema = z.object({
@@ -25,11 +26,12 @@ export async function POST(request: Request) {
 
   const user = await getCurrentUser();
   const actor = user?.id ?? "owner";
+  const workspaceId = await resolveWorkspaceId();
 
   try {
     const results = [];
     for (const productId of parsed.data.productIds) {
-      results.push(await rejectProduct(productId, actor, parsed.data.reason));
+      results.push(await rejectProduct(productId, actor, parsed.data.reason, workspaceId));
     }
     await writeAuditLog({
       action: "product.reject",

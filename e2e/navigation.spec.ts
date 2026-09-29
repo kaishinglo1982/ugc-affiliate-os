@@ -18,8 +18,17 @@ test.describe("Navigation", () => {
 
   test("Hauptnavigation enthält die neuen Bereiche", async ({ page }) => {
     await page.goto("/app");
-    for (const label of ["Content Studio", "Agenten", "Workflows", "Freigaben", "Budgets", "Agent Memory", "Audit-Log"]) {
-      await expect(page.getByRole("link", { name: new RegExp(label, "i") }).first()).toBeVisible();
+    const expectedRoutes = [
+      "/app/content",
+      "/app/agents",
+      "/app/workflows",
+      "/app/approvals",
+      "/app/budgets",
+      "/app/agent-memory",
+      "/app/audit",
+    ];
+    for (const href of expectedRoutes) {
+      await expect(page.locator(`a[href="${href}"]`).first()).toBeVisible();
     }
   });
 });

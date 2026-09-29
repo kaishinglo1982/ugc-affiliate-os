@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { prisma } from "@/lib/db/client";
 import { listSocialPosts, listSocialAccounts } from "@/server/services/publishing";
 import { PublishingPageClient } from "@/components/publishing/publishing-page-client";
@@ -8,11 +9,13 @@ import type { PostDetailData } from "@/components/publishing/post-detail-sheet";
 export const metadata: Metadata = { title: "Social-Publishing" };
 
 export default async function PublishingPage() {
+  const workspaceId = await resolveWorkspaceId();
   const [posts, accounts, campaigns, mediaAssets] = await Promise.all([
     listSocialPosts(),
     listSocialAccounts(),
-    prisma.campaign.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.campaign.findMany({ where: { workspaceId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.mediaAsset.findMany({
+      where: { workspaceId },
       select: { id: true, fileName: true },
       orderBy: { createdAt: "desc" },
       take: 100,
