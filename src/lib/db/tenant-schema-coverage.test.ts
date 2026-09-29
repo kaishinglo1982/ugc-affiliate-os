@@ -95,7 +95,7 @@ describe("tenant schema/RLS coverage", () => {
       ...sql.matchAll(/ALTER TABLE "([^"]+)" FORCE ROW LEVEL SECURITY/g),
     ].map((match) => match[1]);
 
-    expect([...new Set(enabled)].sort()).toEqual(["Product"]);
+    expect([...new Set(enabled)].sort()).toEqual(["AnalyticsSyncJob", "Product"]);
     expect([...new Set(forced)]).toEqual([]);
   });
 });
