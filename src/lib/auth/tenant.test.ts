@@ -35,6 +35,13 @@ describe("resolveWorkspaceId", () => {
     await expect(resolveWorkspaceId()).rejects.toBeInstanceOf(InvalidTenantTokenError);
   });
 
+  it("rejects a non-UUID tenant id before returning workspace authority", async () => {
+    const { resolveWorkspaceId, signTenantToken, InvalidTenantTokenError } = await import("./tenant");
+    const token = await signTenantToken("tenant-123");
+    mockHeaders.set("x-carryos-tenant-token", token);
+    await expect(resolveWorkspaceId()).rejects.toBeInstanceOf(InvalidTenantTokenError);
+  });
+
   it("rejects a token signed with a different secret", async () => {
     process.env.CARRYOS_TENANT_SECRET = SECRET;
     const { signTenantToken } = await import("./tenant");
