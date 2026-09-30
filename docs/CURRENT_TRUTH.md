@@ -210,3 +210,11 @@ Still **no Vercel Production deployment** until the global CarryOS Universe 10/1
 - obtain a fresh full CI + E2E green run on the exact release SHA.
 
 This document does not authorize deployment.
+
+
+### CORE_BOUND AI provider fail-closed hardening — 2026-09-30
+
+- `src/lib/providers/llm/registry.ts` no longer falls back to the local template provider when `CARRYOS_INTEGRATION_MODE=CORE_BOUND`.
+- Productive LLM/script generation therefore fails closed instead of returning synthetic template output while CarryOS-governed AI execution is not yet wired.
+- Commit: `f6b95da8dd40c246ea862265c9b9499d94377cf`.
+- This is a blocker-hardening change, not completion of the CarryOS AI integration. The remaining requirement is to route productive CORE_BOUND generation through the canonical CarryOS runtime and preserve tenant/SP/provenance/FinOps governance.
