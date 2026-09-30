@@ -108,5 +108,11 @@ export function confidenceLabel(score: number): string {
 }
 
 export function resolveContentIntelligenceProvider(): ContentIntelligencePort {
+  if (process.env.CARRYOS_INTEGRATION_MODE === "CORE_BOUND") {
+    throw new Error(
+      "UGC_AI_PROVIDER_NOT_GOVERNED: content intelligence in CORE_BOUND must execute through CarryOS",
+    );
+  }
+
   return new MockContentIntelligenceAdapter();
 }
