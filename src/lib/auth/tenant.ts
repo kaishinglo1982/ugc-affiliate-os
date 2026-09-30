@@ -55,6 +55,13 @@ export async function resolveWorkspaceId(): Promise<string> {
     if (typeof payload.tenantId !== "string" || !payload.tenantId) {
       throw new InvalidTenantTokenError("Tenant token missing tenantId claim");
     }
+    if (
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+        payload.tenantId,
+      )
+    ) {
+      throw new InvalidTenantTokenError("Tenant token tenantId must be a UUID");
+    }
     return payload.tenantId;
   } catch (e) {
     if (e instanceof InvalidTenantTokenError) throw e;
