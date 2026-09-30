@@ -23,7 +23,7 @@ export function isLlmProviderConfigured(provider: LlmProviderKey): boolean {
  * but generation always runs through the local template provider so the
  * studio never makes an unexpected paid call. */
 export function resolveScriptProvider(requested: LlmProviderKey | "template"): ScriptProvider {
-  if (process.env.CARRYOS_INTEGRATION_MODE === "CORE_BOUND" && requested !== "template") {
+  if (process.env.CARRYOS_INTEGRATION_MODE === "CORE_BOUND") {
     throw new Error(
       "UGC_AI_PROVIDER_NOT_GOVERNED: productive AI in CORE_BOUND must execute through CarryOS",
     );
