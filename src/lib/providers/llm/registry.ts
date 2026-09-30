@@ -22,6 +22,12 @@ export function isLlmProviderConfigured(provider: LlmProviderKey): boolean {
  * limitations") — configured providers are reported as available in the UI,
  * but generation always runs through the local template provider so the
  * studio never makes an unexpected paid call. */
-export function resolveScriptProvider(_requested: LlmProviderKey | "template"): ScriptProvider {
+export function resolveScriptProvider(requested: LlmProviderKey | "template"): ScriptProvider {
+  if (process.env.CARRYOS_INTEGRATION_MODE === "CORE_BOUND" && requested !== "template") {
+    throw new Error(
+      "UGC_AI_PROVIDER_NOT_GOVERNED: productive AI in CORE_BOUND must execute through CarryOS",
+    );
+  }
+
   return templateScriptProvider;
 }
