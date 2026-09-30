@@ -1,5 +1,6 @@
 import "server-only";
 import { executeUgcAiThroughCarryOs } from "@/lib/carryos/ugc-ai-client";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import type { GeneratedScript, ScriptGenerationRequest, ScriptProvider } from "./types";
 
 function parse(text: string): GeneratedScript {
@@ -17,8 +18,7 @@ export const carryOsScriptProvider: ScriptProvider = {
   key: "carryos",
   mode: "LIVE",
   async generate(request: ScriptGenerationRequest): Promise<GeneratedScript> {
-    const tenantId = process.env.CARRYOS_TENANT_ID?.trim();
-    if (!tenantId) throw new Error("CARRYOS_TENANT_CONTEXT_REQUIRED");
+    const tenantId = await resolveWorkspaceId();
     const response = await executeUgcAiThroughCarryOs({
       tenantId,
       correlationId: globalThis.crypto?.randomUUID?.() ?? "",
