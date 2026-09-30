@@ -218,3 +218,12 @@ This document does not authorize deployment.
 - Productive LLM/script generation therefore fails closed instead of returning synthetic template output while CarryOS-governed AI execution is not yet wired.
 - Commit: `f6b95da8dd40c246ea862265c9b9499d94377cf`.
 - This is a blocker-hardening change, not completion of the CarryOS AI integration. The remaining requirement is to route productive CORE_BOUND generation through the canonical CarryOS runtime and preserve tenant/SP/provenance/FinOps governance.
+
+
+### CORE_BOUND tenant assertion hardening — 2026-09-30
+
+- Added UUID validation for the tenantId claim before it is returned as UGC workspace authority.
+- Added a negative test proving a non-UUID tenant assertion is rejected.
+- PR #63: fix(auth): harden CORE_BOUND tenant assertion.
+- This does not replace the final tenant-bound CarryOS ServicePrincipal/PluginInstallation authority. It is an interim boundary hardening step.
+- No production deployment performed.
