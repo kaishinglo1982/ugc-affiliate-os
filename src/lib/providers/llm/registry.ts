@@ -1,9 +1,10 @@
+import "server-only";
 import type { ScriptProvider } from "@/lib/providers/llm/types";
 import { templateScriptProvider } from "@/lib/providers/llm/template-provider";
 import { carryOsScriptProvider } from "@/lib/providers/llm/carryos-provider";
 
-export const LLM_PROVIDER_KEYS = ["openai", "anthropic", "google", "mistral", "openrouter", "huggingface", "custom"] as const;
-export type LlmProviderKey = (typeof LLM_PROVIDER_KEYS)[number];
+export { LLM_PROVIDER_KEYS, type LlmProviderKey } from "./registry-client";
+import { LLM_PROVIDER_KEYS, type LlmProviderKey } from "./registry-client";
 
 const ENV_KEY_BY_PROVIDER: Record<LlmProviderKey, string> = {
   openai: "OPENAI_API_KEY",
