@@ -213,8 +213,9 @@ async function runJob(job: {
   periodEnd: Date | null;
 }): Promise<void> {
   if (job.jobType === "ACCOUNT_SYNC" || job.jobType === "POST_SYNC") {
-    if (!job.socialAccountId) throw new SyncJobError("Social-Account erforderlich.");
-    const account = await withWorkspaceTransaction(job.workspaceId, (tx) => tx.socialAccount.findFirst({ where: { id: job.socialAccountId, workspaceId: job.workspaceId } }));
+    const socialAccountId = job.socialAccountId;
+    if (!socialAccountId) throw new SyncJobError("Social-Account erforderlich.");
+    const account = await withWorkspaceTransaction(job.workspaceId, (tx) => tx.socialAccount.findFirst({ where: { id: socialAccountId, workspaceId: job.workspaceId } }));
     if (!account) throw new AnalyticsSyncError("POST_NOT_FOUND", "Social-Account nicht gefunden.");
     if (!isAnalyticsPlatform(account.platform)) {
       throw new AnalyticsSyncError("UNSUPPORTED_METRIC", `Plattform ${account.platform} wird nicht unterstützt.`);
