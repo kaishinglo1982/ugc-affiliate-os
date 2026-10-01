@@ -1552,6 +1552,7 @@ model ContentExperiment {
 
 model ExperimentVariant {
   id                      String                  @id @default(uuid())
+  workspaceId             String
   experimentId            String
   contentVariantId        String?
   publishingConfigurationId String?
@@ -1565,6 +1566,7 @@ model ExperimentVariant {
   contentVariant          ContentVariant?         @relation(fields: [contentVariantId], references: [id])
   assignments             ExperimentAssignment[]
 
+  @@index([workspaceId, experimentId])
   @@index([experimentId])
 }
 
