@@ -10,6 +10,14 @@ ALTER TABLE "ExperimentVariant" ADD COLUMN "workspaceId" TEXT NOT NULL DEFAULT '
 ALTER TABLE "ExperimentVariant" ALTER COLUMN "workspaceId" DROP DEFAULT;
 CREATE INDEX "ExperimentVariant_workspaceId_idx" ON "ExperimentVariant"("workspaceId");
 
+ALTER TABLE "ExperimentResult" ADD COLUMN "workspaceId" TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001';
+ALTER TABLE "ExperimentResult" ALTER COLUMN "workspaceId" DROP DEFAULT;
+CREATE INDEX "ExperimentResult_workspaceId_idx" ON "ExperimentResult"("workspaceId");
+
+ALTER TABLE "DataQualityIssue" ADD COLUMN "workspaceId" TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001';
+ALTER TABLE "DataQualityIssue" ALTER COLUMN "workspaceId" DROP DEFAULT;
+CREATE INDEX "DataQualityIssue_workspaceId_idx" ON "DataQualityIssue"("workspaceId");
+
 CREATE OR REPLACE FUNCTION current_workspace_id()
 RETURNS text
 LANGUAGE sql
