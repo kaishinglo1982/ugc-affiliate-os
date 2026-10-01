@@ -156,8 +156,8 @@ export async function createExperimentDraftFromRecommendation(id: string, actor:
       approvalStatus: "DRAFT",
       variants: {
         create: [
-          { name: "Kontrolle", isControl: true, trafficWeight: 50, status: "DRAFT" },
-          { name: "Variante B", isControl: false, trafficWeight: 50, status: "DRAFT" },
+          { workspaceId, name: "Kontrolle", isControl: true, trafficWeight: 50, status: "DRAFT" },
+          { workspaceId, name: "Variante B", isControl: false, trafficWeight: 50, status: "DRAFT" },
         ],
       },
     },
