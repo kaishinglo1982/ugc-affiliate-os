@@ -91,6 +91,7 @@ export async function runDataQualityScan(workspaceId: string, actor: string) {
       issueCount: issues.length,
       issues: {
         create: issues.map((i) => ({
+          workspaceId,
           issueType: i.issueType,
           severity: i.severity,
           detail: i.detail,
