@@ -1590,6 +1590,7 @@ model ExperimentAssignment {
 
 model ExperimentResult {
   id                    String                @id @default(uuid())
+  workspaceId           String
   experimentId          String
   analyzedAt            DateTime              @default(now())
   status                ExperimentResultStatus
@@ -1705,6 +1706,7 @@ model DataQualityReport {
 
 model DataQualityIssue {
   id                String               @id @default(uuid())
+  workspaceId       String
   reportId          String
   issueType         DataQualityIssueType
   severity          AnomalySeverity
@@ -1712,6 +1714,7 @@ model DataQualityIssue {
   detectedAt        DateTime             @default(now())
 
   report            DataQualityReport    @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, reportId])
   @@index([reportId])
 }
 
