@@ -1,4 +1,30 @@
 -- Phase 10 schema synchronization and ContentBrief creative fields
+-- These enum types are present in the Prisma schema but were not created by the
+-- earlier migration history. Create them idempotently before adding typed columns.
+DO $$
+BEGIN
+  CREATE TYPE "PacingType" AS ENUM ('slow', 'medium', 'fast');
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  CREATE TYPE "CallToActionType" AS ENUM (
+    'CLICK_LINK',
+    'BUY_NOW',
+    'LEARN_MORE',
+    'SAVE_POST',
+    'FOLLOW',
+    'COMMENT',
+    'SHARE',
+    'VISIT_PROFILE',
+    'NONE'
+  );
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
+
 ALTER TABLE "ContentBrief"
   ADD COLUMN IF NOT EXISTS "campaignStrategyId" TEXT,
   ADD COLUMN IF NOT EXISTS "creativeAngleId" TEXT,
@@ -28,4 +54,6 @@ ALTER TABLE "ContentBrief"
   ADD COLUMN IF NOT EXISTS "affiliateDisclosureRequired" BOOLEAN NOT NULL DEFAULT false,
   ADD COLUMN IF NOT EXISTS "affiliateDisclosureText" TEXT,
   ADD COLUMN IF NOT EXISTS "version" INTEGER NOT NULL DEFAULT 1;
-CREATE INDEX IF NOT EXISTS "ContentBrief_workspaceId_campaignStrategyId_idx" ON "ContentBrief"("workspaceId", "campaignStrategyId");
+
+CREATE INDEX IF NOT EXISTS "ContentBrief_workspaceId_campaignStrategyId_idx"
+  ON "ContentBrief"("workspaceId", "campaignStrategyId");
