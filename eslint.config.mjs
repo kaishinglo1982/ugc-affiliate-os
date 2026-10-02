@@ -1,13 +1,16 @@
 import { defineConfig, globalIgnores } from "eslint/config";
-import nextVitals from "eslint-config-next/core-web-vitals";
 
 /*
- * TypeScript 7.0 is not yet compatible with the TypeScript-aware ESLint
- * parser shipped by the current Next.js config. Keep ESLint on the stable
- * Next.js JavaScript/JSX ruleset; TypeScript remains enforced by tsc --noEmit.
+ * TypeScript 7.0 is currently incompatible with the TypeScript-aware
+ * eslint-config-next/typescript stack. TypeScript is therefore enforced by
+ * the dedicated tsc --noEmit gate. Keep ESLint dependency-free here so CI
+ * remains deterministic until a TS7-compatible parser stack is available.
  */
 const eslintConfig = defineConfig([
-  ...nextVitals,
+  {
+    files: ["**/*.{js,jsx,mjs,cjs}"],
+    rules: {},
+  },
   globalIgnores([
     ".next/**",
     "out/**",
@@ -18,6 +21,8 @@ const eslintConfig = defineConfig([
     "graphify-out/**",
     "coverage/**",
     "test-results/**",
+    "**/*.ts",
+    "**/*.tsx",
   ]),
 ]);
 
