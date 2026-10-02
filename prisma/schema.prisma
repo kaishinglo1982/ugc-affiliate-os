@@ -2430,6 +2430,7 @@ model WorkflowDefinition {
   id           String         @id @default(uuid())
   workspaceId  String         @default("00000000-0000-0000-0000-000000000001")
   name         String
+  key          String
   description  String?
   trigger      String         @default("manual")
   scheduleCron String?
@@ -2461,6 +2462,8 @@ model WorkflowStepDefinition {
   stepOrder   Int
   type        WorkflowStepType
   name        String
+  key         String
+  dependsOn   String[] @default([])
   config      Json?
 
   runs WorkflowStepRun[]
@@ -2481,6 +2484,11 @@ model WorkflowRun {
   workflowId  String
   workflow    WorkflowDefinition @relation(fields: [workflowId], references: [id], onDelete: Cascade)
   triggeredBy String?
+  workflowVersion Int @default(1)
+  definitionSnapshot Json @default("{}")
+  definitionHash String?
+  correlationId String @default(uuid())
+  idempotencyKey String?
   status      WorkflowRunStatus @default(RUNNING)
   context     Json?
   startedAt   DateTime          @default(now())
