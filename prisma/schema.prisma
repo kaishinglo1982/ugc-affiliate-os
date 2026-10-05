@@ -1,5 +1,5 @@
 // UGC Affiliate Operating System — data model
-// Single-user system. All monetary values use Decimal. Timestamps are UTC;
+// Standalone mode remains single-workspace compatible; CORE_BOUND requests use an explicit CarryOS tenant binding. All monetary values use Decimal. Timestamps are UTC;
 // localized display (Europe/Berlin) happens in the presentation layer.
 
 generator client {
@@ -41,6 +41,21 @@ model Session {
 
   @@index([userId])
   @@index([expiresAt])
+}
+
+// ---------------------------------------------------------------------------
+// CarryOS tenant binding
+// ---------------------------------------------------------------------------
+
+model CarryOSTenantBinding {
+  id          String   @id @default(uuid())
+  tenantId    String   @unique
+  workspaceId String   @unique
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([workspaceId, active])
 }
 
 // ---------------------------------------------------------------------------

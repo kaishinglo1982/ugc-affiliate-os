@@ -2,6 +2,7 @@ import "server-only";
 import { headers } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 import { DEFAULT_WORKSPACE_ID } from "@/lib/config/workspace";
+import { prisma } from "@/lib/db/client";
 
 /**
  * Tenant resolution for CarryOS integration (BAND-60). When CarryOS routes a
@@ -26,6 +27,7 @@ function getTenantSecretKey(): Uint8Array | null {
 }
 
 export class InvalidTenantTokenError extends Error {}
+export class TenantWorkspaceBindingError extends Error {}
 
 export async function signTenantToken(tenantId: string): Promise<string> {
   const key = getTenantSecretKey();
@@ -55,7 +57,14 @@ export async function resolveWorkspaceId(): Promise<string> {
     if (typeof payload.tenantId !== "string" || !payload.tenantId) {
       throw new InvalidTenantTokenError("Tenant token missing tenantId claim");
     }
-    return payload.tenantId;
+    const binding = await prisma.carryOSTenantBinding.findUnique({
+      where: { tenantId: payload.tenantId },
+      select: { workspaceId: true, active: true },
+    });
+    if (!binding?.active) {
+      throw new TenantWorkspaceBindingError("CarryOS tenant is not bound to an active UGC workspace");
+    }
+    return binding.workspaceId;
   } catch (e) {
     if (e instanceof InvalidTenantTokenError) throw e;
     throw new InvalidTenantTokenError("Tenant token verification failed");
