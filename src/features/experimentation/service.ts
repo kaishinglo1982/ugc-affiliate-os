@@ -77,6 +77,7 @@ export async function createExperiment(input: CreateExperimentInput, actor: stri
       approvalStatus: "DRAFT",
       variants: {
         create: input.variants.map((v) => ({
+          workspaceId,
           name: v.name,
           isControl: v.isControl,
           trafficWeight: v.trafficWeight,
@@ -251,6 +252,7 @@ export async function analyzeExperimentById(experimentId: string, workspaceId: s
 
   const result = await prisma.experimentResult.create({
     data: {
+      workspaceId,
       experimentId,
       analyzedAt: new Date(),
       status: outcome.status,

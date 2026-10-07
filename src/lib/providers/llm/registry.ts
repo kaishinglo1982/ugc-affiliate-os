@@ -1,8 +1,10 @@
+import "server-only";
 import type { ScriptProvider } from "@/lib/providers/llm/types";
 import { templateScriptProvider } from "@/lib/providers/llm/template-provider";
+import { carryOsScriptProvider } from "@/lib/providers/llm/carryos-provider";
 
-export const LLM_PROVIDER_KEYS = ["openai", "anthropic", "google", "mistral", "openrouter", "huggingface", "custom"] as const;
-export type LlmProviderKey = (typeof LLM_PROVIDER_KEYS)[number];
+export { LLM_PROVIDER_KEYS, type LlmProviderKey } from "./registry-client";
+import { LLM_PROVIDER_KEYS, type LlmProviderKey } from "./registry-client";
 
 const ENV_KEY_BY_PROVIDER: Record<LlmProviderKey, string> = {
   openai: "OPENAI_API_KEY",
@@ -18,16 +20,7 @@ export function isLlmProviderConfigured(provider: LlmProviderKey): boolean {
   return Boolean(process.env[ENV_KEY_BY_PROVIDER[provider]]);
 }
 
-/** Vendor SDK calls are not wired up yet (see docs/build-report.md "Known
- * limitations") — configured providers are reported as available in the UI,
- * but generation always runs through the local template provider so the
- * studio never makes an unexpected paid call. */
 export function resolveScriptProvider(requested: LlmProviderKey | "template"): ScriptProvider {
-  if (process.env.CARRYOS_INTEGRATION_MODE === "CORE_BOUND") {
-    throw new Error(
-      "UGC_AI_PROVIDER_NOT_GOVERNED: productive AI in CORE_BOUND must execute through CarryOS",
-    );
-  }
-
+  if (process.env.CARRYOS_INTEGRATION_MODE === "CORE_BOUND") return carryOsScriptProvider;
   return templateScriptProvider;
 }

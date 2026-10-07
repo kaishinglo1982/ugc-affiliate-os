@@ -1,8 +1,22 @@
 -- Workspace RLS policy groundwork.
+-- ExperimentVariant was introduced without workspace ownership in the legacy Phase 6 migration.
+-- Backfill the legacy default before creating its workspace isolation policy.
 --
 -- Policies are created before RLS is enabled so application code can be migrated
 -- to transaction-bound workspace context without a partial production cutover.
 -- Enforcement is intentionally deferred to the dedicated RLS activation gate.
+
+ALTER TABLE "ExperimentVariant" ADD COLUMN "workspaceId" TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001';
+ALTER TABLE "ExperimentVariant" ALTER COLUMN "workspaceId" DROP DEFAULT;
+CREATE INDEX "ExperimentVariant_workspaceId_idx" ON "ExperimentVariant"("workspaceId");
+
+ALTER TABLE "ExperimentResult" ADD COLUMN "workspaceId" TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001';
+ALTER TABLE "ExperimentResult" ALTER COLUMN "workspaceId" DROP DEFAULT;
+CREATE INDEX "ExperimentResult_workspaceId_idx" ON "ExperimentResult"("workspaceId");
+
+ALTER TABLE "DataQualityIssue" ADD COLUMN "workspaceId" TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001';
+ALTER TABLE "DataQualityIssue" ALTER COLUMN "workspaceId" DROP DEFAULT;
+CREATE INDEX "DataQualityIssue_workspaceId_idx" ON "DataQualityIssue"("workspaceId");
 
 CREATE OR REPLACE FUNCTION current_workspace_id()
 RETURNS text

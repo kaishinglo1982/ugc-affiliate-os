@@ -41,6 +41,7 @@ export async function GET(request: Request) {
 }
 
 const stepSchema = z.object({
+  key: z.string().min(1).max(100).optional(),
   type: z.enum(["AGENT", "TOOL", "APPROVAL", "CONDITION"]),
   name: z.string().min(1).max(200),
   config: z.unknown().optional(),
@@ -48,6 +49,7 @@ const stepSchema = z.object({
 
 const createSchema = z.object({
   name: z.string().min(1).max(200),
+  key: z.string().min(1).max(100).optional(),
   description: z.string().max(2000).optional(),
   trigger: z.string().max(50).optional(),
   scheduleCron: z.string().max(100).optional(),
@@ -83,11 +85,13 @@ export async function POST(request: Request) {
     data: {
       workspaceId: workspaceId,
       ...rest,
+      key: rest.key ?? rest.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, ""),
       config: rest.config as Prisma.InputJsonValue | undefined,
       steps: steps
         ? {
             create: steps.map((s, index) => ({
               stepOrder: index,
+              key: s.key ?? `step-${index}`,
               type: s.type as WorkflowStepType,
               name: s.name,
               config: s.config as Prisma.InputJsonValue | undefined,

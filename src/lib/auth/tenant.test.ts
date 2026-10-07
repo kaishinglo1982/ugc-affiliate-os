@@ -8,11 +8,13 @@ vi.mock("next/headers", () => ({
 }));
 
 const SECRET = "a".repeat(48);
+const TENANT_ID = "11111111-1111-4111-8111-111111111111";
 
 describe("resolveWorkspaceId", () => {
   beforeEach(() => {
     mockHeaders.clear();
     process.env.CARRYOS_TENANT_SECRET = SECRET;
+    delete process.env.CARRYOS_INTEGRATION_MODE;
     vi.resetModules();
   });
 
@@ -24,9 +26,9 @@ describe("resolveWorkspaceId", () => {
 
   it("returns the tenantId from a validly signed token", async () => {
     const { resolveWorkspaceId, signTenantToken } = await import("./tenant");
-    const token = await signTenantToken("tenant-123");
+    const token = await signTenantToken(TENANT_ID);
     mockHeaders.set("x-carryos-tenant-token", token);
-    await expect(resolveWorkspaceId()).resolves.toBe("tenant-123");
+    await expect(resolveWorkspaceId()).resolves.toBe(TENANT_ID);
   });
 
   it("rejects instead of falling back when the header is present but invalid", async () => {
@@ -35,10 +37,14 @@ describe("resolveWorkspaceId", () => {
     await expect(resolveWorkspaceId()).rejects.toBeInstanceOf(InvalidTenantTokenError);
   });
 
-  it("rejects a token signed with a different secret", async () => {
-    process.env.CARRYOS_TENANT_SECRET = SECRET;
+  it("rejects a non-UUID tenant id before issuing a tenant token", async () => {
     const { signTenantToken } = await import("./tenant");
-    const token = await signTenantToken("tenant-123");
+    await expect(signTenantToken("tenant-123")).rejects.toThrow("tenantId must be a UUID");
+  });
+
+  it("rejects a token signed with a different secret", async () => {
+    const { signTenantToken } = await import("./tenant");
+    const token = await signTenantToken(TENANT_ID);
 
     vi.resetModules();
     process.env.CARRYOS_TENANT_SECRET = "b".repeat(48);

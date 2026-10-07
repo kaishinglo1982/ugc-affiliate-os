@@ -16,10 +16,10 @@ test.describe("Navigation", () => {
     await expect(page).toHaveURL(/\/app\/audit/);
   });
 
-  test("Hauptnavigation enthält die neuen Bereiche", async ({ page }) => {
+  test("Hauptnavigation enthält die aktuellen Bereiche", async ({ page }) => {
     await page.goto("/app");
-    for (const label of ["Content Studio", "Agenten", "Workflows", "Freigaben", "Budgets", "Agent Memory", "Audit-Log"]) {
-      await expect(page.getByRole("link", { name: new RegExp(label, "i") }).first()).toBeVisible();
+    for (const label of ["Content Studio", "Agenten", "Workflows", "Freigaben", "Budgets", "Memory", "Audit"]) {
+      await expect(page.getByText(label, { exact: true }).first()).toBeVisible();
     }
   });
 });

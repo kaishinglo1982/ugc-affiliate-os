@@ -16,7 +16,7 @@ import { FormField } from "@/components/ui/form-field";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { generateScriptAction } from "@/server/actions/scripts";
-import { isLlmProviderConfigured, LLM_PROVIDER_KEYS, type LlmProviderKey } from "@/lib/providers/llm/registry";
+import { LLM_PROVIDER_KEYS, type LlmProviderKey } from "@/lib/providers/llm/registry-client";
 import type { Result } from "@/types/result";
 
 const PLATFORMS = ["TikTok", "Instagram", "YouTube Shorts", "Pinterest", "Facebook", "X", "LinkedIn", "Reddit"];

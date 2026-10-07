@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { Prisma, type WorkflowStepType } from "@/generated/prisma/client";
+import { z } from "zod";
 import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
 import { getCurrentUser } from "@/lib/auth/current-user";
@@ -10,6 +10,7 @@ import { writeAuditLog } from "@/lib/audit/log";
 export const dynamic = "force-dynamic";
 
 const stepSchema = z.object({
+  key: z.string().min(1).optional(),
   name: z.string().min(1),
   type: z.string().min(1),
   config: z.record(z.string(), z.unknown()).optional(),
@@ -34,6 +35,10 @@ export async function POST(
   const step = await prisma.workflowStepDefinition.create({
     data: {
       workflowId: id,
+      key:
+        parsed.data.key ??
+        parsed.data.name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") ??
+        `step-${existing + 1}`,
       name: parsed.data.name,
       type: parsed.data.type as WorkflowStepType,
       config: (parsed.data.config ?? {}) as Prisma.InputJsonValue,

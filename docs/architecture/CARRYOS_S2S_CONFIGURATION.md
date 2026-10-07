@@ -1,0 +1,5 @@
+# UGC local development / standalone configuration
+CARRYOS_API_URL=
+CARRYOS_SERVICE_PRINCIPAL_TOKEN=
+CARRYOS_UGC_CONTRACT_VERSION=
+

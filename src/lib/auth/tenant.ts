@@ -2,22 +2,12 @@ import "server-only";
 import { headers } from "next/headers";
 import { SignJWT, jwtVerify } from "jose";
 import { DEFAULT_WORKSPACE_ID } from "@/lib/config/workspace";
+import { resolveWorkspaceIdForCarryOsTenant, TenantWorkspaceBindingError } from "./carryos-workspace-binding";
 
-/**
- * Tenant resolution for CarryOS integration (BAND-60). When CarryOS routes a
- * request to this app on behalf of a tenant, it sets a short-lived JWT in
- * this header, signed with a secret shared out-of-band with CarryOS
- * (CARRYOS_TENANT_SECRET) — never the same key as AUTH_SECRET, which signs
- * this app's own user sessions.
- *
- * No header at all = standalone/dev mode, unchanged single-workspace
- * behavior (DEFAULT_WORKSPACE_ID). A header that IS present but fails
- * verification is rejected outright, not silently downgraded to the
- * default — a bad signature means someone is trying to assert a tenant
- * identity, and falling back would risk running their request under the
- * wrong (or a more privileged) workspace instead of refusing it.
- */
 const TENANT_HEADER = "x-carryos-tenant-token";
+const TOKEN_ISSUER = "carryos-core";
+const TOKEN_AUDIENCE = "ugc-affiliate-os";
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function getTenantSecretKey(): Uint8Array | null {
   const secret = process.env.CARRYOS_TENANT_SECRET;
@@ -27,11 +17,16 @@ function getTenantSecretKey(): Uint8Array | null {
 
 export class InvalidTenantTokenError extends Error {}
 
+export { TenantWorkspaceBindingError };
+
 export async function signTenantToken(tenantId: string): Promise<string> {
   const key = getTenantSecretKey();
   if (!key) throw new Error("CARRYOS_TENANT_SECRET must be set to a string of at least 32 characters");
+  if (!UUID_PATTERN.test(tenantId)) throw new Error("CarryOS tenantId must be a UUID");
   return new SignJWT({ tenantId })
     .setProtectedHeader({ alg: "HS256" })
+    .setIssuer(TOKEN_ISSUER)
+    .setAudience(TOKEN_AUDIENCE)
     .setIssuedAt()
     .setExpirationTime("5m")
     .sign(key);
@@ -51,13 +46,21 @@ export async function resolveWorkspaceId(): Promise<string> {
   if (!key) throw new InvalidTenantTokenError("CARRYOS_TENANT_SECRET is not configured");
 
   try {
-    const { payload } = await jwtVerify(token, key);
-    if (typeof payload.tenantId !== "string" || !payload.tenantId) {
-      throw new InvalidTenantTokenError("Tenant token missing tenantId claim");
+    const { payload } = await jwtVerify(token, key, {
+      issuer: TOKEN_ISSUER,
+      audience: TOKEN_AUDIENCE,
+    });
+    if (typeof payload.tenantId !== "string" || !UUID_PATTERN.test(payload.tenantId)) {
+      throw new InvalidTenantTokenError("Tenant token tenantId must be a UUID");
     }
+
+    if (process.env.CARRYOS_INTEGRATION_MODE === "CORE_BOUND") {
+      return resolveWorkspaceIdForCarryOsTenant(payload.tenantId);
+    }
+
     return payload.tenantId;
   } catch (e) {
-    if (e instanceof InvalidTenantTokenError) throw e;
+    if (e instanceof InvalidTenantTokenError || e instanceof TenantWorkspaceBindingError) throw e;
     throw new InvalidTenantTokenError("Tenant token verification failed");
   }
 }
