@@ -72,7 +72,7 @@ if (existsSync(providerDir)) {
     for (const entry of readdirSync(current)) {
       const path = join(current, entry);
       if (statSync(path).isDirectory()) stack.push(path);
-      else if (/\\.(ts|tsx)$/.test(path)) {
+      else if (/\.(ts|tsx)$/.test(path)) {
         const source = readFileSync(path, "utf8");
         if (
           source.includes("CARRYOS_INTEGRATION_MODE") &&
