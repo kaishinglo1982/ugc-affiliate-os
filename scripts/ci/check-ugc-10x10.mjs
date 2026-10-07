@@ -48,12 +48,13 @@ if (!ci.includes("Run e2e tests") || !ci.includes("playwright install --with-dep
   failures.push("E2E CI execution missing");
 
 for (const needle of [
-  "model CarryOsPluginBinding",
+  "CarryOsPluginBinding",
   "requireCarryOsUgcBinding",
-  "CARRYOS_UGC_CONTRACT_VERSION",
-]) if (!core.includes(needle)) {
-  // CORE gate itself can verify only its own runtime inputs; this assertion
-  // ensures the release gate remains coupled to the binding contract.
+  "servicePrincipalId",
+]) {
+  if (!core.includes(needle) && !read("src/lib/auth/carryos-plugin-binding.ts").includes(needle)) {
+    failures.push(`binding contract missing: ${needle}`);
+  }
 }
 
 if (failures.length) {
