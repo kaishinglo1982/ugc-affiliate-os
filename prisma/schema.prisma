@@ -139,6 +139,7 @@ model Product {
 
 model ProductScore {
   id                    String   @id @default(uuid())
+  workspaceId String
   productId             String
   product               Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   demand                Int      @default(0)
@@ -156,6 +157,7 @@ model ProductScore {
   createdAt             DateTime @default(now())
 
   @@index([productId])
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -183,6 +185,7 @@ enum IntegrationMode {
 
 model AffiliateProgram {
   id             String               @id @default(uuid())
+  workspaceId String
   provider       AffiliateProviderKey
   customName     String?
   trackingId     String?
@@ -199,10 +202,12 @@ model AffiliateProgram {
   offers   AffiliateOffer[]
 
   @@index([provider])
+  @@index([workspaceId])
 }
 
 model AffiliateLink {
   id               String            @id @default(uuid())
+  workspaceId String
   programId        String
   program          AffiliateProgram  @relation(fields: [programId], references: [id], onDelete: Cascade)
   productId        String?
@@ -228,16 +233,19 @@ model AffiliateLink {
 
   @@index([programId])
   @@index([productId])
+  @@index([workspaceId])
 }
 
 model LinkClick {
   id        String        @id @default(uuid())
+  workspaceId String
   linkId    String
   link      AffiliateLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
   occurredAt DateTime     @default(now())
   source    String?
 
   @@index([linkId])
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -259,6 +267,7 @@ enum CampaignStatus {
 
 model Campaign {
   id             String         @id @default(uuid())
+  workspaceId String
   name           String
   productId      String?
   product        Product?       @relation(fields: [productId], references: [id])
@@ -285,6 +294,7 @@ model Campaign {
   briefs      ContentBrief[]
 
   @@index([status])
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -299,6 +309,7 @@ enum ScriptStatus {
 
 model Script {
   id          String       @id @default(uuid())
+  workspaceId String
   title       String
   productId   String?
   product     Product?     @relation(fields: [productId], references: [id])
@@ -319,10 +330,12 @@ model Script {
 
   @@index([status])
   @@index([campaignId])
+  @@index([workspaceId])
 }
 
 model ScriptVersion {
   id             String   @id @default(uuid())
+  workspaceId String
   scriptId       String
   script         Script   @relation(fields: [scriptId], references: [id], onDelete: Cascade)
   versionNumber  Int
@@ -343,6 +356,7 @@ model ScriptVersion {
   createdAt      DateTime @default(now())
 
   @@unique([scriptId, versionNumber])
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -371,6 +385,7 @@ enum VideoProviderKey {
 
 model VideoJob {
   id           String         @id @default(uuid())
+  workspaceId String
   scriptId     String?
   script       Script?        @relation(fields: [scriptId], references: [id])
   productId    String?
@@ -400,6 +415,7 @@ model VideoJob {
 
   @@index([status])
   @@index([campaignId])
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -415,6 +431,7 @@ enum MediaKind {
 
 model MediaAsset {
   id          String    @id @default(uuid())
+  workspaceId String
   kind        MediaKind
   fileName    String
   storageKey  String
@@ -440,6 +457,7 @@ model MediaAsset {
 
   @@index([kind])
   @@index([campaignId])
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -459,6 +477,7 @@ enum SocialPlatform {
 
 model SocialAccount {
   id           String          @id @default(uuid())
+  workspaceId String
   platform     SocialPlatform
   handle       String
   mode         IntegrationMode @default(MOCK)
@@ -471,6 +490,7 @@ model SocialAccount {
   posts SocialPost[]
 
   @@index([platform])
+  @@index([workspaceId])
 }
 
 enum SocialPostStatus {
@@ -486,6 +506,7 @@ enum SocialPostStatus {
 
 model SocialPost {
   id              String            @id @default(uuid())
+  workspaceId String
   campaignId      String?
   campaign        Campaign?         @relation(fields: [campaignId], references: [id])
   mediaAssetId    String?
@@ -514,6 +535,7 @@ model SocialPost {
 
   @@index([status])
   @@index([scheduledAt])
+  @@index([workspaceId])
 }
 
 enum PublishJobStatus {
@@ -534,6 +556,7 @@ enum PublishJobStatus {
  */
 model PublishJob {
   id              String           @id @default(uuid())
+  workspaceId String
   postId          String
   post            SocialPost       @relation(fields: [postId], references: [id], onDelete: Cascade)
   status          PublishJobStatus @default(PENDING)
@@ -545,6 +568,7 @@ model PublishJob {
   updatedAt       DateTime         @updatedAt
 
   @@index([status, nextAttemptAt])
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -560,6 +584,7 @@ enum RevenueStatus {
 
 model Revenue {
   id            String        @id @default(uuid())
+  workspaceId String
   date          DateTime
   programId     String?
   program       AffiliateProgram? @relation(fields: [programId], references: [id])
@@ -578,6 +603,7 @@ model Revenue {
 
   @@index([date])
   @@index([campaignId])
+  @@index([workspaceId])
 }
 
 enum ExpenseCategory {
@@ -596,6 +622,7 @@ enum ExpenseCategory {
 
 model Expense {
   id           String          @id @default(uuid())
+  workspaceId String
   date         DateTime
   category     ExpenseCategory
   vendor       String?
@@ -614,16 +641,19 @@ model Expense {
 
   @@index([date])
   @@index([campaignId])
+  @@index([workspaceId])
 }
 
 model TaxSetting {
   id                    String   @id @default(uuid())
+  workspaceId String
   reserveRatePercent    Decimal  @db.Decimal(5, 2) @default(30)
   vatRatePercent        Decimal  @db.Decimal(5, 2) @default(19)
   vatEnabled            Boolean  @default(false)
   tradeTaxReservePercent Decimal @db.Decimal(5, 2) @default(15)
   incomeTaxReservePercent Decimal @db.Decimal(5, 2) @default(25)
   updatedAt             DateTime @updatedAt
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -642,6 +672,7 @@ enum IntegrationCategory {
 
 model Integration {
   id            String              @id @default(uuid())
+  workspaceId String
   providerKey   String              @unique
   displayName   String
   category      IntegrationCategory
@@ -656,10 +687,12 @@ model Integration {
   updatedAt     DateTime            @updatedAt
 
   @@index([category])
+  @@index([workspaceId])
 }
 
 model EncryptedCredential {
   id            String   @id @default(uuid())
+  workspaceId String
   label         String
   cipherText    String
   iv            String
@@ -671,6 +704,7 @@ model EncryptedCredential {
   affiliatePrograms AffiliateProgram[]
   socialAccounts    SocialAccount[]
   integrations      Integration[]
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -686,6 +720,7 @@ enum AgentStatus {
 
 model Agent {
   id             String      @id @default(uuid())
+  workspaceId String
   key            String      @unique
   name           String
   role           String
@@ -702,6 +737,7 @@ model Agent {
   updatedAt      DateTime    @updatedAt
 
   runs AgentRun[]
+  @@index([workspaceId])
 }
 
 enum AgentRunStatus {
@@ -712,6 +748,7 @@ enum AgentRunStatus {
 
 model AgentRun {
   id         String         @id @default(uuid())
+  workspaceId String
   agentId    String
   agent      Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
   status     AgentRunStatus @default(RUNNING)
@@ -722,6 +759,7 @@ model AgentRun {
   toolCalls  AgentToolCall[]
 
   @@index([agentId])
+  @@index([workspaceId])
 }
 
 enum AutomationTrigger {
@@ -748,6 +786,7 @@ enum AutomationActionType {
 
 model Automation {
   id           String            @id @default(uuid())
+  workspaceId String
   name         String
   isActive     Boolean           @default(true)
   trigger      AutomationTrigger
@@ -759,6 +798,7 @@ model Automation {
   updatedAt    DateTime          @updatedAt
 
   runs AutomationRun[]
+  @@index([workspaceId])
 }
 
 enum AutomationRunStatus {
@@ -769,6 +809,7 @@ enum AutomationRunStatus {
 
 model AutomationRun {
   id           String               @id @default(uuid())
+  workspaceId String
   automationId String
   automation   Automation           @relation(fields: [automationId], references: [id], onDelete: Cascade)
   status       AutomationRunStatus
@@ -776,6 +817,7 @@ model AutomationRun {
   message      String?
 
   @@index([automationId])
+  @@index([workspaceId])
 }
 
 // ---------------------------------------------------------------------------
@@ -791,6 +833,7 @@ enum NotificationLevel {
 
 model Notification {
   id        String             @id @default(uuid())
+  workspaceId String
   level     NotificationLevel  @default(INFO)
   title     String
   message   String
@@ -799,20 +842,24 @@ model Notification {
   createdAt DateTime           @default(now())
 
   @@index([readAt])
+  @@index([workspaceId])
 }
 
 model ContactRequest {
   id        String   @id @default(uuid())
+  workspaceId String
   name      String
   email     String
   subject   String
   message   String
   createdAt DateTime @default(now())
   handledAt DateTime?
+  @@index([workspaceId])
 }
 
 model AuditLog {
   id         String   @id @default(uuid())
+  workspaceId String
   actor      String   @default("owner")
   action     String
   entityType String
@@ -823,6 +870,7 @@ model AuditLog {
 
   @@index([entityType, entityId])
   @@index([createdAt])
+  @@index([workspaceId])
 }
 
 // ===========================================================================
