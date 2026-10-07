@@ -70,6 +70,12 @@ jobs:
       - name: Generate Prisma client
         run: pnpm run db:generate
 
+      - name: CORE_BOUND gate
+        run: node scripts/ci/check-core-bound.mjs
+
+      - name: Workspace RLS coverage gate
+        run: node scripts/ci/check-workspace-rls-coverage.mjs
+
       - name: Apply migrations
         run: pnpm run db:migrate:deploy
 
@@ -84,6 +90,9 @@ jobs:
 
       - name: Build
         run: pnpm run build
+
+      - name: UGC 10x10 release gate
+        run: node scripts/ci/check-ugc-10x10.mjs
 
   e2e:
     name: E2E
