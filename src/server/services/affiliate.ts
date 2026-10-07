@@ -1,18 +1,21 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export async function listAffiliatePrograms() {
-  return prisma.affiliateProgram.findMany({
+  const workspaceId = await resolveWorkspaceId();
+  return withWorkspaceTransaction(workspaceId, (tx) => tx.affiliateProgram.findMany({
     include: { credential: { select: { id: true, lastRotatedAt: true } }, _count: { select: { links: true } } },
     orderBy: { createdAt: "desc" },
-  });
+  }));
 }
 
 export async function listAffiliateLinks() {
-  return prisma.affiliateLink.findMany({
+  const workspaceId = await resolveWorkspaceId();
+  return withWorkspaceTransaction(workspaceId, (tx) => tx.affiliateLink.findMany({
     include: { program: true, product: { select: { id: true, name: true } } },
     orderBy: { createdAt: "desc" },
-  });
+  }));
 }
 
 export async function listProductsForSelect() {
