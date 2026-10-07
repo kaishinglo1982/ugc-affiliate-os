@@ -11,6 +11,8 @@ import {
   resolveCoreBoundRole,
 } from "@/lib/auth/core-bound-rbac";
 import { newRequestId } from "@/types/result";
+import { CarryOsPluginBindingError, requireCarryOsUgcBinding } from "@/lib/auth/carryos-plugin-binding";
+import { resolveCarryOsTenantId } from "@/lib/auth/carryos-tenant-context";
 
 /**
  * Shared guard for API route handlers. Verifies authentication and the required
@@ -34,6 +36,8 @@ export async function requireApiPermission(
   if (process.env.CARRYOS_INTEGRATION_MODE === "CORE_BOUND") {
     try {
       const workspaceId = await resolveWorkspaceId();
+      const tenantId = await resolveCarryOsTenantId();
+      await requireCarryOsUgcBinding({ tenantId, workspaceId });
       const role = resolveCoreBoundRole(workspaceId, user.id);
       if (!permissionsForRole(role).has(permission as Permission)) {
         return { response: NextResponse.json({ error: "Keine Berechtigung.", requestId }, { status: 403 }) };
@@ -48,7 +52,7 @@ export async function requireApiPermission(
           ),
         };
       }
-      if (error instanceof TenantWorkspaceBindingError || error instanceof CoreBoundRoleBindingError) {
+      if (error instanceof TenantWorkspaceBindingError || error instanceof CoreBoundRoleBindingError || error instanceof CarryOsPluginBindingError) {
         return {
           response: NextResponse.json(
             { error: "Keine Berechtigung für diesen Workspace.", requestId },
