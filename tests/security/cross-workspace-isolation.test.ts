@@ -1,0 +1,2 @@
+import {describe,it,expect} from "vitest";
+describe("negative cross-workspace isolation",()=>{it("requires FORCE RLS and transaction-scoped workspace context",async()=>{const{readFileSync}=await import("node:fs");const r=readFileSync("prisma/migrations/20261007180000_workspace_rls_full_activation/migration.sql","utf8");const t=readFileSync("src/lib/db/workspace-transaction.ts","utf8");expect(r).toContain("FORCE ROW LEVEL SECURITY");expect(r).toContain('"workspaceId" = current_workspace_id()');expect(r).toContain("WITH CHECK");expect(t).toContain("prisma.$transaction");})});
