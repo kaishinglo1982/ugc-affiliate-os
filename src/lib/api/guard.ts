@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { hasPermission, type Permission } from "@/lib/auth/rbac";
 import { newRequestId } from "@/types/result";
+import { CarryOsPluginBindingError, requireCarryOsUgcBinding } from "@/lib/auth/carryos-plugin-binding";
 
 /**
  * Shared guard for API route handlers. Verifies authentication and the required
