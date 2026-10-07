@@ -25,7 +25,7 @@ export async function getAnalyticsData(filters: AnalyticsFilters) {
   const platformText = filters.platform ? platformLabel(filters.platform) : undefined;
 
   const campaign = filters.campaignId
-    ? await withWorkspaceTransaction(workspaceId, (tx) => tx.campaign.findUnique({ where: { id: filters.campaignId }, select: { affiliateLinkId: true } })
+    ? await withWorkspaceTransaction(workspaceId, (tx) => tx.campaign.findUnique({ where: { id: filters.campaignId }, select: { affiliateLinkId: true } }))
     : null;
   // A campaign filter with no linked affiliate link should yield zero clicks, not "all clicks".
   const campaignHasNoLink = Boolean(filters.campaignId) && !campaign?.affiliateLinkId;
