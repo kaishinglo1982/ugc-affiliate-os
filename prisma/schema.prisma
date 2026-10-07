@@ -139,8 +139,7 @@ model Product {
 
 model ProductScore {
   id                    String   @id @default(uuid())
-  workspaceId String
-  productId             String
+  workspaceId String @default(dbgenerated("current_workspace_id()"))productId             String
   product               Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
   demand                Int      @default(0)
   commission            Int      @default(0)
@@ -185,8 +184,7 @@ enum IntegrationMode {
 
 model AffiliateProgram {
   id             String               @id @default(uuid())
-  workspaceId String
-  provider       AffiliateProviderKey
+  workspaceId String @default(dbgenerated("current_workspace_id()"))provider       AffiliateProviderKey
   customName     String?
   trackingId     String?
   credentialId   String?
@@ -207,8 +205,7 @@ model AffiliateProgram {
 
 model AffiliateLink {
   id               String            @id @default(uuid())
-  workspaceId String
-  programId        String
+  workspaceId String @default(dbgenerated("current_workspace_id()"))programId        String
   program          AffiliateProgram  @relation(fields: [programId], references: [id], onDelete: Cascade)
   productId        String?
   product          Product?          @relation(fields: [productId], references: [id])
@@ -238,8 +235,7 @@ model AffiliateLink {
 
 model LinkClick {
   id        String        @id @default(uuid())
-  workspaceId String
-  linkId    String
+  workspaceId String @default(dbgenerated("current_workspace_id()"))linkId    String
   link      AffiliateLink @relation(fields: [linkId], references: [id], onDelete: Cascade)
   occurredAt DateTime     @default(now())
   source    String?
@@ -267,8 +263,7 @@ enum CampaignStatus {
 
 model Campaign {
   id             String         @id @default(uuid())
-  workspaceId String
-  name           String
+  workspaceId String @default(dbgenerated("current_workspace_id()"))name           String
   productId      String?
   product        Product?       @relation(fields: [productId], references: [id])
   affiliateLinkId String?
@@ -309,8 +304,7 @@ enum ScriptStatus {
 
 model Script {
   id          String       @id @default(uuid())
-  workspaceId String
-  title       String
+  workspaceId String @default(dbgenerated("current_workspace_id()"))title       String
   productId   String?
   product     Product?     @relation(fields: [productId], references: [id])
   campaignId  String?
@@ -335,8 +329,7 @@ model Script {
 
 model ScriptVersion {
   id             String   @id @default(uuid())
-  workspaceId String
-  scriptId       String
+  workspaceId String @default(dbgenerated("current_workspace_id()"))scriptId       String
   script         Script   @relation(fields: [scriptId], references: [id], onDelete: Cascade)
   versionNumber  Int
   hook           String
@@ -385,8 +378,7 @@ enum VideoProviderKey {
 
 model VideoJob {
   id           String         @id @default(uuid())
-  workspaceId String
-  scriptId     String?
+  workspaceId String @default(dbgenerated("current_workspace_id()"))scriptId     String?
   script       Script?        @relation(fields: [scriptId], references: [id])
   productId    String?
   product      Product?       @relation(fields: [productId], references: [id])
@@ -431,8 +423,7 @@ enum MediaKind {
 
 model MediaAsset {
   id          String    @id @default(uuid())
-  workspaceId String
-  kind        MediaKind
+  workspaceId String @default(dbgenerated("current_workspace_id()"))kind        MediaKind
   fileName    String
   storageKey  String
   url         String
@@ -477,8 +468,7 @@ enum SocialPlatform {
 
 model SocialAccount {
   id           String          @id @default(uuid())
-  workspaceId String
-  platform     SocialPlatform
+  workspaceId String @default(dbgenerated("current_workspace_id()"))platform     SocialPlatform
   handle       String
   mode         IntegrationMode @default(MOCK)
   credentialId String?
@@ -506,8 +496,7 @@ enum SocialPostStatus {
 
 model SocialPost {
   id              String            @id @default(uuid())
-  workspaceId String
-  campaignId      String?
+  workspaceId String @default(dbgenerated("current_workspace_id()"))campaignId      String?
   campaign        Campaign?         @relation(fields: [campaignId], references: [id])
   mediaAssetId    String?
   mediaAsset      MediaAsset?       @relation(fields: [mediaAssetId], references: [id])
@@ -556,8 +545,7 @@ enum PublishJobStatus {
  */
 model PublishJob {
   id              String           @id @default(uuid())
-  workspaceId String
-  postId          String
+  workspaceId String @default(dbgenerated("current_workspace_id()"))postId          String
   post            SocialPost       @relation(fields: [postId], references: [id], onDelete: Cascade)
   status          PublishJobStatus @default(PENDING)
   attempts        Int              @default(0)
@@ -584,8 +572,7 @@ enum RevenueStatus {
 
 model Revenue {
   id            String        @id @default(uuid())
-  workspaceId String
-  date          DateTime
+  workspaceId String @default(dbgenerated("current_workspace_id()"))date          DateTime
   programId     String?
   program       AffiliateProgram? @relation(fields: [programId], references: [id])
   productId     String?
@@ -622,8 +609,7 @@ enum ExpenseCategory {
 
 model Expense {
   id           String          @id @default(uuid())
-  workspaceId String
-  date         DateTime
+  workspaceId String @default(dbgenerated("current_workspace_id()"))date         DateTime
   category     ExpenseCategory
   vendor       String?
   campaignId   String?
@@ -646,8 +632,7 @@ model Expense {
 
 model TaxSetting {
   id                    String   @id @default(uuid())
-  workspaceId String
-  reserveRatePercent    Decimal  @db.Decimal(5, 2) @default(30)
+  workspaceId String @default(dbgenerated("current_workspace_id()"))reserveRatePercent    Decimal  @db.Decimal(5, 2) @default(30)
   vatRatePercent        Decimal  @db.Decimal(5, 2) @default(19)
   vatEnabled            Boolean  @default(false)
   tradeTaxReservePercent Decimal @db.Decimal(5, 2) @default(15)
@@ -672,8 +657,7 @@ enum IntegrationCategory {
 
 model Integration {
   id            String              @id @default(uuid())
-  workspaceId String
-  providerKey   String              @unique
+  workspaceId String @default(dbgenerated("current_workspace_id()"))providerKey   String              @unique
   displayName   String
   category      IntegrationCategory
   mode          IntegrationMode     @default(MOCK)
@@ -692,8 +676,7 @@ model Integration {
 
 model EncryptedCredential {
   id            String   @id @default(uuid())
-  workspaceId String
-  label         String
+  workspaceId String @default(dbgenerated("current_workspace_id()"))label         String
   cipherText    String
   iv            String
   authTag       String
@@ -720,8 +703,7 @@ enum AgentStatus {
 
 model Agent {
   id             String      @id @default(uuid())
-  workspaceId String
-  key            String      @unique
+  workspaceId String @default(dbgenerated("current_workspace_id()"))key            String      @unique
   name           String
   role           String
   description    String
@@ -748,8 +730,7 @@ enum AgentRunStatus {
 
 model AgentRun {
   id         String         @id @default(uuid())
-  workspaceId String
-  agentId    String
+  workspaceId String @default(dbgenerated("current_workspace_id()"))agentId    String
   agent      Agent          @relation(fields: [agentId], references: [id], onDelete: Cascade)
   status     AgentRunStatus @default(RUNNING)
   startedAt  DateTime       @default(now())
@@ -786,8 +767,7 @@ enum AutomationActionType {
 
 model Automation {
   id           String            @id @default(uuid())
-  workspaceId String
-  name         String
+  workspaceId String @default(dbgenerated("current_workspace_id()"))name         String
   isActive     Boolean           @default(true)
   trigger      AutomationTrigger
   conditions   Json?
@@ -809,8 +789,7 @@ enum AutomationRunStatus {
 
 model AutomationRun {
   id           String               @id @default(uuid())
-  workspaceId String
-  automationId String
+  workspaceId String @default(dbgenerated("current_workspace_id()"))automationId String
   automation   Automation           @relation(fields: [automationId], references: [id], onDelete: Cascade)
   status       AutomationRunStatus
   runAt        DateTime             @default(now())
@@ -833,8 +812,7 @@ enum NotificationLevel {
 
 model Notification {
   id        String             @id @default(uuid())
-  workspaceId String
-  level     NotificationLevel  @default(INFO)
+  workspaceId String @default(dbgenerated("current_workspace_id()"))level     NotificationLevel  @default(INFO)
   title     String
   message   String
   link      String?
@@ -847,8 +825,7 @@ model Notification {
 
 model ContactRequest {
   id        String   @id @default(uuid())
-  workspaceId String
-  name      String
+  workspaceId String @default(dbgenerated("current_workspace_id()"))name      String
   email     String
   subject   String
   message   String
@@ -859,8 +836,7 @@ model ContactRequest {
 
 model AuditLog {
   id         String   @id @default(uuid())
-  workspaceId String
-  actor      String   @default("owner")
+  workspaceId String @default(dbgenerated("current_workspace_id()"))actor      String   @default("owner")
   action     String
   entityType String
   entityId   String?
