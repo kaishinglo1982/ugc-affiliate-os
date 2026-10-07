@@ -1,5 +1,6 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import type { Prisma } from "@/generated/prisma/client";
 
 export interface MediaListFilters {
@@ -19,12 +20,13 @@ export async function listMediaAssets(filters: MediaListFilters) {
     ];
   }
 
-  return prisma.mediaAsset.findMany({
+  const workspaceId = await resolveWorkspaceId();
+  return withWorkspaceTransaction(workspaceId, (tx) => tx.mediaAsset.findMany({
     where,
     include: {
       product: { select: { id: true, name: true } },
       campaign: { select: { id: true, name: true } },
     },
     orderBy: { createdAt: "desc" },
-  });
+  }));
 }
