@@ -2511,8 +2511,74 @@ model WorkflowStepRun {
   error         String?
   startedAt     DateTime          @default(now())
   finishedAt    DateTime?
+  nextAttemptAt DateTime?
+  claimedBy     String?
+  claimToken    String? @unique
+  leaseExpiresAt DateTime?
+  heartbeatAt   DateTime?
+  attemptCount  Int @default(0)
+  maxAttempts   Int @default(3)
+  version       Int @default(1)
+  state         String @default("READY")
 
   @@index([workspaceId, workflowRunId])
+  @@index([workspaceId, state, nextAttemptAt, leaseExpiresAt])
+}
+
+model AgentCapabilityRegistration {
+  id                  String   @id @default(uuid())
+  workspaceId         String
+  agentKey            String
+  version             Int      @default(1)
+  enabled             Boolean  @default(true)
+  health              String   @default("ONLINE")
+  capabilities        Json
+  allowedToolKeys     String[] @default([])
+  providerKeys        String[] @default([])
+  currentLoad         Int      @default(0)
+  maxConcurrency      Int      @default(1)
+  estimatedCostPerTask Decimal @default(0) @db.Decimal(12, 4)
+  averageLatencyMs    Int      @default(0)
+  successRate         Decimal  @default(1) @db.Decimal(5, 4)
+  priority            Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  @@unique([workspaceId, agentKey, version])
+  @@index([workspaceId, health, enabled])
+}
+
+model AgentCapacityReservation {
+  id                  String   @id @default(uuid())
+  workspaceId         String
+  agentRegistrationId String
+  workflowStepRunId   String
+  reservationToken    String   @unique
+  status              String   @default("RESERVED")
+  expiresAt           DateTime
+  createdAt            DateTime @default(now())
+  releasedAt          DateTime?
+
+  @@unique([workspaceId, workflowStepRunId])
+  @@index([workspaceId, status, expiresAt])
+}
+
+model CarryOsPluginBinding {
+  id                   String   @id @default(uuid())
+  tenantId             String
+  workspaceId          String
+  pluginInstallationId String
+  servicePrincipalId   String
+  contractVersion      String
+  status               String   @default("ACTIVE")
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  revokedAt            DateTime?
+
+  @@unique([tenantId, pluginInstallationId])
+  @@unique([tenantId, workspaceId])
+  @@index([tenantId, status])
+  @@index([servicePrincipalId])
 }
 
 enum AgentToolRiskLevel {
