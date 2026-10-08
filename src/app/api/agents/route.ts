@@ -3,7 +3,8 @@ import { z } from "zod";
 import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
 import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
+import { resolveWorkspaceId, InvalidTenantTokenError } from "@/lib/auth/tenant";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 import { writeAuditLog } from "@/lib/audit/log";
 import type { AgentStatus } from "@/generated/prisma/client";
 
@@ -15,12 +16,16 @@ export async function GET(request: Request) {
 
   const { searchParams } = new URL(request.url);
   const status = searchParams.get("status");
+  let workspaceId: string;
+  try { workspaceId = await resolveWorkspaceId(); }
+  catch (e) {
+    if (e instanceof InvalidTenantTokenError) return NextResponse.json({ error: "Ungültiges Tenant-Token." }, { status: 401 });
+    throw e;
+  }
 
-  const agents = await prisma.agent.findMany({
-    where: { ...(status ? { status: status as AgentStatus } : {}) },
-    orderBy: { createdAt: "desc" },
-  });
-
+  const agents = await withWorkspaceTransaction(workspaceId, (tx) =>
+    tx.agent.findMany({ where: { workspaceId, ...(status ? { status: status as AgentStatus } : {}) }, orderBy: { createdAt: "desc" } }),
+  );
   return NextResponse.json({ agents });
 }
 
@@ -39,13 +44,19 @@ export async function POST(request: Request) {
   if (guard) return guard.response;
 
   const parsed = createSchema.safeParse(await request.json());
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Ungültige Eingabe." }, { status: 400 });
-  }
+  if (!parsed.success) return NextResponse.json({ error: "Ungültige Eingabe." }, { status: 400 });
 
   const actor = (await getCurrentUser())?.id ?? "owner";
-  const agent = await prisma.agent.create({
+  let workspaceId: string;
+  try { workspaceId = await resolveWorkspaceId(); }
+  catch (e) {
+    if (e instanceof InvalidTenantTokenError) return NextResponse.json({ error: "Ungültiges Tenant-Token." }, { status: 401 });
+    throw e;
+  }
+
+  const agent = await withWorkspaceTransaction(workspaceId, (tx) => tx.agent.create({
     data: {
+      workspaceId,
       key: parsed.data.key,
       name: parsed.data.name,
       role: parsed.data.role,
@@ -54,14 +65,8 @@ export async function POST(request: Request) {
       allowedActions: parsed.data.allowedActions ?? [],
       status: (parsed.data.status ?? "IDLE") as AgentStatus,
     },
-  });
+  }));
 
-  await writeAuditLog({
-    action: "agent.create",
-    entityType: "Agent",
-    entityId: agent.id,
-    actor,
-  });
-
+  await writeAuditLog({ action: "agent.create", entityType: "Agent", entityId: agent.id, actor });
   return NextResponse.json({ agent }, { status: 201 });
 }
