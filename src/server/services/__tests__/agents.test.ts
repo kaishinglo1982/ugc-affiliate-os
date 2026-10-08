@@ -179,7 +179,12 @@ describe("agents service — capabilities", () => {
 });
 
 describe("agents service — execution records", () => {
-  beforeEach(() => {\n    vi.clearAllMocks();\n    prismaMock.$transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) =>\n      callback({ ...prismaMock, $executeRaw: vi.fn() }),\n    );\n  });
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prismaMock.$transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) =>
+      callback({ ...prismaMock, $executeRaw: vi.fn() }),
+    );
+  });
 
   it("starts a run and increments observability", async () => {
     prismaMock.agentRun.findFirst.mockResolvedValueOnce(null);
