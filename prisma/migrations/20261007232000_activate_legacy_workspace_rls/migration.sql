@@ -77,15 +77,15 @@ ALTER TABLE "TaxSetting" ALTER COLUMN "workspaceId" DROP DEFAULT;
 ALTER TABLE "TaxSetting" ALTER COLUMN "workspaceId" SET DEFAULT COALESCE(current_workspace_id(), '00000000-0000-0000-0000-000000000001');
 CREATE INDEX "TaxSetting_workspaceId_idx" ON "TaxSetting"("workspaceId");
 
-ALTER TABLE "Integration" ADD COLUMN "workspaceId" TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001';
+-- "Integration"."workspaceId" already exists (20260924144000_workspace_ownership_credentials_integrations); only the transaction-bound default is switched here.
 ALTER TABLE "Integration" ALTER COLUMN "workspaceId" DROP DEFAULT;
 ALTER TABLE "Integration" ALTER COLUMN "workspaceId" SET DEFAULT COALESCE(current_workspace_id(), '00000000-0000-0000-0000-000000000001');
 CREATE INDEX "Integration_workspaceId_idx" ON "Integration"("workspaceId");
 
-ALTER TABLE "EncryptedCredential" ADD COLUMN "workspaceId" TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001';
+-- "EncryptedCredential"."workspaceId" already exists (20260924144000_workspace_ownership_credentials_integrations); only the transaction-bound default is switched here.
 ALTER TABLE "EncryptedCredential" ALTER COLUMN "workspaceId" DROP DEFAULT;
 ALTER TABLE "EncryptedCredential" ALTER COLUMN "workspaceId" SET DEFAULT COALESCE(current_workspace_id(), '00000000-0000-0000-0000-000000000001');
-CREATE INDEX "EncryptedCredential_workspaceId_idx" ON "EncryptedCredential"("workspaceId");
+-- "EncryptedCredential_workspaceId_idx" already created in 20260924144000_workspace_ownership_credentials_integrations.
 
 ALTER TABLE "Agent" ADD COLUMN "workspaceId" TEXT NOT NULL DEFAULT '00000000-0000-0000-0000-000000000001';
 ALTER TABLE "Agent" ALTER COLUMN "workspaceId" DROP DEFAULT;
