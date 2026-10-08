@@ -40,8 +40,8 @@ export async function startAgentRun(input:AgentRunStartInput,options:{workspaceI
  }).then(run=>{if(options.incrementObservability??true)incrementMetric("ugc_agent_runs_total");return run;});
 }
 
-export async function finishAgentRun(runId:string,input:AgentRunFinishInput,options:{incrementObservability?:boolean}={}):Promise<{id:string;status:AgentRunStatus;finishedAt:Date|null}>{
- const workspaceId=(options as {workspaceId?:string}).workspaceId;if(!workspaceId)throw new Error("WORKSPACE_CONTEXT_REQUIRED");
+export async function finishAgentRun(runId:string,input:AgentRunFinishInput,options:{workspaceId?:string;incrementObservability?:boolean}={}):Promise<{id:string;status:AgentRunStatus;finishedAt:Date|null}>{
+ const workspaceId=options.workspaceId;if(!workspaceId)throw new Error("WORKSPACE_CONTEXT_REQUIRED");
  const updated=await withWorkspaceTransaction(workspaceId,async tx=>{
   const run=await tx.agentRun.findUnique({where:{id:runId},select:{id:true,status:true,agentId:true}});if(!run)throw new Error("AGENT_RUN_NOT_FOUND");
   if(run.status!=="RUNNING")return {id:run.id,status:run.status as AgentRunStatus,finishedAt:null};
