@@ -33,7 +33,7 @@ vi.mock("@/lib/db/client", () => ({
     agentMemoryEntry: {
       create: vi.fn(),
       findMany: vi.fn(),
-      update: vi.fn(),
+      updateMany: vi.fn(),
       deleteMany: vi.fn(),
     },
   },
@@ -56,7 +56,7 @@ const prismaMock = prisma as unknown as {
   agentMemoryEntry: {
     create: ReturnType<typeof vi.fn>;
     findMany: ReturnType<typeof vi.fn>;
-    update: ReturnType<typeof vi.fn>;
+    updateMany: ReturnType<typeof vi.fn>;
     deleteMany: ReturnType<typeof vi.fn>;
   };
 };
@@ -96,7 +96,7 @@ describe("agents service — lifecycle transitions", () => {
     expect(prismaMock.agent.update).toHaveBeenCalledWith({
       where: { id: "a1" },
       data: { status: "RUNNING" },
-      select: { id: true, status: true },
+      select: { status: true },
     });
   });
 
@@ -124,7 +124,7 @@ describe("agents service — lifecycle transitions", () => {
   it("throws on illegal transition", async () => {
     prismaMock.agent.findFirst.mockResolvedValueOnce({ id: "a1", status: "ERROR" });
 
-    await expect(setAgentStatus("a1", "running")).rejects.toThrow(
+    await expect(setAgentStatus("a1", "running", { workspaceId: "11111111-1111-4111-8111-111111111111" })).rejects.toThrow(
       "ILLEGAL_AGENT_TRANSITION",
     );
   });
@@ -317,12 +317,12 @@ describe("agents service — memory CRUD", () => {
   });
 
   it("updates an entry tenant-isolated", async () => {
-    prismaMock.agentMemoryEntry.update.mockResolvedValueOnce({ id: "m1" });
+    prismaMock.agentMemoryEntry.updateMany.mockResolvedValueOnce({ count: 1 });
 
     await updateAgentMemoryEntry("m1", "11111111-1111-4111-8111-111111111111", { importance: 5 });
 
-    expect(prismaMock.agentMemoryEntry.update).toHaveBeenCalledWith({
-      where: { id: "m1" },
+    expect(prismaMock.agentMemoryEntry.updateMany).toHaveBeenCalledWith({
+      where: { id: "m1", workspaceId: "11111111-1111-4111-8111-111111111111" },
       data: { importance: 5 },
     });
   });

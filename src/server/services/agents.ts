@@ -13,7 +13,7 @@ export function canTransitionAgentStatus(from:AgentStatus,to:AgentStatus){return
 export async function setAgentStatus(id:string,lifecycle:AgentLifecycleStatus,options:{workspaceId?:string}={}):Promise<AgentStatus>{
  const target=LIFECYCLE_TO_STATUS[lifecycle]; const workspaceId=options.workspaceId; if(!workspaceId)throw new Error("WORKSPACE_CONTEXT_REQUIRED");
  return withWorkspaceTransaction(workspaceId,async tx=>{
-  const agent=await tx.agent.findFirst({where:{id},select:{id:true,status:true}}); if(!agent)throw new Error("AGENT_NOT_FOUND");
+  const agent=await tx.agent.findFirst({where:{id,workspaceId},select:{id:true,status:true}}); if(!agent)throw new Error("AGENT_NOT_FOUND");
   if(agent.status===target)return agent.status;
   if(!canTransitionAgentStatus(agent.status,target))throw new Error(`ILLEGAL_AGENT_TRANSITION: ${agent.status} -> ${target}`);
   return (await tx.agent.update({where:{id},data:{status:target},select:{status:true}})).status;
@@ -31,13 +31,15 @@ function agentRunLogs(input:AgentRunStartInput):Prisma.InputJsonValue|typeof Pri
 
 export async function startAgentRun(input:AgentRunStartInput,options:{workspaceId?:string;incrementObservability?:boolean}={}):Promise<{id:string;status:AgentRunStatus;startedAt:Date}>{
  const workspaceId=options.workspaceId;if(!workspaceId)throw new Error("WORKSPACE_CONTEXT_REQUIRED");
+ let created=false;
  return withWorkspaceTransaction(workspaceId,async tx=>{
   if(input.executionKey){const existing=await tx.agentRun.findFirst({where:{agentId:input.agentId,status:"RUNNING",logs:{path:["executionKey"],equals:input.executionKey}},select:{id:true,status:true,startedAt:true}});if(existing)return {id:existing.id,status:existing.status as AgentRunStatus,startedAt:existing.startedAt};}
   const agent=await tx.agent.findFirst({where:{id:input.agentId},select:{id:true}});if(!agent)throw new Error("AGENT_NOT_FOUND");
   const run=await tx.agentRun.create({data:{agentId:input.agentId,status:"RUNNING",summary:input.summary??null,logs:agentRunLogs(input)},select:{id:true,status:true,startedAt:true}});
   await tx.agent.update({where:{id:input.agentId},data:{status:"RUNNING",lastRunAt:new Date()}});
+  created=true;
   return {id:run.id,status:run.status as AgentRunStatus,startedAt:run.startedAt};
- }).then(run=>{if(options.incrementObservability??true)incrementMetric("ugc_agent_runs_total");return run;});
+ }).then(run=>{if(created&&(options.incrementObservability??true))incrementMetric("ugc_agent_runs_total");return run;});
 }
 
 export async function finishAgentRun(runId:string,input:AgentRunFinishInput,options:{workspaceId?:string;incrementObservability?:boolean}={}):Promise<{id:string;status:AgentRunStatus;finishedAt:Date|null}>{
@@ -49,7 +51,7 @@ export async function finishAgentRun(runId:string,input:AgentRunFinishInput,opti
   await tx.agent.update({where:{id:run.agentId},data:input.status==="SUCCESS"?{status:"IDLE",successCount:{increment:1}}:{status:"ERROR",errorCount:{increment:1}}});
   return {id:next.id,status:next.status as AgentRunStatus,finishedAt:next.finishedAt};
  });
- if(options.incrementObservability??true)incrementMetric(input.status==="SUCCESS"?"ugc_agent_runs_succeeded_total":"ugc_agent_runs_failed_total"); return updated;
+ if(updated.finishedAt!==null&&(options.incrementObservability??true))incrementMetric(input.status==="SUCCESS"?"ugc_agent_runs_succeeded_total":"ugc_agent_runs_failed_total"); return updated;
 }
 
 export async function createAgentMemoryEntry(input:{workspaceId:string;agentKey:string;type?:AgentMemoryType;key:string;value?:unknown;importance?:number;expiresAt?:Date|null}){return withWorkspaceTransaction(input.workspaceId,tx=>tx.agentMemoryEntry.create({data:{workspaceId:input.workspaceId,agentKey:input.agentKey,type:input.type??"FACT",key:input.key,value:nullableJson(input.value),importance:input.importance??1,expiresAt:input.expiresAt??null}}));}
