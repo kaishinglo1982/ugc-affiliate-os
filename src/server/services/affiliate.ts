@@ -19,9 +19,10 @@ export async function listAffiliateLinks() {
 }
 
 export async function listProductsForSelect() {
-  return prisma.product.findMany({
-    where: { status: { not: "ARCHIVED" } },
+  const workspaceId = await resolveWorkspaceId();
+  return withWorkspaceTransaction(workspaceId, (tx) => tx.product.findMany({
+    where: { workspaceId, status: { not: "ARCHIVED" } },
     select: { id: true, name: true },
     orderBy: { name: "asc" },
-  });
+  }));
 }
