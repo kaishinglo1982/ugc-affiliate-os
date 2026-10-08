@@ -189,6 +189,35 @@ CREATE TYPE "MediaAudioAssetType" AS ENUM ('voice', 'music', 'sound_effect', 'am
 -- the enum.
 
 
+ALTER TYPE "ApprovalResourceType" ADD VALUE 'campaign_candidate';
+ALTER TYPE "ApprovalResourceType" ADD VALUE 'campaign_strategy';
+ALTER TYPE "ApprovalResourceType" ADD VALUE 'creative_angle';
+ALTER TYPE "ApprovalResourceType" ADD VALUE 'creative_brief';
+ALTER TYPE "ApprovalResourceType" ADD VALUE 'content_batch';
+ALTER TYPE "ApprovalResourceType" ADD VALUE 'production_task_override';
+ALTER TYPE "ApprovalResourceType" ADD VALUE 'production_schedule_override';
+ALTER TYPE "ApprovalResourceType" ADD VALUE 'campaign_quality_override';
+ALTER TYPE "ApprovalResourceType" ADD VALUE 'campaign_production';
+ALTER TYPE "ApprovalResourceType" ADD VALUE 'media_production_plan';
+ALTER TYPE "ApprovalResourceType" ADD VALUE 'voice_profile';
+ALTER TYPE "ApprovalResourceType" ADD VALUE 'avatar_profile';
+ALTER TYPE "ApprovalResourceType" ADD VALUE 'consent_record';
+ALTER TYPE "ApprovalResourceType" ADD VALUE 'media_generation_job';
+ALTER TYPE "ApprovalResourceType" ADD VALUE 'render_specification';
+ALTER TYPE "ApprovalResourceType" ADD VALUE 'media_timeline';
+ALTER TYPE "ApprovalResourceType" ADD VALUE 'render_job';
+ALTER TYPE "ApprovalResourceType" ADD VALUE 'subtitle_track';
+ALTER TYPE "ApprovalResourceType" ADD VALUE 'media_asset';
+ALTER TYPE "ApprovalResourceType" ADD VALUE 'media_variant';
+
+-- AlterEnum
+-- This migration adds more than one value to an enum.
+-- With PostgreSQL versions 11 and earlier, this is not possible
+-- in a single migration. This can be worked around by creating
+-- multiple migrations, each migration adding only one value to
+-- the enum.
+
+
 ALTER TYPE "ContentBriefStatus" ADD VALUE 'UNDER_REVIEW';
 ALTER TYPE "ContentBriefStatus" ADD VALUE 'REJECTED';
 ALTER TYPE "ContentBriefStatus" ADD VALUE 'SUPERSEDED';
