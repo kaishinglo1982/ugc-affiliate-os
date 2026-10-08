@@ -9,7 +9,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: 1,
   reporter: process.env.CI
-    ? [["github"], ["list"], ["html", { open: "never", outputFolder: "playwright-report" }]]
+    ? [["github"], ["./e2e/ci-diagnostic-reporter.ts"], ["list"], ["html", { open: "never", outputFolder: "playwright-report" }]]
     : [["list"], ["html", { open: "never", outputFolder: "playwright-report" }]],
   use: {
     baseURL,
