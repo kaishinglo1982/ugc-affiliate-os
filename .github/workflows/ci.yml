@@ -79,8 +79,9 @@ jobs:
         # tables) are a known, separately tracked reverse drift and are intentionally not gated here.
         run: |
           pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script > /tmp/schema-diff.sql
-          if grep -En '^(CREATE TABLE|CREATE (UNIQUE )?INDEX|CREATE TYPE "[A-Za-z]+" AS ENUM|ALTER TYPE "[A-Za-z]+" ADD VALUE)' /tmp/schema-diff.sql; then
-            echo "::error::schema.prisma declares objects that no migration creates"
+          if grep -En '^(CREATE TABLE|CREATE (UNIQUE )?INDEX|CREATE TYPE "[A-Za-z]+" AS ENUM|ALTER TYPE "[A-Za-z]+" ADD VALUE)' /tmp/schema-diff.sql > /tmp/schema-gaps.txt; then
+            gaps=$(head -c 3000 /tmp/schema-gaps.txt | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=Schema drift::schema.prisma declares objects that no migration creates:%0A${gaps}"
             exit 1
           fi
 
