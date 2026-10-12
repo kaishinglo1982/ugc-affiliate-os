@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { resolveWorkspaceId } from "@/lib/auth/tenant";
-import { prisma } from "@/lib/db/client";
 import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 import { toCsv } from "@/lib/csv";
 
