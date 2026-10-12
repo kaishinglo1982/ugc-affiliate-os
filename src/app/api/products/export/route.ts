@@ -1,18 +1,21 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
+import { requireApiPermission } from "@/lib/api/guard";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 import { toCsv } from "@/lib/csv";
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Nicht authentifiziert." }, { status: 401 });
-  }
+  const guard = await requireApiPermission("products.read");
+  if (guard) return guard.response;
 
-  const products = await prisma.product.findMany({
-    include: { scores: { orderBy: { createdAt: "desc" }, take: 1 } },
-    orderBy: { createdAt: "desc" },
-  });
+  const workspaceId = await resolveWorkspaceId();
+  const products = await withWorkspaceTransaction(workspaceId, (tx) =>
+    tx.product.findMany({
+      where: { workspaceId },
+      include: { scores: { orderBy: { createdAt: "desc" }, take: 1 } },
+      orderBy: { createdAt: "desc" },
+    }),
+  );
 
   const header = [
     "name",
