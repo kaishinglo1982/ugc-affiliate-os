@@ -200,11 +200,13 @@ export async function analyzeExperimentById(experimentId: string, workspaceId: s
   const variants: VariantStat[] = [];
   for (const v of exp.variants) {
     const snapshot = v.contentVariantId
-      ? await prisma.contentPerformanceSnapshot.aggregate({
-          where: { contentVariantId: v.contentVariantId },
-          _sum: { impressions: true, linkClicks: true, conversions: true, views: true },
-          _count: { _all: true },
-        })
+      ? await withWorkspaceTransaction(workspaceId, (tx) =>
+          tx.contentPerformanceSnapshot.aggregate({
+            where: { workspaceId, contentVariantId: v.contentVariantId },
+            _sum: { impressions: true, linkClicks: true, conversions: true, views: true },
+            _count: { _all: true },
+          }),
+        )
       : null;
     const impressions = BigInt(snapshot?._sum.impressions?.toString() ?? "0");
     const linkClicks = BigInt(snapshot?._sum.linkClicks?.toString() ?? "0");
