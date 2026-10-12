@@ -73,6 +73,9 @@ jobs:
       - name: Apply migrations
         run: pnpm run db:migrate:deploy
 
+      - name: Verify RLS for every workspace-scoped Prisma table
+        run: node tests/all-workspace-rls-catalog.test.mjs
+
       - name: Schema drift gate (every schema object must be created by a migration)
         # Fails when schema.prisma declares tables, enums, indexes or enum values that no migration
         # creates. Objects that exist only in migrations (Phase 10 workflow engine, agent capability
