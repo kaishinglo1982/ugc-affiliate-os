@@ -4,6 +4,7 @@ import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
 import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
 import { prisma } from "@/lib/db/client";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 import { writeAuditLog } from "@/lib/audit/log";
 import { getCurrentUser } from "@/lib/auth/current-user";
 
@@ -33,19 +34,23 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 400 });
   }
 
-  const existing = await prisma.analyticsAnomaly.findFirst({ where: { id, workspaceId: workspaceId } });
+  const existing = await withWorkspaceTransaction(workspaceId, (tx) =>
+    tx.analyticsAnomaly.findFirst({ where: { id, workspaceId } }),
+  );
   if (!existing) {
     return NextResponse.json({ error: "Anomalie nicht gefunden." }, { status: 404 });
   }
 
   const user = await getCurrentUser();
-  const anomaly = await prisma.analyticsAnomaly.update({
-    where: { id },
-    data: {
-      status: parsed.data.status,
-      resolvedAt: parsed.data.status === "RESOLVED" ? new Date() : null,
-    },
-  });
+  const anomaly = await withWorkspaceTransaction(workspaceId, (tx) =>
+    tx.analyticsAnomaly.update({
+      where: { id },
+      data: {
+        status: parsed.data.status,
+        resolvedAt: parsed.data.status === "RESOLVED" ? new Date() : null,
+      },
+    }),
+  );
   await writeAuditLog({
     action: "analytics.anomaly.updated",
     entityType: "AnalyticsAnomaly",
