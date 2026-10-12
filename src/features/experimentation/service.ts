@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db/client";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 import { featureFlags } from "@/lib/config/feature-flags";
 import { writeAuditLog } from "@/lib/audit/log";
 import { incrementMetric, METRICS, logStructured } from "@/lib/observability/metrics";
