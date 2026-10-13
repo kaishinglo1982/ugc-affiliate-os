@@ -1,5 +1,6 @@
 import "server-only";
 import { prisma } from "@/lib/db/client";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 import { Decimal } from "@/lib/shared/decimal";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
@@ -14,11 +15,13 @@ function big(v: { toString(): string } | null | undefined): bigint {
 }
 
 async function buildContext(workspaceId: string): Promise<RecommendationContext> {
-  const content = await prisma.contentPerformanceSnapshot.findMany({
-    where: { workspaceId },
-    orderBy: { commissionRevenue: "desc" },
-    take: 200,
-  });
+  const content = await withWorkspaceTransaction(workspaceId, (tx) =>
+    tx.contentPerformanceSnapshot.findMany({
+      where: { workspaceId },
+      orderBy: { commissionRevenue: "desc" },
+      take: 200,
+    }),
+  );
   const brandImpressions = content.reduce((s, c) => s + big(c.impressions), 0n);
   const brandClicks = content.reduce((s, c) => s + big(c.linkClicks), 0n);
   const brandConversions = content.reduce((s, c) => s + big(c.conversions), 0n);
@@ -36,7 +39,9 @@ async function buildContext(workspaceId: string): Promise<RecommendationContext>
     attributionErrors: 0,
   }));
 
-  const products = await prisma.productPerformanceSnapshot.findMany({ where: { workspaceId }, take: 200 });
+  const products = await withWorkspaceTransaction(workspaceId, (tx) =>
+    tx.productPerformanceSnapshot.findMany({ where: { workspaceId }, take: 200 }),
+  );
   const productPerf = products.map((p) => ({
     productId: p.productId,
     views: big(p.views),

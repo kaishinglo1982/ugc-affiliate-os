@@ -5,9 +5,23 @@ import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { saveHuggingFaceSettingsSchema, disconnectIntegrationSchema } from "@/lib/validation/integrations";
 import { encryptSecret } from "@/lib/encryption/aes";
 import { runMutation } from "@/server/actions/action-helpers";
+import { requireApiPermission } from "@/lib/api/guard";
+import { Permission } from "@/lib/auth/rbac";
+import { getCurrentUser } from "@/lib/auth/current-user";
+import { writeAuditLog } from "@/lib/audit/log";
+import { fail, newRequestId } from "@/types/result";
 import { revalidatePath } from "next/cache";
 
+/** Credential management requires an authenticated caller with workspace.manage. */
+async function denyUnlessCredentialManager(): Promise<string | null> {
+  const denied = await requireApiPermission(Permission.MANAGE_WORKSPACE);
+  if (!denied) return null;
+  return denied.response.status === 401 ? "Nicht authentifiziert." : "Keine Berechtigung.";
+}
+
 export async function saveHuggingFaceSettingsAction(_prevState: unknown, formData: FormData) {
+  const deniedMessage = await denyUnlessCredentialManager();
+  if (deniedMessage) return { success: false, error: deniedMessage };
   const parsed = saveHuggingFaceSettingsSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) return { success: false, error: "Eingabe ungültig.", fieldErrors: parsed.error.flatten().fieldErrors as Record<string, string[]> };
   const { apiKey, model, temperature, maxTokens, autoSuggestHooks } = parsed.data;
@@ -33,10 +47,20 @@ export async function saveHuggingFaceSettingsAction(_prevState: unknown, formDat
       data: { credentialId, status: credentialId ? "CONNECTED" : integration.status, config: { model, temperature, maxTokens, autoSuggestHooks } },
     });
   });
+  const user = await getCurrentUser();
+  await writeAuditLog({
+    action: "integration.huggingface.save",
+    entityType: "Integration",
+    entityId: "huggingface",
+    requestId: newRequestId(),
+    actor: user?.email,
+  });
   revalidatePath("/app/integrations"); return { success: true };
 }
 
 export async function disconnectIntegrationAction(providerKey: string) {
+  const deniedMessage = await denyUnlessCredentialManager();
+  if (deniedMessage) return fail(deniedMessage, newRequestId());
   const workspaceId = await resolveWorkspaceId();
   return runMutation({
     schema: disconnectIntegrationSchema, input: { providerKey }, auditAction: "integration.disconnect", entityType: "Integration",

@@ -73,6 +73,21 @@ jobs:
       - name: Apply migrations
         run: pnpm run db:migrate:deploy
 
+      - name: Schema drift gate (every schema object must be created by a migration)
+        # Fails when schema.prisma declares tables, enums, indexes or enum values that no migration
+        # creates. Objects that exist only in migrations (Phase 10 workflow engine, agent capability
+        # tables) are a known, separately tracked reverse drift and are intentionally not gated here.
+        run: |
+          # Fail closed if Prisma cannot compute the diff. Without pipefail/set -e, a failed
+          # command could leave an empty file and accidentally make the drift gate pass.
+          set -euo pipefail
+          pnpm exec prisma migrate diff --from-config-datasource --to-schema prisma/schema.prisma --script > /tmp/schema-diff.sql
+          if grep -En '^(CREATE TABLE|CREATE (UNIQUE )?INDEX|CREATE TYPE "[A-Za-z]+" AS ENUM|ALTER TYPE "[A-Za-z]+" ADD VALUE)' /tmp/schema-diff.sql > /tmp/schema-gaps.txt; then
+            gaps=$(head -c 3000 /tmp/schema-gaps.txt | sed 's/%/%25/g' | awk '{printf "%s%%0A", $0}')
+            echo "::error title=Schema drift::schema.prisma declares objects that no migration creates:%0A${gaps}"
+            exit 1
+          fi
+
       - name: Typecheck
         run: pnpm run typecheck
 
