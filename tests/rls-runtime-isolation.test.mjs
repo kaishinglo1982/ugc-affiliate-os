@@ -30,8 +30,8 @@ try {
 
   await client.query('DELETE FROM "Product" WHERE id = ANY($1::text[])', [[productA, productB]]);
   await client.query(
-    `INSERT INTO "Product" (id, "workspaceId", "canonicalName", name)
-     VALUES ($1, $2, $3, $3), ($4, $5, $6, $6)`,
+    `INSERT INTO "Product" (id, "workspaceId", "canonicalName", name, "updatedAt")
+     VALUES ($1, $2, $3, $3, NOW()), ($4, $5, $6, $6, NOW())`,
     [productA, workspaceA, "RLS runtime fixture A", productB, workspaceB, "RLS runtime fixture B"],
   );
 
@@ -45,12 +45,15 @@ try {
     const visible = await client.query('SELECT id FROM "Product" WHERE id = ANY($1::text[]) ORDER BY id', [[productA, productB]]);
     assert.deepEqual(visible.rows.map((row) => row.id), [productA], "workspace A must see only its own fixture");
 
-    const updateForeign = await client.query('UPDATE "Product" SET name = $1 WHERE id = $2', ["cross-tenant write", productB]);
+    const updateForeign = await client.query('UPDATE "Product" SET name = $1, "updatedAt" = NOW() WHERE id = $2', ["cross-tenant write", productB]);
     assert.equal(updateForeign.rowCount, 0, "workspace A must not update workspace B rows");
+
+    const deleteForeign = await client.query('DELETE FROM "Product" WHERE id = $1', [productB]);
+    assert.equal(deleteForeign.rowCount, 0, "workspace A must not delete workspace B rows");
 
     await assert.rejects(
       client.query(
-        'INSERT INTO "Product" (id, "workspaceId", "canonicalName", name) VALUES ($1, $2, $3, $3)',
+        'INSERT INTO "Product" (id, "workspaceId", "canonicalName", name, "updatedAt") VALUES ($1, $2, $3, $3, NOW())',
         ["20000000-0000-4000-8000-000000000103", workspaceB, "RLS forbidden insert"],
       ),
       (error) => error?.code === "42501",
@@ -60,7 +63,7 @@ try {
     await client.query("ROLLBACK");
   }
 
-  console.log("Workspace RLS runtime isolation: PASS (missing context, cross-workspace read/update/insert)");
+  console.log("Workspace RLS runtime isolation: PASS (missing context, cross-workspace read/update/delete/insert)");
 } finally {
   await client.query('DELETE FROM "Product" WHERE id = ANY($1::text[])', [[productA, productB]]);
   await client.end();
