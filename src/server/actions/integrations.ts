@@ -7,12 +7,20 @@ import {
 } from "@/lib/validation/integrations";
 import { encryptSecret } from "@/lib/encryption/aes";
 import { runMutation } from "@/server/actions/action-helpers";
+import { getCurrentUser } from "@/lib/auth/current-user";
 import { revalidatePath } from "next/cache";
 
 export async function saveHuggingFaceSettingsAction(
   _prevState: unknown,
   formData: FormData,
 ) {
+  // Server Actions are callable directly; never rely on the integrations page
+  // being behind a UI route guard.
+  const user = await getCurrentUser();
+  if (!user) {
+    return { success: false, error: "Nicht authentifiziert." };
+  }
+
   const parsed = saveHuggingFaceSettingsSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
     return {
