@@ -559,6 +559,7 @@ enum RevenueStatus {
 }
 
 model Revenue {
+  workspaceId   String   @default("00000000-0000-0000-0000-000000000001")
   id            String        @id @default(uuid())
   date          DateTime
   programId     String?
@@ -595,6 +596,7 @@ enum ExpenseCategory {
 }
 
 model Expense {
+  workspaceId   String   @default("00000000-0000-0000-0000-000000000001")
   id           String          @id @default(uuid())
   date         DateTime
   category     ExpenseCategory

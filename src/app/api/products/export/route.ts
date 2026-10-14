@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/db/client";
 import { toCsv } from "@/lib/csv";
+import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -9,7 +10,18 @@ export async function GET() {
     return NextResponse.json({ error: "Nicht authentifiziert." }, { status: 401 });
   }
 
+  let workspaceId: string;
+  try {
+    workspaceId = await resolveWorkspaceId();
+  } catch (error) {
+    if (error instanceof InvalidTenantTokenError) {
+      return NextResponse.json({ error: "Ungültiges Tenant-Token." }, { status: 401 });
+    }
+    throw error;
+  }
+
   const products = await prisma.product.findMany({
+    where: { workspaceId },
     include: { scores: { orderBy: { createdAt: "desc" }, take: 1 } },
     orderBy: { createdAt: "desc" },
   });
