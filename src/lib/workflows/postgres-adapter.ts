@@ -1,5 +1,7 @@
 import type { PoolClient, QueryResultRow } from "pg";
 
+import { withWorkspacePgTransaction } from "@/lib/db/workspace-pg-transaction";
+
 import type {
   PersistedWorkflowDefinition,
   PersistedWorkflowRun,
@@ -109,12 +111,12 @@ export class PostgresWorkflowPersistenceAdapter
     key: string;
     version: number;
   }): Promise<PersistedWorkflowDefinition | null> {
-    const result = await this.pool.query<DefinitionRow>(
+    const result = await withWorkspacePgTransaction(this.pool, input.workspaceId, async (client) => client.query<DefinitionRow>(
       `${definitionSelect}
        WHERE d."workspaceId" = $1 AND d."key" = $2 AND d."version" = $3
        GROUP BY d."id"`,
       [input.workspaceId, input.key, input.version],
-    );
+    ));
     return result.rows[0] ? mapDefinition(result.rows[0]) : null;
   }
 
@@ -123,9 +125,7 @@ export class PostgresWorkflowPersistenceAdapter
     definition: WorkflowDefinitionInput;
     definitionHash: string;
   }): Promise<PersistedWorkflowDefinition> {
-    const client = await this.pool.connect();
-    try {
-      await client.query("BEGIN");
+    await withWorkspacePgTransaction(this.pool, input.workspaceId, async (client) => {
       const created = await client.query<{ id: string }>(
         `INSERT INTO "WorkflowDefinition"
           ("id", "workspaceId", "key", "version", "name", "description",
@@ -166,21 +166,15 @@ export class PostgresWorkflowPersistenceAdapter
           ],
         );
       }
-      await client.query("COMMIT");
+    });
 
-      const persisted = await this.findDefinition({
-        workspaceId: input.workspaceId,
-        key: input.definition.key,
-        version: input.definition.version,
-      });
-      if (!persisted) throw new Error("Created workflow definition could not be reloaded.");
-      return persisted;
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
-    } finally {
-      client.release();
-    }
+    const persisted = await this.findDefinition({
+      workspaceId: input.workspaceId,
+      key: input.definition.key,
+      version: input.definition.version,
+    });
+    if (!persisted) throw new Error("Created workflow definition could not be reloaded.");
+    return persisted;
   }
 
   async activateDefinition(input: {
@@ -189,9 +183,7 @@ export class PostgresWorkflowPersistenceAdapter
     expectedVersion: number;
     activatedAt: Date;
   }): Promise<PersistedWorkflowDefinition> {
-    const client = await this.pool.connect();
-    try {
-      await client.query("BEGIN");
+    const key = await withWorkspacePgTransaction(this.pool, input.workspaceId, async (client) => {
       const target = await client.query<{ key: string; version: number }>(
         `SELECT "key", "version" FROM "WorkflowDefinition"
          WHERE "id" = $1 AND "workspaceId" = $2
@@ -216,21 +208,16 @@ export class PostgresWorkflowPersistenceAdapter
          WHERE "id" = $2 AND "workspaceId" = $3 AND "version" = $4`,
         [input.activatedAt, input.workflowId, input.workspaceId, input.expectedVersion],
       );
-      await client.query("COMMIT");
+      return row.key;
+    });
 
-      const result = await this.pool.query<DefinitionRow>(
-        `${definitionSelect} WHERE d."id" = $1 AND d."workspaceId" = $2 GROUP BY d."id"`,
-        [input.workflowId, input.workspaceId],
-      );
-      const activated = result.rows[0];
-      if (!activated) throw new Error("Activated workflow definition could not be reloaded.");
-      return mapDefinition(activated);
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
-    } finally {
-      client.release();
-    }
+    const activated = await this.findDefinition({
+      workspaceId: input.workspaceId,
+      key,
+      version: input.expectedVersion,
+    });
+    if (!activated) throw new Error("Activated workflow definition could not be reloaded.");
+    return activated;
   }
 
   async createRun(input: {
@@ -242,7 +229,7 @@ export class PostgresWorkflowPersistenceAdapter
     correlationId: string;
     idempotencyKey: string | null;
   }): Promise<PersistedWorkflowRun> {
-    const result = await this.pool.query<RunRow>(
+    const result = await withWorkspacePgTransaction(this.pool, input.workspaceId, async (client) => client.query<RunRow>(
       `INSERT INTO "WorkflowRun"
         ("id", "workspaceId", "workflowId", "workflowVersion", "definitionSnapshot",
          "definitionHash", "correlationId", "idempotencyKey", "status", "startedAt")
@@ -260,7 +247,7 @@ export class PostgresWorkflowPersistenceAdapter
         input.correlationId,
         input.idempotencyKey,
       ],
-    );
+    ));
     const row = result.rows[0];
     if (!row) throw new Error("Workflow run insert returned no row.");
     return mapRun(row);
@@ -270,13 +257,13 @@ export class PostgresWorkflowPersistenceAdapter
     workspaceId: string;
     idempotencyKey: string;
   }): Promise<PersistedWorkflowRun | null> {
-    const result = await this.pool.query<RunRow>(
+    const result = await withWorkspacePgTransaction(this.pool, input.workspaceId, async (client) => client.query<RunRow>(
       `SELECT "id", "workspaceId", "workflowId", "workflowVersion",
               "definitionSnapshot", "definitionHash", "correlationId", "idempotencyKey"
        FROM "WorkflowRun"
        WHERE "workspaceId" = $1 AND "idempotencyKey" = $2`,
       [input.workspaceId, input.idempotencyKey],
-    );
+    ));
     return result.rows[0] ? mapRun(result.rows[0]) : null;
   }
 }
