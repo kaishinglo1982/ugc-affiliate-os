@@ -183,3 +183,12 @@ Required green evidence:
 No P0/P1 blockers.
 
 Still **no Vercel Production deployment** until the global CarryOS Universe 10/10 gate is green.
+
+## Workspace RLS completion gate — 2026-10-14
+
+The current beta hardening branch adds a follow-up migration that discovers every public PostgreSQL table with a `workspaceId` column, enables and forces RLS, and applies both a same-workspace permissive policy and a restrictive same-workspace policy. The restrictive policy is intended to prevent an additional permissive policy from widening tenant access.
+
+The CI RLS inventory test is wired into the Validate workflow after migrations. It checks the live catalog for all workspace-owned tables, requires RLS enabled and forced, requires both workspace-bound policies, and verifies the test role is neither superuser nor `BYPASSRLS`. Cross-workspace reads/writes remain covered by the existing Campaign/Revenue smoke test.
+
+**Evidence status:** implementation is committed on the open PR branch; the new workflow step has not yet been confirmed by an exact-head CI run. Do not mark the beta RLS gate complete until that run passes.
+
