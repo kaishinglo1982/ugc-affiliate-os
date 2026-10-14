@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
-import { prisma } from "@/lib/db/client";
+import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
 
 export const dynamic = "force-dynamic";
 
@@ -14,6 +15,13 @@ function parseIntOr(value: string | null, fallback: number): number {
 export async function GET(request: Request) {
   const guard = await requireApiPermission(Permission.VIEW_AUDIT_LOG);
   if (guard) return guard.response;
+
+  let workspaceId: string;
+  try { workspaceId = await resolveWorkspaceId(); }
+  catch (e) {
+    if (e instanceof InvalidTenantTokenError) return NextResponse.json({ error: "Ungültiges Tenant-Token." }, { status: 401 });
+    throw e;
+  }
 
   const { searchParams } = new URL(request.url);
   const limit = Math.min(Math.max(parseIntOr(searchParams.get("limit"), 50), 1), 200);
@@ -30,20 +38,16 @@ export async function GET(request: Request) {
     ...(entityType ? { entityType } : {}),
     ...(entityId ? { entityId } : {}),
     ...(actor ? { actor } : {}),
-    ...(from || to
-      ? {
-          createdAt: {
-            ...(from ? { gte: new Date(from) } : {}),
-            ...(to ? { lte: new Date(to) } : {}),
-          },
-        }
-      : {}),
+    ...(from || to ? { createdAt: { ...(from ? { gte: new Date(from) } : {}), ...(to ? { lte: new Date(to) } : {}) } } : {}),
   };
 
-  const [items, total] = await Promise.all([
-    prisma.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, take: limit, skip: offset }),
-    prisma.auditLog.count({ where }),
-  ]);
+  const result = await withWorkspaceTransaction(workspaceId, async (tx) => {
+    const [items, total] = await Promise.all([
+      tx.auditLog.findMany({ where, orderBy: { createdAt: "desc" }, take: limit, skip: offset }),
+      tx.auditLog.count({ where }),
+    ]);
+    return { items, total };
+  });
 
-  return NextResponse.json({ items, total, limit, offset });
+  return NextResponse.json({ ...result, limit, offset });
 }

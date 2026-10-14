@@ -1,12 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { listAgentRuns } from "@/server/services/agents";
 import { Badge } from "@/components/ui/badge";
 
 export const metadata: Metadata = { title: "Agent Runs" };
 
 export default async function AgentRunsPage() {
-  const runs = await listAgentRuns();
+  const workspaceId = await resolveWorkspaceId();
+  const runs = await listAgentRuns(workspaceId);
 
   return (
     <div className="space-y-6">

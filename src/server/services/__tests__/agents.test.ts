@@ -16,6 +16,7 @@ import { incrementMetric } from "@/lib/observability/metrics";
 
 vi.mock("@/lib/db/client", () => ({
   prisma: {
+    $transaction: vi.fn(),
     agent: {
       findFirst: vi.fn(),
       update: vi.fn(),
@@ -32,7 +33,7 @@ vi.mock("@/lib/db/client", () => ({
     agentMemoryEntry: {
       create: vi.fn(),
       findMany: vi.fn(),
-      update: vi.fn(),
+      updateMany: vi.fn(),
       deleteMany: vi.fn(),
     },
   },
@@ -51,10 +52,11 @@ const prismaMock = prisma as unknown as {
     update: ReturnType<typeof vi.fn>;
   };
   agentToolDefinition: { findMany: ReturnType<typeof vi.fn> };
+  $transaction: ReturnType<typeof vi.fn>;
   agentMemoryEntry: {
     create: ReturnType<typeof vi.fn>;
     findMany: ReturnType<typeof vi.fn>;
-    update: ReturnType<typeof vi.fn>;
+    updateMany: ReturnType<typeof vi.fn>;
     deleteMany: ReturnType<typeof vi.fn>;
   };
 };
@@ -62,6 +64,9 @@ const prismaMock = prisma as unknown as {
 describe("agents service — lifecycle transitions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    prismaMock.$transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) =>
+      callback({ ...prismaMock, $executeRaw: vi.fn() }),
+    );
   });
 
   it("recognizes valid lifecycle statuses", () => {
@@ -85,13 +90,13 @@ describe("agents service — lifecycle transitions", () => {
     prismaMock.agent.findFirst.mockResolvedValueOnce({ id: "a1", status: "IDLE" });
     prismaMock.agent.update.mockResolvedValueOnce({ id: "a1", status: "RUNNING" });
 
-    const result = await setAgentStatus("a1", "running", { workspaceId: "ws1" });
+    const result = await setAgentStatus("a1", "running", { workspaceId: "11111111-1111-4111-8111-111111111111" });
 
     expect(result).toBe("RUNNING");
     expect(prismaMock.agent.update).toHaveBeenCalledWith({
       where: { id: "a1" },
       data: { status: "RUNNING" },
-      select: { id: true, status: true },
+      select: { status: true },
     });
   });
 
@@ -99,10 +104,10 @@ describe("agents service — lifecycle transitions", () => {
     prismaMock.agent.findFirst.mockResolvedValueOnce({ id: "a1", status: "IDLE" });
     prismaMock.agent.update.mockResolvedValueOnce({ id: "a1", status: "PAUSED" });
 
-    await setAgentStatus("a1", "paused", { workspaceId: "ws-99" });
+    await setAgentStatus("a1", "paused", { workspaceId: "22222222-2222-4222-8222-222222222222" });
 
     expect(prismaMock.agent.findFirst).toHaveBeenCalledWith({
-      where: { id: "a1", workspaceId: "ws-99" },
+      where: { id: "a1", workspaceId: "22222222-2222-4222-8222-222222222222" },
       select: { id: true, status: true },
     });
   });
@@ -110,7 +115,7 @@ describe("agents service — lifecycle transitions", () => {
   it("is idempotent for same status", async () => {
     prismaMock.agent.findFirst.mockResolvedValueOnce({ id: "a1", status: "RUNNING" });
 
-    const result = await setAgentStatus("a1", "running");
+    const result = await setAgentStatus("a1", "running", { workspaceId: "11111111-1111-4111-8111-111111111111" });
 
     expect(result).toBe("RUNNING");
     expect(prismaMock.agent.update).not.toHaveBeenCalled();
@@ -119,7 +124,7 @@ describe("agents service — lifecycle transitions", () => {
   it("throws on illegal transition", async () => {
     prismaMock.agent.findFirst.mockResolvedValueOnce({ id: "a1", status: "ERROR" });
 
-    await expect(setAgentStatus("a1", "running")).rejects.toThrow(
+    await expect(setAgentStatus("a1", "running", { workspaceId: "11111111-1111-4111-8111-111111111111" })).rejects.toThrow(
       "ILLEGAL_AGENT_TRANSITION",
     );
   });
@@ -127,12 +132,17 @@ describe("agents service — lifecycle transitions", () => {
   it("throws when agent not found", async () => {
     prismaMock.agent.findFirst.mockResolvedValueOnce(null);
 
-    await expect(setAgentStatus("missing", "running")).rejects.toThrow("AGENT_NOT_FOUND");
+    await expect(setAgentStatus("missing", "running", { workspaceId: "11111111-1111-4111-8111-111111111111" })).rejects.toThrow("AGENT_NOT_FOUND");
   });
 });
 
 describe("agents service — capabilities", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prismaMock.$transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) =>
+      callback({ ...prismaMock, $executeRaw: vi.fn() }),
+    );
+  });
 
   it("returns tools as capabilities with resolved permissions", async () => {
     prismaMock.agentToolDefinition.findMany.mockResolvedValueOnce([
@@ -150,7 +160,7 @@ describe("agents service — capabilities", () => {
       },
     ]);
 
-    const caps = await getAgentCapabilities("ws1");
+    const caps = await getAgentCapabilities("11111111-1111-4111-8111-111111111111");
 
     expect(caps).toHaveLength(1);
     expect(caps[0]).toMatchObject({
@@ -169,7 +179,12 @@ describe("agents service — capabilities", () => {
 });
 
 describe("agents service — execution records", () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    prismaMock.$transaction.mockImplementation(async (callback: (tx: unknown) => Promise<unknown>) =>
+      callback({ ...prismaMock, $executeRaw: vi.fn() }),
+    );
+  });
 
   it("starts a run and increments observability", async () => {
     prismaMock.agentRun.findFirst.mockResolvedValueOnce(null);
@@ -181,7 +196,7 @@ describe("agents service — execution records", () => {
     });
     prismaMock.agent.update.mockResolvedValueOnce({});
 
-    const run = await startAgentRun({ agentId: "a1", executionKey: "ek-1" });
+    const run = await startAgentRun({ agentId: "a1", executionKey: "ek-1" }, { workspaceId: "11111111-1111-4111-8111-111111111111" });
 
     expect(run.status).toBe("RUNNING");
     expect(incrementMetric).toHaveBeenCalledWith("ugc_agent_runs_total");
@@ -203,7 +218,7 @@ describe("agents service — execution records", () => {
       startedAt: new Date("2026-01-01T00:00:00Z"),
     });
 
-    const run = await startAgentRun({ agentId: "a1", executionKey: "ek-1" });
+    const run = await startAgentRun({ agentId: "a1", executionKey: "ek-1" }, { workspaceId: "11111111-1111-4111-8111-111111111111" });
 
     expect(run.id).toBe("r1");
     expect(run.status).toBe("RUNNING");
@@ -233,7 +248,7 @@ describe("agents service — execution records", () => {
     });
     prismaMock.agent.update.mockResolvedValueOnce({});
 
-    const result = await finishAgentRun("r1", { status: "SUCCESS" });
+    const result = await finishAgentRun("r1", { status: "SUCCESS" }, { workspaceId: "11111111-1111-4111-8111-111111111111" });
 
     expect(result.status).toBe("SUCCESS");
     expect(incrementMetric).toHaveBeenCalledWith("ugc_agent_runs_succeeded_total");
@@ -250,7 +265,7 @@ describe("agents service — execution records", () => {
       agentId: "a1",
     });
 
-    const result = await finishAgentRun("r1", { status: "SUCCESS" });
+    const result = await finishAgentRun("r1", { status: "SUCCESS" }, { workspaceId: "11111111-1111-4111-8111-111111111111" });
 
     expect(result.finishedAt).toBeNull();
     expect(prismaMock.agentRun.update).not.toHaveBeenCalled();
@@ -260,7 +275,7 @@ describe("agents service — execution records", () => {
   it("throws when finishing a missing run", async () => {
     prismaMock.agentRun.findUnique.mockResolvedValueOnce(null);
 
-    await expect(finishAgentRun("missing", { status: "SUCCESS" })).rejects.toThrow(
+    await expect(finishAgentRun("missing", { status: "SUCCESS" }, { workspaceId: "11111111-1111-4111-8111-111111111111" })).rejects.toThrow(
       "AGENT_RUN_NOT_FOUND",
     );
   });
@@ -273,7 +288,7 @@ describe("agents service — memory CRUD", () => {
     prismaMock.agentMemoryEntry.create.mockResolvedValueOnce({ id: "m1" });
 
     await createAgentMemoryEntry({
-      workspaceId: "ws1",
+      workspaceId: "11111111-1111-4111-8111-111111111111",
       agentKey: "researcher",
       key: "pref_lang",
       value: { lang: "de" },
@@ -281,7 +296,7 @@ describe("agents service — memory CRUD", () => {
 
     expect(prismaMock.agentMemoryEntry.create).toHaveBeenCalledWith({
       data: expect.objectContaining({
-        workspaceId: "ws1",
+        workspaceId: "11111111-1111-4111-8111-111111111111",
         agentKey: "researcher",
         key: "pref_lang",
         type: "FACT",
@@ -293,21 +308,21 @@ describe("agents service — memory CRUD", () => {
   it("reads entries filtered by tenant and agent key", async () => {
     prismaMock.agentMemoryEntry.findMany.mockResolvedValueOnce([{ id: "m1" }]);
 
-    await getAgentMemoryEntries("ws1", "researcher", { type: "PREFERENCE" });
+    await getAgentMemoryEntries("11111111-1111-4111-8111-111111111111", "researcher", { type: "PREFERENCE" });
 
     expect(prismaMock.agentMemoryEntry.findMany).toHaveBeenCalledWith({
-      where: { workspaceId: "ws1", agentKey: "researcher", type: "PREFERENCE" },
+      where: { workspaceId: "11111111-1111-4111-8111-111111111111", agentKey: "researcher", type: "PREFERENCE" },
       orderBy: [{ importance: "desc" }, { createdAt: "desc" }],
     });
   });
 
   it("updates an entry tenant-isolated", async () => {
-    prismaMock.agentMemoryEntry.update.mockResolvedValueOnce({ id: "m1" });
+    prismaMock.agentMemoryEntry.updateMany.mockResolvedValueOnce({ count: 1 });
 
-    await updateAgentMemoryEntry("m1", "ws1", { importance: 5 });
+    await updateAgentMemoryEntry("m1", "11111111-1111-4111-8111-111111111111", { importance: 5 });
 
-    expect(prismaMock.agentMemoryEntry.update).toHaveBeenCalledWith({
-      where: { id: "m1" },
+    expect(prismaMock.agentMemoryEntry.updateMany).toHaveBeenCalledWith({
+      where: { id: "m1", workspaceId: "11111111-1111-4111-8111-111111111111" },
       data: { importance: 5 },
     });
   });
@@ -315,10 +330,10 @@ describe("agents service — memory CRUD", () => {
   it("deletes only within the tenant", async () => {
     prismaMock.agentMemoryEntry.deleteMany.mockResolvedValueOnce({ count: 1 });
 
-    await deleteAgentMemoryEntry("m1", "ws1");
+    await deleteAgentMemoryEntry("m1", "11111111-1111-4111-8111-111111111111");
 
     expect(prismaMock.agentMemoryEntry.deleteMany).toHaveBeenCalledWith({
-      where: { id: "m1", workspaceId: "ws1" },
+      where: { id: "m1", workspaceId: "11111111-1111-4111-8111-111111111111" },
     });
   });
 });

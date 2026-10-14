@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
-import { prisma } from "@/lib/db/client";
 import { listRevenues, listExpenses, getFinanceOverview, getOrCreateTaxSetting } from "@/server/services/finance";
+import { listAffiliatePrograms, listProductsForSelect } from "@/server/services/affiliate";
+import { listCampaigns } from "@/server/services/campaigns";
 import { estimateTaxReserve } from "@/lib/finance/calculations";
 import { FinancePageClient } from "@/components/finance/finance-page-client";
 import type { RevenueRow } from "@/components/finance/revenues-table";
@@ -14,9 +15,9 @@ export default async function FinancePage() {
     listExpenses(),
     getFinanceOverview(),
     getOrCreateTaxSetting(),
-    prisma.affiliateProgram.findMany({ select: { id: true, provider: true, customName: true }, orderBy: { provider: "asc" } }),
-    prisma.product.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
-    prisma.campaign.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    listAffiliatePrograms(),
+    listProductsForSelect(),
+    listCampaigns(),
   ]);
 
   const revenueRows: RevenueRow[] = revenues.map((r) => ({

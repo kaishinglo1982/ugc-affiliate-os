@@ -53,3 +53,24 @@ describe("resolveWorkspaceId", () => {
     await expect(resolveWorkspaceId()).rejects.toBeInstanceOf(InvalidTenantTokenError);
   });
 });
+
+
+describe("CORE_BOUND tenant authority", () => {
+  it("rejects a missing tenant assertion instead of falling back to the default workspace", async () => {
+    vi.resetModules();
+    process.env.CARRYOS_INTEGRATION_MODE = "CORE_BOUND";
+    delete process.env.CARRYOS_TENANT_SECRET;
+    const { resolveWorkspaceId, InvalidTenantTokenError } = await import("./tenant");
+    await expect(resolveWorkspaceId()).rejects.toBeInstanceOf(InvalidTenantTokenError);
+  });
+
+  it("rejects malformed tenant assertions in CORE_BOUND mode", async () => {
+    vi.resetModules();
+    process.env.CARRYOS_INTEGRATION_MODE = "CORE_BOUND";
+    process.env.CARRYOS_TENANT_SECRET = "b".repeat(48);
+    const { resolveWorkspaceId, InvalidTenantTokenError } = await import("./tenant");
+    const headersApi = await import("next/headers");
+    vi.spyOn(headersApi, "headers").mockResolvedValue(new Headers({ "x-carryos-tenant-token": "not-a-jwt" }) as never);
+    await expect(resolveWorkspaceId()).rejects.toBeInstanceOf(InvalidTenantTokenError);
+  });
+});

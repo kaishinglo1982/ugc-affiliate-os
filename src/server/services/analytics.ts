@@ -1,5 +1,6 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import type { DashboardPeriod } from "@/lib/dashboard-period";
 import { getPeriodRange } from "@/lib/period-range";
 import { platformLabel } from "@/lib/platforms";
@@ -20,10 +21,11 @@ function dayKey(date: Date): string {
 
 export async function getAnalyticsData(filters: AnalyticsFilters) {
   const { from, to } = getPeriodRange(filters.period);
+  const workspaceId = await resolveWorkspaceId();
   const platformText = filters.platform ? platformLabel(filters.platform) : undefined;
 
   const campaign = filters.campaignId
-    ? await prisma.campaign.findUnique({ where: { id: filters.campaignId }, select: { affiliateLinkId: true } })
+    ? await withWorkspaceTransaction(workspaceId, (tx) => tx.campaign.findUnique({ where: { id: filters.campaignId }, select: { affiliateLinkId: true } }))
     : null;
   // A campaign filter with no linked affiliate link should yield zero clicks, not "all clicks".
   const campaignHasNoLink = Boolean(filters.campaignId) && !campaign?.affiliateLinkId;
@@ -70,16 +72,16 @@ export async function getAnalyticsData(filters: AnalyticsFilters) {
     ...(filters.productId ? { campaign: { productId: filters.productId } } : {}),
   };
 
-  const [clicks, revenues, adSpendAgg, posts, statusCounts] = await Promise.all([
-    prisma.linkClick.findMany({ where: clickWhere, select: { occurredAt: true, link: { select: { platform: true } } } }),
-    prisma.revenue.findMany({ where: revenueWhere, select: { date: true, grossAmount: true, platform: true } }),
-    prisma.expense.aggregate({ where: adSpendWhere, _sum: { amount: true } }),
-    prisma.socialPost.findMany({
+  const [clicks, revenues, adSpendAgg, posts, statusCounts] = await withWorkspaceTransaction(workspaceId, (tx) => Promise.all([
+    tx.linkClick.findMany({ where: clickWhere, select: { occurredAt: true, link: { select: { platform: true } } } }),
+    tx.revenue.findMany({ where: revenueWhere, select: { date: true, grossAmount: true, platform: true } }),
+    tx.expense.aggregate({ where: adSpendWhere, _sum: { amount: true } }),
+    tx.socialPost.findMany({
       where: postWhere,
       select: { publishedAt: true, impressions: true, reach: true, likes: true, comments: true, shares: true, account: { select: { platform: true } } },
     }),
-    prisma.socialPost.groupBy({ by: ["status"], where: statusBreakdownWhere, _count: { _all: true } }),
-  ]);
+    tx.socialPost.groupBy({ by: ["status"], where: statusBreakdownWhere, _count: { _all: true } }),
+  ]));
 
   const impressions = posts.reduce((sum, p) => sum + (p.impressions ?? 0), 0);
   const reach = posts.reduce((sum, p) => sum + (p.reach ?? 0), 0);

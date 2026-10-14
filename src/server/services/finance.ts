@@ -1,33 +1,38 @@
 import "server-only";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { prisma } from "@/lib/db/client";
 import { summarizeFinance } from "@/lib/finance/calculations";
 
 export async function listRevenues() {
-  return prisma.revenue.findMany({
+  const workspaceId = await resolveWorkspaceId();
+  return withWorkspaceTransaction(workspaceId, (tx) => tx.revenue.findMany({
     include: {
       product: { select: { id: true, name: true } },
       campaign: { select: { id: true, name: true } },
       program: { select: { id: true, provider: true, customName: true } },
     },
     orderBy: { date: "desc" },
-  });
+  }));
 }
 
 export async function listExpenses() {
-  return prisma.expense.findMany({
+  const workspaceId = await resolveWorkspaceId();
+  return withWorkspaceTransaction(workspaceId, (tx) => tx.expense.findMany({
     include: {
       product: { select: { id: true, name: true } },
       campaign: { select: { id: true, name: true } },
     },
     orderBy: { date: "desc" },
-  });
+  }));
 }
 
 /** Singleton settings row — created with sensible defaults on first read. */
 export async function getOrCreateTaxSetting() {
-  const existing = await prisma.taxSetting.findFirst();
+  const workspaceId = await resolveWorkspaceId();
+  const existing = await withWorkspaceTransaction(workspaceId, (tx) => tx.taxSetting.findFirst());
   if (existing) return existing;
-  return prisma.taxSetting.create({
+  return withWorkspaceTransaction(workspaceId, (tx) => tx.taxSetting.create({
     data: {
       reserveRatePercent: 30,
       vatRatePercent: 19,
@@ -35,7 +40,7 @@ export async function getOrCreateTaxSetting() {
       tradeTaxReservePercent: 15,
       incomeTaxReservePercent: 25,
     },
-  });
+  }));
 }
 
 function monthKey(date: Date): string {
@@ -56,14 +61,15 @@ export interface FinanceOverview {
 }
 
 export async function getFinanceOverview(): Promise<FinanceOverview> {
-  const [revenues, expenses] = await Promise.all([
-    prisma.revenue.findMany({
+  const workspaceId = await resolveWorkspaceId();
+  const [revenues, expenses] = await withWorkspaceTransaction(workspaceId, (tx) => Promise.all([
+    tx.revenue.findMany({
       include: { product: { select: { name: true } }, campaign: { select: { name: true } } },
     }),
-    prisma.expense.findMany({
+    tx.expense.findMany({
       include: { product: { select: { name: true } }, campaign: { select: { name: true } } },
     }),
-  ]);
+  ]));
 
   const summary = summarizeFinance(
     revenues.map((r) => r.grossAmount),

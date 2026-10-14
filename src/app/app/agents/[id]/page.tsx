@@ -14,14 +14,15 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
   const { id } = await params;
-  const agent = await getAgent(id);
+  const workspaceId = await resolveWorkspaceId();
+  const agent = await getAgent(id, workspaceId);
   return { title: agent ? `Agent ${agent.name}` : "Agent" };
 }
 
 export default async function AgentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const workspaceId = await resolveWorkspaceId();
-  const agent = await getAgent(id);
+  const agent = await getAgent(id, workspaceId);
   if (!agent) notFound();
 
   const memory = await listAgentMemory(workspaceId, { agentKey: agent.key });

@@ -1,19 +1,22 @@
 import "server-only";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export async function listCampaigns() {
-  const campaigns = await prisma.campaign.findMany({
+  const workspaceId = await resolveWorkspaceId();
+  const campaigns = await withWorkspaceTransaction(workspaceId, (tx) => tx.campaign.findMany({
     include: {
       product: { select: { id: true, name: true } },
       _count: { select: { scripts: true, videoJobs: true, socialPosts: true } },
     },
     orderBy: { updatedAt: "desc" },
-  });
+  }));
   return campaigns;
 }
 
 export async function getCampaignById(id: string) {
-  return prisma.campaign.findUnique({
+  const workspaceId = await resolveWorkspaceId();
+  return withWorkspaceTransaction(workspaceId, (tx) => tx.campaign.findUnique({
     where: { id },
     include: {
       product: true,
@@ -24,5 +27,5 @@ export async function getCampaignById(id: string) {
       revenues: { orderBy: { date: "desc" } },
       expenses: { orderBy: { date: "desc" } },
     },
-  });
+  }));
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { listMediaAssets } from "@/server/services/media";
+import { listCampaigns } from "@/server/services/campaigns";
 import { listProductsForSelect } from "@/server/services/affiliate";
-import { prisma } from "@/lib/db/client";
 import { MediaPageClient } from "@/components/media/media-page-client";
 import type { MediaAssetItem } from "@/components/media/media-grid";
 
@@ -16,7 +16,7 @@ export default async function MediaPage({ searchParams }: MediaPageProps) {
   const [assets, products, campaigns] = await Promise.all([
     listMediaAssets({ search: params.search, kind: params.kind }),
     listProductsForSelect(),
-    prisma.campaign.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    listCampaigns(),
   ]);
 
   const items: MediaAssetItem[] = assets.map((a) => ({
