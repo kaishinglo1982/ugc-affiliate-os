@@ -47,29 +47,71 @@ async function withWorkspace(client, workspaceId, fn) {
 const tables = ["ProductScore","AffiliateProgram","AffiliateLink","LinkClick","Campaign","Script","ScriptVersion","VideoJob","MediaAsset","SocialAccount","SocialPost","PublishJob","Revenue","Expense","TaxSetting","Integration","EncryptedCredential","Agent","AgentRun","Automation","AutomationRun","Notification","ContactRequest","AuditLog"];
 
 const admin = await new Client({ connectionString: DATABASE_URL });
-await admin.connect();
+let workspaceTables = [];
 try {
   await admin.query(`DO $$
   BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = '${TEST_ROLE}') THEN
-      CREATE ROLE ${TEST_ROLE} LOGIN PASSWORD '${TEST_PASSWORD}';
+      CREATE ROLE ${TEST_ROLE} LOGIN PASSWORD '${TEST_PASSWORD}' NOSUPERUSER NOBYPASSRLS;
     ELSE
-      ALTER ROLE ${TEST_ROLE} PASSWORD '${TEST_PASSWORD}';
+      ALTER ROLE ${TEST_ROLE} LOGIN PASSWORD '${TEST_PASSWORD}' NOSUPERUSER NOBYPASSRLS;
     END IF;
   END $$;`);
   await admin.query(`GRANT USAGE ON SCHEMA public TO ${TEST_ROLE}`);
-  for (const table of tables) {
-    await admin.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE "${table}" TO ${TEST_ROLE}`);
+
+  const inventory = await admin.query(`
+    SELECT
+      c.relname AS table_name,
+      c.relrowsecurity AS rls_enabled,
+      c.relforcerowsecurity AS rls_forced,
+      EXISTS (
+        SELECT 1 FROM pg_policies p
+        WHERE p.schemaname = n.nspname
+          AND p.tablename = c.relname
+          AND p.permissive = 'PERMISSIVE'
+          AND coalesce(p.qual, '') ILIKE '%current_workspace_id%'
+          AND coalesce(p.with_check, '') ILIKE '%current_workspace_id%'
+      ) AS has_permissive_workspace_policy,
+      EXISTS (
+        SELECT 1 FROM pg_policies p
+        WHERE p.schemaname = n.nspname
+          AND p.tablename = c.relname
+          AND p.permissive = 'RESTRICTIVE'
+          AND coalesce(p.qual, '') ILIKE '%current_workspace_id%'
+          AND coalesce(p.with_check, '') ILIKE '%current_workspace_id%'
+      ) AS has_restrictive_workspace_policy
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    JOIN pg_attribute a ON a.attrelid = c.oid
+    WHERE n.nspname = 'public'
+      AND c.relkind IN ('r', 'p')
+      AND a.attname = 'workspaceId'
+      AND a.attnum > 0
+      AND NOT a.attisdropped
+    ORDER BY c.relname
+  `);
+  workspaceTables = inventory.rows;
+  assert.ok(
+    workspaceTables.length >= 120,
+    `Expected workspace RLS inventory to cover the current schema (at least 120 tables); found ${workspaceTables.length}`,
+  );
+
+  for (const row of workspaceTables) {
+    assert.equal(row.rls_enabled, true, `${row.table_name} RLS must be enabled`);
+    assert.equal(row.rls_forced, true, `${row.table_name} RLS must be forced`);
+    assert.equal(row.has_permissive_workspace_policy, true, `${row.table_name} must have a workspace-bound permissive policy`);
+    assert.equal(row.has_restrictive_workspace_policy, true, `${row.table_name} must have a restrictive workspace policy`);
+    // Identifiers come from pg_catalog, not request input.
+    const quotedTable = `"${String(row.table_name).replaceAll('"', '""')}"`;
+    await admin.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE ${quotedTable} TO ${TEST_ROLE}`);
   }
 
-  for (const table of ["Campaign", "Revenue"]) {
-    const state = await admin.query(
-      "SELECT relrowsecurity, relforcerowsecurity FROM pg_class WHERE oid = $1::regclass",
-      [table],
-    );
-    assert.equal(state.rows[0].relrowsecurity, true, `${table} RLS must be enabled`);
-    assert.equal(state.rows[0].relforcerowsecurity, true, `${table} RLS must be forced`);
-  }
+  const roleState = await admin.query(
+    "SELECT rolsuper, rolbypassrls FROM pg_roles WHERE rolname = $1",
+    [TEST_ROLE],
+  );
+  assert.equal(roleState.rows[0]?.rolsuper, false, "RLS probe role must not be superuser");
+  assert.equal(roleState.rows[0]?.rolbypassrls, false, "RLS probe role must not bypass RLS");
 } finally {
   await admin.end();
 }
@@ -91,6 +133,17 @@ try {
     );
     return result.rows[0].id;
   });
+
+
+  const noContextRead = await client.query('SELECT id FROM "Campaign" WHERE id = $1', [campaignA]);
+  assert.equal(noContextRead.rowCount, 0, "missing workspace context must fail closed for reads");
+  await assert.rejects(
+    client.query(
+      'INSERT INTO "Campaign" ("id","workspaceId","name","status","currency","updatedAt") VALUES (gen_random_uuid(),$1,$2,\'DRAFT\',\'EUR\',now())',
+      [TENANT_A, "missing-context-insert"],
+    ),
+    "missing workspace context must reject writes",
+  );
 
   const visibleToB = await withWorkspace(client, TENANT_B, async () => {
     const campaign = await client.query('SELECT id FROM "Campaign" WHERE id = $1', [campaignA]);
