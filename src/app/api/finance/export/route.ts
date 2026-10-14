@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/db/client";
 import { toCsv } from "@/lib/csv";
-import { DEFAULT_WORKSPACE_ID } from "@/lib/config/workspace";
+import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export async function GET(request: Request) {
   const user = await getCurrentUser();
@@ -10,11 +10,21 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Nicht authentifiziert." }, { status: 401 });
   }
 
+  let workspaceId: string;
+  try {
+    workspaceId = await resolveWorkspaceId();
+  } catch (error) {
+    if (error instanceof InvalidTenantTokenError) {
+      return NextResponse.json({ error: "Ungültiges Tenant-Token." }, { status: 401 });
+    }
+    throw error;
+  }
+
   const type = new URL(request.url).searchParams.get("type") === "expense" ? "expense" : "revenue";
 
   if (type === "expense") {
     const expenses = await prisma.expense.findMany({
-      where: { workspaceId: DEFAULT_WORKSPACE_ID },
+      where: { workspaceId },
       include: { product: { select: { name: true } }, campaign: { select: { name: true } } },
       orderBy: { date: "desc" },
     });
@@ -39,7 +49,7 @@ export async function GET(request: Request) {
   }
 
   const revenues = await prisma.revenue.findMany({
-    where: { workspaceId: DEFAULT_WORKSPACE_ID },
+    where: { workspaceId },
     include: {
       product: { select: { name: true } },
       campaign: { select: { name: true } },
