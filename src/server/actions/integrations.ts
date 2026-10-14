@@ -21,6 +21,16 @@ export async function saveHuggingFaceSettingsAction(
     return { success: false, error: "Nicht authentifiziert." };
   }
 
+  // Integration and encrypted-credential records are currently global, not
+  // workspace-scoped. Refuse writes in Core-bound multi-tenant mode until the
+  // schema and credential lifecycle are tenant-bound; auth alone is not enough.
+  if (process.env.CARRYOS_INTEGRATION_MODE === "CORE_BOUND") {
+    return {
+      success: false,
+      error: "HuggingFace-Einstellungen sind im mandantenübergreifenden Core-Modus gesperrt, bis Integrationen und Zugangsdaten mandantengebunden sind.",
+    };
+  }
+
   const parsed = saveHuggingFaceSettingsSchema.safeParse(Object.fromEntries(formData.entries()));
   if (!parsed.success) {
     return {
