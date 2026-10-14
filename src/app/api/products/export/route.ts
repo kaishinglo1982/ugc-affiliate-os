@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { prisma } from "@/lib/db/client";
 import { toCsv } from "@/lib/csv";
+import { DEFAULT_WORKSPACE_ID } from "@/lib/config/workspace";
 
 export async function GET() {
   const user = await getCurrentUser();
@@ -10,6 +11,7 @@ export async function GET() {
   }
 
   const products = await prisma.product.findMany({
+    where: { workspaceId: DEFAULT_WORKSPACE_ID },
     include: { scores: { orderBy: { createdAt: "desc" }, take: 1 } },
     orderBy: { createdAt: "desc" },
   });
