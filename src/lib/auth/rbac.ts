@@ -10,6 +10,7 @@ export const PERMISSIONS = [
   "analytics.sync",
   "analytics.backfill",
   "analytics.export",
+  "finance.export",
   "content.intelligence.read",
   "content.intelligence.run",
   "content.variants.read",
@@ -155,6 +156,8 @@ export type Permission = (typeof PERMISSIONS)[number];
  *  permission strings. */
 export const Permission = {
   VIEW_ANALYTICS: "analytics.read",
+  EXPORT_FINANCE: "finance.export",
+  VIEW_PRODUCTS: "products.read",
   MANAGE_ANALYTICS_SYNC: "analytics.sync",
   MANAGE_ANALYTICS: "anomalies.manage",
   VIEW_EXPERIMENTS: "experiments.read",
@@ -366,6 +369,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   ],
   finance_viewer: [
     "analytics.read",
+    "finance.export",
     "data_quality.read",
     "anomalies.read",
     "product_profitability.read",
