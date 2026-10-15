@@ -96,7 +96,9 @@ export async function saveExpenseAction(
     return fail("Eingabe ungültig.", requestId, parsed.error.flatten().fieldErrors);
   }
 
+  const workspaceId = await resolveWorkspaceId();
   const data = {
+    workspaceId,
     date: new Date(parsed.data.date),
     category: parsed.data.category,
     vendor: parsed.data.vendor || null,
@@ -108,9 +110,16 @@ export async function saveExpenseAction(
     notes: parsed.data.notes || null,
   };
 
-  const expense = expenseId
-    ? await prisma.expense.update({ where: { id: expenseId }, data })
-    : await prisma.expense.create({ data });
+  const expense = await withWorkspaceTransaction(workspaceId, async (tx) => {
+    if (expenseId) {
+      const updated = await tx.expense.updateMany({ where: { id: expenseId, workspaceId }, data });
+      if (updated.count !== 1) throw new Error("EXPENSE_NOT_FOUND_IN_WORKSPACE");
+      const record = await tx.expense.findFirst({ where: { id: expenseId, workspaceId } });
+      if (!record) throw new Error("EXPENSE_NOT_FOUND_IN_WORKSPACE");
+      return record;
+    }
+    return tx.expense.create({ data });
+  });
 
   await writeAuditLog({
     action: expenseId ? "expense.update" : "expense.create",
