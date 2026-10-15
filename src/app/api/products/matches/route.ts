@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApiPermission } from "@/lib/api/guard";
 import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceTransaction } from "@/lib/db/with-workspace-transaction";
 
 export async function GET(_request: Request) {
   const guard = await requireApiPermission("product_matches.read");
@@ -10,20 +10,23 @@ export async function GET(_request: Request) {
   let workspaceId: string;
   try {
     workspaceId = await resolveWorkspaceId();
-  } catch (e) {
-    if (e instanceof InvalidTenantTokenError) {
+  } catch (error) {
+    if (error instanceof InvalidTenantTokenError) {
       return NextResponse.json({ error: "Ungültiges Tenant-Token." }, { status: 401 });
     }
-    throw e;
+    throw error;
   }
 
-  const candidates = await prisma.productMatchCandidate.findMany({
-    where: { workspaceId: workspaceId, status: "PENDING" },
-    include: {
-      sourceOffer: true,
-      candidateProduct: { select: { id: true, canonicalName: true, brandName: true } },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const candidates = await withWorkspaceTransaction(workspaceId, (tx) =>
+    tx.productMatchCandidate.findMany({
+      where: { workspaceId, status: "PENDING" },
+      include: {
+        sourceOffer: true,
+        candidateProduct: { select: { id: true, canonicalName: true, brandName: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    }),
+  );
+
   return NextResponse.json({ candidates });
 }
