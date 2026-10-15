@@ -420,6 +420,8 @@ enum MediaKind {
 
 model MediaAsset {
   id          String    @id @default(uuid())
+  // Nullable until legacy media ownership is explicitly reconciled.
+  workspaceId String?
   kind        MediaKind
   fileName    String
   storageKey  String
@@ -443,7 +445,7 @@ model MediaAsset {
 
   primaryImageProducts Product[] @relation("ProductPrimaryImage")
 
-  @@index([kind])
+  @@index([workspaceId, kind])
   @@index([campaignId])
 }
 
@@ -464,6 +466,8 @@ enum SocialPlatform {
 
 model SocialAccount {
   id           String          @id @default(uuid())
+  // Nullable until legacy account ownership is explicitly reconciled.
+  workspaceId  String?
   platform     SocialPlatform
   handle       String
   mode         IntegrationMode @default(MOCK)
@@ -475,7 +479,7 @@ model SocialAccount {
 
   posts SocialPost[]
 
-  @@index([platform])
+  @@index([workspaceId, platform])
 }
 
 enum SocialPostStatus {
