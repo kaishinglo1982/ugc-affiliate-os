@@ -17,7 +17,7 @@ export default async function FinancePage() {
     listExpenses(workspaceId),
     getFinanceOverview(workspaceId),
     getOrCreateTaxSetting(),
-    prisma.affiliateProgram.findMany({ select: { id: true, provider: true, customName: true }, orderBy: { provider: "asc" } }),
+    prisma.affiliateProgram.findMany({ where: { workspaceId }, select: { id: true, provider: true, customName: true }, orderBy: { provider: "asc" } }),
     prisma.product.findMany({ where: { workspaceId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
     listCampaigns(),
   ]);
