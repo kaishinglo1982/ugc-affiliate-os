@@ -170,6 +170,7 @@ export async function convertCandidate(id: string, body: unknown, workspaceId: s
   const actor = (await getCurrentUser())?.id ?? "owner";
   const campaign = await prisma.campaign.create({
     data: {
+      workspaceId,
       name: parsed.name,
       productId: candidate.productId,
       status: "DRAFT",
