@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db/client";
+import { listCampaigns } from "@/server/services/campaigns";
 import { listScripts } from "@/server/services/scripts";
 import { listProductsForSelect } from "@/server/services/affiliate";
 import { LLM_PROVIDER_KEYS, isLlmProviderConfigured, type LlmProviderKey } from "@/lib/providers/llm/registry";
@@ -13,7 +14,7 @@ export default async function ScriptsPage() {
   const [scripts, products, campaigns] = await Promise.all([
     listScripts(),
     listProductsForSelect(),
-    prisma.campaign.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    listCampaigns(),
   ]);
 
   const rows: ScriptRow[] = scripts.map((s) => ({
