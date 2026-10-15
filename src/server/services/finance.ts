@@ -1,26 +1,29 @@
 import "server-only";
 import { prisma } from "@/lib/db/client";
+import { withWorkspaceTransaction } from "@/lib/db/with-workspace-transaction";
 import { summarizeFinance } from "@/lib/finance/calculations";
 
-export async function listRevenues() {
-  return prisma.revenue.findMany({
+export async function listRevenues(workspaceId: string) {
+  return withWorkspaceTransaction(workspaceId, (tx) => tx.revenue.findMany({
+    where: { workspaceId },
     include: {
       product: { select: { id: true, name: true } },
       campaign: { select: { id: true, name: true } },
       program: { select: { id: true, provider: true, customName: true } },
     },
     orderBy: { date: "desc" },
-  });
+  }));
 }
 
-export async function listExpenses() {
-  return prisma.expense.findMany({
+export async function listExpenses(workspaceId: string) {
+  return withWorkspaceTransaction(workspaceId, (tx) => tx.expense.findMany({
+    where: { workspaceId },
     include: {
       product: { select: { id: true, name: true } },
       campaign: { select: { id: true, name: true } },
     },
     orderBy: { date: "desc" },
-  });
+  }));
 }
 
 /** Singleton settings row — created with sensible defaults on first read. */
@@ -55,15 +58,17 @@ export interface FinanceOverview {
   byCampaign: Array<{ label: string; revenue: number; expense: number; margin: number }>;
 }
 
-export async function getFinanceOverview(): Promise<FinanceOverview> {
-  const [revenues, expenses] = await Promise.all([
-    prisma.revenue.findMany({
+export async function getFinanceOverview(workspaceId: string): Promise<FinanceOverview> {
+  const [revenues, expenses] = await withWorkspaceTransaction(workspaceId, (tx) => Promise.all([
+    tx.revenue.findMany({
+      where: { workspaceId },
       include: { product: { select: { name: true } }, campaign: { select: { name: true } } },
     }),
-    prisma.expense.findMany({
+    tx.expense.findMany({
+      where: { workspaceId },
       include: { product: { select: { name: true } }, campaign: { select: { name: true } } },
     }),
-  ]);
+  ]));
 
   const summary = summarizeFinance(
     revenues.map((r) => r.grossAmount),
