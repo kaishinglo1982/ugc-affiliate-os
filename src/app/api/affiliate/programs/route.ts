@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireApiPermission } from "@/lib/api/guard";
 import { Permission } from "@/lib/auth/rbac";
 import { prisma } from "@/lib/db/client";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import type { AffiliateProviderKey } from "@/generated/prisma/client";
 
 export const dynamic = "force-dynamic";
@@ -14,8 +15,10 @@ export async function GET(request: Request) {
   const provider = searchParams.get("provider");
   const status = searchParams.get("status");
 
+  const workspaceId = await resolveWorkspaceId();
   const programs = await prisma.affiliateProgram.findMany({
     where: {
+      workspaceId,
       ...(provider ? { provider: provider as AffiliateProviderKey } : {}),
       ...(status ? { status } : {}),
     },
