@@ -14,6 +14,7 @@ import { isValidPostTransition, type SocialPostStatus } from "@/features/publish
 import { resolveSocialProvider } from "@/lib/providers/social/mock-provider";
 import { ok, fail, newRequestId, type Result } from "@/types/result";
 import { getCurrentUser } from "@/lib/auth/current-user";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { writeAuditLog } from "@/lib/audit/log";
 import type { SocialPost } from "@/generated/prisma/client";
 
@@ -31,6 +32,20 @@ export async function savePostAction(
     return fail("Eingabe ungültig.", requestId, parsed.error.flatten().fieldErrors);
   }
 
+  let workspaceId: string;
+  try { workspaceId = await resolveWorkspaceId(); } catch { return fail("Workspace-Kontext fehlt oder ist ungültig.", requestId); }
+
+  const account = await prisma.socialAccount.findFirst({ where: { id: parsed.data.accountId, workspaceId }, select: { id: true } });
+  if (!account) return fail("Social Account nicht gefunden.", requestId);
+  if (parsed.data.campaignId) {
+    const campaign = await prisma.campaign.findFirst({ where: { id: parsed.data.campaignId, workspaceId }, select: { id: true } });
+    if (!campaign) return fail("Kampagne nicht gefunden.", requestId);
+  }
+  if (parsed.data.mediaAssetId) {
+    const media = await prisma.mediaAsset.findFirst({ where: { id: parsed.data.mediaAssetId, workspaceId }, select: { id: true } });
+    if (!media) return fail("Medienasset nicht gefunden.", requestId);
+  }
+
   const data = {
     accountId: parsed.data.accountId,
     campaignId: parsed.data.campaignId || null,
@@ -41,6 +56,10 @@ export async function savePostAction(
     disclosure: parsed.data.disclosure || null,
   };
 
+  if (postId) {
+    const existing = await prisma.socialPost.findFirst({ where: { id: postId, account: { workspaceId } }, select: { id: true } });
+    if (!existing) return fail("Post nicht gefunden.", requestId);
+  }
   const post = postId
     ? await prisma.socialPost.update({ where: { id: postId }, data })
     : await prisma.socialPost.create({ data: { ...data, status: "DRAFT" } });
@@ -63,9 +82,10 @@ async function transitionPost(
   to: SocialPostStatus,
   requestId: string,
   actor: string,
+  workspaceId: string,
   extraData?: Record<string, unknown>,
 ): Promise<Result<SocialPost>> {
-  const current = await prisma.socialPost.findUnique({ where: { id } });
+  const current = await prisma.socialPost.findFirst({ where: { id, account: { workspaceId } } });
   if (!current) return fail("Post nicht gefunden.", requestId);
 
   if (!isValidPostTransition(current.status as SocialPostStatus, to)) {
@@ -102,7 +122,9 @@ export async function changePostStatusAction(id: string, status: string): Promis
     return fail("Dieser Status benötigt einen eigenen Ablauf.", requestId);
   }
 
-  return transitionPost(id, parsed.data.status, requestId, user.email);
+  let workspaceId: string;
+  try { workspaceId = await resolveWorkspaceId(); } catch { return fail("Workspace-Kontext fehlt oder ist ungültig.", requestId); }
+  return transitionPost(id, parsed.data.status, requestId, user.email, workspaceId);
 }
 
 export async function schedulePostAction(
@@ -118,7 +140,9 @@ export async function schedulePostAction(
     return fail(parsed.error.issues[0]?.message ?? "Ungültige Eingabe.", requestId);
   }
 
-  return transitionPost(id, "SCHEDULED", requestId, user.email, {
+  let workspaceId: string;
+  try { workspaceId = await resolveWorkspaceId(); } catch { return fail("Workspace-Kontext fehlt oder ist ungültig.", requestId); }
+  return transitionPost(id, "SCHEDULED", requestId, user.email, workspaceId, {
     scheduledAt: new Date(parsed.data.scheduledAt),
   });
 }
@@ -129,8 +153,10 @@ export async function publishPostAction(id: string): Promise<Result<SocialPost &
   const user = await getCurrentUser();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
-  const post = await prisma.socialPost.findUnique({
-    where: { id },
+  let workspaceId: string;
+  try { workspaceId = await resolveWorkspaceId(); } catch { return fail("Workspace-Kontext fehlt oder ist ungültig.", requestId); }
+  const post = await prisma.socialPost.findFirst({
+    where: { id, account: { workspaceId } },
     include: { account: true, mediaAsset: { select: { url: true } } },
   });
   if (!post) return fail("Post nicht gefunden.", requestId);
@@ -176,7 +202,9 @@ export async function duplicatePostAction(id: string): Promise<Result<{ id: stri
   const user = await getCurrentUser();
   if (!user) return fail("Nicht authentifiziert.", requestId);
 
-  const source = await prisma.socialPost.findUnique({ where: { id } });
+  let workspaceId: string;
+  try { workspaceId = await resolveWorkspaceId(); } catch { return fail("Workspace-Kontext fehlt oder ist ungültig.", requestId); }
+  const source = await prisma.socialPost.findFirst({ where: { id, account: { workspaceId } } });
   if (!source) return fail("Post nicht gefunden.", requestId);
 
   const copy = await prisma.socialPost.create({
@@ -212,7 +240,10 @@ export async function deletePostAction(id: string) {
     auditAction: "social_post.delete",
     entityType: "SocialPost",
     handler: async (input) => {
-      await prisma.socialPost.delete({ where: { id: input.id } });
+      const workspaceId = await resolveWorkspaceId();
+      const existing = await prisma.socialPost.findFirst({ where: { id: input.id, account: { workspaceId } }, select: { id: true } });
+      if (!existing) throw new Error("POST_NOT_FOUND_IN_WORKSPACE");
+      await prisma.socialPost.delete({ where: { id: existing.id } });
       return { id: input.id };
     },
     entityId: (output) => output.id,
