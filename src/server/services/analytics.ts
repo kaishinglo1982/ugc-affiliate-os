@@ -79,7 +79,6 @@ export async function getAnalyticsData(filters: AnalyticsFilters) {
     },
     ...(filters.campaignId ? { campaignId: filters.campaignId } : {}),
     ...(filters.platform ? { account: { platform: filters.platform as never } } : {}),
-    ...(filters.productId ? { campaign: { productId: filters.productId } } : {}),
   };
 
   const [clicks, revenues, adSpendAgg, posts, statusCounts] = await Promise.all([
