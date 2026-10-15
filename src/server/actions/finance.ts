@@ -43,9 +43,16 @@ export async function saveRevenueAction(
     notes: parsed.data.notes || null,
   };
 
-  const revenue = revenueId
-    ? await prisma.revenue.update({ where: { id: revenueId }, data })
-    : await prisma.revenue.create({ data });
+  const revenue = await withWorkspaceTransaction(workspaceId, async (tx) => {
+    if (revenueId) {
+      const updated = await tx.revenue.updateMany({ where: { id: revenueId, workspaceId }, data });
+      if (updated.count !== 1) throw new Error("REVENUE_NOT_FOUND_IN_WORKSPACE");
+      const record = await tx.revenue.findFirst({ where: { id: revenueId, workspaceId } });
+      if (!record) throw new Error("REVENUE_NOT_FOUND_IN_WORKSPACE");
+      return record;
+    }
+    return tx.revenue.create({ data });
+  });
 
   await writeAuditLog({
     action: revenueId ? "revenue.update" : "revenue.create",
