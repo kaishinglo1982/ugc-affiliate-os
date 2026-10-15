@@ -38,6 +38,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
 
   const [data, products, campaigns, programs] = await Promise.all([
     getAnalyticsData({
+      workspaceId,
       period,
       platform: params.platform,
       productId: params.productId,
