@@ -6,6 +6,7 @@ import { platformLabel } from "@/lib/platforms";
 import type { Prisma } from "@/generated/prisma/client";
 
 export interface AnalyticsFilters {
+  workspaceId: string;
   period: DashboardPeriod;
   platform?: string;
   productId?: string;
@@ -19,6 +20,7 @@ function dayKey(date: Date): string {
 }
 
 export async function getAnalyticsData(filters: AnalyticsFilters) {
+  const workspaceId = filters.workspaceId;
   const { from, to } = getPeriodRange(filters.period);
   const platformText = filters.platform ? platformLabel(filters.platform) : undefined;
 
@@ -40,6 +42,7 @@ export async function getAnalyticsData(filters: AnalyticsFilters) {
   };
 
   const revenueWhere: Prisma.RevenueWhereInput = {
+    workspaceId,
     date: { gte: from, lte: to },
     ...(filters.productId ? { productId: filters.productId } : {}),
     ...(filters.campaignId ? { campaignId: filters.campaignId } : {}),
@@ -48,6 +51,7 @@ export async function getAnalyticsData(filters: AnalyticsFilters) {
   };
 
   const adSpendWhere: Prisma.ExpenseWhereInput = {
+    workspaceId,
     date: { gte: from, lte: to },
     category: "ADVERTISING",
     ...(filters.productId ? { productId: filters.productId } : {}),
