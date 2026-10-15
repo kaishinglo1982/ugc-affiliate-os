@@ -51,7 +51,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       orderBy: { name: "asc" },
     }),
     listCampaigns(),
-    prisma.affiliateProgram.findMany({ select: { id: true, provider: true, customName: true }, orderBy: { provider: "asc" } }),
+    prisma.affiliateProgram.findMany({ where: { workspaceId }, select: { id: true, provider: true, customName: true }, orderBy: { provider: "asc" } }),
   ]);
 
   return (
