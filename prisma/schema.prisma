@@ -183,6 +183,8 @@ enum IntegrationMode {
 
 model AffiliateProgram {
   id             String               @id @default(uuid())
+  // Nullable until legacy program ownership has been reconciled.
+  workspaceId    String?
   provider       AffiliateProviderKey
   customName     String?
   trackingId     String?
