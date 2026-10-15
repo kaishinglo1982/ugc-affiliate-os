@@ -12,6 +12,8 @@ import {
 import { ok, fail, newRequestId, type Result } from "@/types/result";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
+import { withWorkspaceTransaction } from "@/lib/db/with-workspace-transaction";
 
 export async function saveRevenueAction(
   revenueId: string | null,
@@ -27,7 +29,9 @@ export async function saveRevenueAction(
     return fail("Eingabe ungültig.", requestId, parsed.error.flatten().fieldErrors);
   }
 
+  const workspaceId = await resolveWorkspaceId();
   const data = {
+    workspaceId,
     date: new Date(parsed.data.date),
     programId: parsed.data.programId || null,
     productId: parsed.data.productId || null,
