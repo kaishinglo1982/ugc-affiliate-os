@@ -6,6 +6,7 @@ import { platformLabel } from "@/lib/platforms";
 import type { Prisma } from "@/generated/prisma/client";
 
 export interface AnalyticsFilters {
+  workspaceId: string;
   period: DashboardPeriod;
   platform?: string;
   productId?: string;
@@ -19,11 +20,12 @@ function dayKey(date: Date): string {
 }
 
 export async function getAnalyticsData(filters: AnalyticsFilters) {
+  const workspaceId = filters.workspaceId;
   const { from, to } = getPeriodRange(filters.period);
   const platformText = filters.platform ? platformLabel(filters.platform) : undefined;
 
   const campaign = filters.campaignId
-    ? await prisma.campaign.findUnique({ where: { id: filters.campaignId }, select: { affiliateLinkId: true } })
+    ? await prisma.campaign.findFirst({ where: { id: filters.campaignId, workspaceId }, select: { affiliateLinkId: true } })
     : null;
   // A campaign filter with no linked affiliate link should yield zero clicks, not "all clicks".
   const campaignHasNoLink = Boolean(filters.campaignId) && !campaign?.affiliateLinkId;
@@ -32,6 +34,7 @@ export async function getAnalyticsData(filters: AnalyticsFilters) {
     occurredAt: { gte: from, lte: to },
     ...(campaignHasNoLink ? { linkId: "__none__" } : {}),
     link: {
+      program: { workspaceId },
       ...(filters.productId ? { productId: filters.productId } : {}),
       ...(filters.programId ? { programId: filters.programId } : {}),
       ...(platformText ? { platform: platformText } : {}),
@@ -40,6 +43,7 @@ export async function getAnalyticsData(filters: AnalyticsFilters) {
   };
 
   const revenueWhere: Prisma.RevenueWhereInput = {
+    workspaceId,
     date: { gte: from, lte: to },
     ...(filters.productId ? { productId: filters.productId } : {}),
     ...(filters.campaignId ? { campaignId: filters.campaignId } : {}),
@@ -48,6 +52,7 @@ export async function getAnalyticsData(filters: AnalyticsFilters) {
   };
 
   const adSpendWhere: Prisma.ExpenseWhereInput = {
+    workspaceId,
     date: { gte: from, lte: to },
     category: "ADVERTISING",
     ...(filters.productId ? { productId: filters.productId } : {}),
@@ -56,18 +61,24 @@ export async function getAnalyticsData(filters: AnalyticsFilters) {
 
   const postWhere: Prisma.SocialPostWhereInput = {
     publishedAt: { gte: from, lte: to },
+    campaign: {
+      workspaceId,
+      ...(filters.productId ? { productId: filters.productId } : {}),
+    },
     ...(filters.campaignId ? { campaignId: filters.campaignId } : {}),
     ...(filters.contentStatus ? { status: filters.contentStatus as never } : {}),
     ...(filters.platform ? { account: { platform: filters.platform as never } } : {}),
-    ...(filters.productId ? { campaign: { productId: filters.productId } } : {}),
   };
 
   // Content-status breakdown should reflect the same scope minus the period lock on
   // unpublished posts (a DRAFT post has no publishedAt and would otherwise vanish).
   const statusBreakdownWhere: Prisma.SocialPostWhereInput = {
+    campaign: {
+      workspaceId,
+      ...(filters.productId ? { productId: filters.productId } : {}),
+    },
     ...(filters.campaignId ? { campaignId: filters.campaignId } : {}),
     ...(filters.platform ? { account: { platform: filters.platform as never } } : {}),
-    ...(filters.productId ? { campaign: { productId: filters.productId } } : {}),
   };
 
   const [clicks, revenues, adSpendAgg, posts, statusCounts] = await Promise.all([

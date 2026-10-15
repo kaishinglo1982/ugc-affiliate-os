@@ -2,6 +2,7 @@ import "server-only";
 import { prisma } from "@/lib/db/client";
 import { summarizeFinance } from "@/lib/finance/calculations";
 import type { DashboardPeriod } from "@/lib/dashboard-period";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 
 export type { DashboardPeriod } from "@/lib/dashboard-period";
 
@@ -41,7 +42,8 @@ function dayKey(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
-export async function getDashboardData(period: DashboardPeriod) {
+export async function getDashboardData(period: DashboardPeriod, workspaceId?: string) {
+  const resolvedWorkspaceId = workspaceId ?? await resolveWorkspaceId();
   const { from, to } = getPeriodRange(period);
 
   const [
@@ -62,36 +64,51 @@ export async function getDashboardData(period: DashboardPeriod) {
     socialPosts,
   ] = await Promise.all([
     prisma.revenue.findMany({
-      where: { date: { gte: from, lte: to } },
+      where: {
+        workspaceId: resolvedWorkspaceId,
+        date: { gte: from, lte: to },
+        AND: [
+          { OR: [{ productId: null }, { product: { workspaceId: resolvedWorkspaceId } }] },
+          { OR: [{ campaignId: null }, { campaign: { workspaceId: resolvedWorkspaceId } }] },
+          { OR: [{ programId: null }, { program: { workspaceId: resolvedWorkspaceId } }] },
+        ],
+      },
       include: { product: true },
       orderBy: { date: "asc" },
     }),
     prisma.expense.findMany({
-      where: { date: { gte: from, lte: to } },
+      where: {
+        workspaceId: resolvedWorkspaceId,
+        date: { gte: from, lte: to },
+        AND: [
+          { OR: [{ productId: null }, { product: { workspaceId: resolvedWorkspaceId } }] },
+          { OR: [{ campaignId: null }, { campaign: { workspaceId: resolvedWorkspaceId } }] },
+        ],
+      },
       orderBy: { date: "asc" },
     }),
-    prisma.linkClick.count({ where: { occurredAt: { gte: from, lte: to } } }),
-    prisma.revenue.count({ where: { date: { gte: from, lte: to } } }),
+    prisma.linkClick.count({ where: { occurredAt: { gte: from, lte: to }, link: { program: { workspaceId: resolvedWorkspaceId } } } }),
+    prisma.revenue.count({ where: { workspaceId: resolvedWorkspaceId, date: { gte: from, lte: to } } }),
     prisma.socialPost.count({
-      where: { status: "PUBLISHED", publishedAt: { gte: from, lte: to } },
+      where: { status: "PUBLISHED", publishedAt: { gte: from, lte: to }, account: { workspaceId: resolvedWorkspaceId } },
     }),
-    prisma.campaign.count({ where: { status: "ACTIVE" } }),
+    prisma.campaign.count({ where: { workspaceId: resolvedWorkspaceId, status: "ACTIVE" } }),
     prisma.videoJob.count({
-      where: { status: { in: ["QUEUED", "PROCESSING", "REVIEW_REQUIRED"] } },
+      where: { status: { in: ["QUEUED", "PROCESSING", "REVIEW_REQUIRED"] }, campaign: { workspaceId: resolvedWorkspaceId } },
     }),
-    prisma.auditLog.findMany({ orderBy: { createdAt: "desc" }, take: 8 }),
+    Promise.resolve([] as Array<{ id: string; action: string; createdAt: Date }>), // AuditLog has no workspace ownership field; never expose global activity in a tenant dashboard.
     prisma.socialPost.findMany({
-      where: { status: "SCHEDULED", scheduledAt: { gte: new Date() } },
+      where: { status: "SCHEDULED", scheduledAt: { gte: new Date() }, account: { workspaceId: resolvedWorkspaceId } },
       orderBy: { scheduledAt: "asc" },
       take: 5,
       include: { account: true, campaign: true },
     }),
-    prisma.integration.findMany({ where: { lastError: { not: null } } }),
+    Promise.resolve([] as Array<{ id: string; displayName: string; lastError: string | null }>), // Integration records have no workspace ownership; avoid leaking global integration errors.
     prisma.agent.findMany({ orderBy: { name: "asc" } }),
-    prisma.campaign.groupBy({ by: ["status"], _count: { _all: true } }),
-    prisma.script.groupBy({ by: ["status"], _count: { _all: true } }),
-    prisma.videoJob.groupBy({ by: ["status"], _count: { _all: true } }),
-    prisma.socialPost.groupBy({ by: ["status"], _count: { _all: true } }),
+    prisma.campaign.groupBy({ by: ["status"], where: { workspaceId: resolvedWorkspaceId }, _count: { _all: true } }),
+    prisma.script.groupBy({ by: ["status"], where: { campaign: { workspaceId: resolvedWorkspaceId } }, _count: { _all: true } }),
+    prisma.videoJob.groupBy({ by: ["status"], where: { campaign: { workspaceId: resolvedWorkspaceId } }, _count: { _all: true } }),
+    prisma.socialPost.groupBy({ by: ["status"], where: { account: { workspaceId: resolvedWorkspaceId } }, _count: { _all: true } }),
   ]);
 
   const summary = summarizeFinance(

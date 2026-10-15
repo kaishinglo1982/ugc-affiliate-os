@@ -32,6 +32,7 @@ import {
   AGENT_STATUS_LABELS,
 } from "@/lib/status-labels";
 import { formatDistanceToNow } from "date-fns";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { de } from "date-fns/locale";
 
 export const metadata: Metadata = { title: "Dashboard" };
@@ -48,7 +49,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
     ? (params.period as DashboardPeriod)
     : "30d";
 
-  const data = await getDashboardData(period);
+  const workspaceId = await resolveWorkspaceId();
+  const data = await getDashboardData(period, workspaceId);
 
   return (
     <div className="space-y-6">

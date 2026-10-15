@@ -12,6 +12,8 @@ import {
 import { ok, fail, newRequestId, type Result } from "@/types/result";
 import { getCurrentUser } from "@/lib/auth/current-user";
 import { writeAuditLog } from "@/lib/audit/log";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
+import { withWorkspaceTransaction } from "@/lib/db/with-workspace-transaction";
 
 export async function saveRevenueAction(
   revenueId: string | null,
@@ -27,7 +29,9 @@ export async function saveRevenueAction(
     return fail("Eingabe ungültig.", requestId, parsed.error.flatten().fieldErrors);
   }
 
+  const workspaceId = await resolveWorkspaceId();
   const data = {
+    workspaceId,
     date: new Date(parsed.data.date),
     programId: parsed.data.programId || null,
     productId: parsed.data.productId || null,
@@ -39,9 +43,16 @@ export async function saveRevenueAction(
     notes: parsed.data.notes || null,
   };
 
-  const revenue = revenueId
-    ? await prisma.revenue.update({ where: { id: revenueId }, data })
-    : await prisma.revenue.create({ data });
+  const revenue = await withWorkspaceTransaction(workspaceId, async (tx) => {
+    if (revenueId) {
+      const updated = await tx.revenue.updateMany({ where: { id: revenueId, workspaceId }, data });
+      if (updated.count !== 1) throw new Error("REVENUE_NOT_FOUND_IN_WORKSPACE");
+      const record = await tx.revenue.findFirst({ where: { id: revenueId, workspaceId } });
+      if (!record) throw new Error("REVENUE_NOT_FOUND_IN_WORKSPACE");
+      return record;
+    }
+    return tx.revenue.create({ data });
+  });
 
   await writeAuditLog({
     action: revenueId ? "revenue.update" : "revenue.create",
@@ -62,7 +73,11 @@ export async function deleteRevenueAction(id: string) {
     auditAction: "revenue.delete",
     entityType: "Revenue",
     handler: async (input) => {
-      await prisma.revenue.delete({ where: { id: input.id } });
+      const workspaceId = await resolveWorkspaceId();
+      const deleted = await withWorkspaceTransaction(workspaceId, (tx) =>
+        tx.revenue.deleteMany({ where: { id: input.id, workspaceId } }),
+      );
+      if (deleted.count !== 1) throw new Error("REVENUE_NOT_FOUND_IN_WORKSPACE");
       return { id: input.id };
     },
     entityId: (output) => output.id,
@@ -85,7 +100,9 @@ export async function saveExpenseAction(
     return fail("Eingabe ungültig.", requestId, parsed.error.flatten().fieldErrors);
   }
 
+  const workspaceId = await resolveWorkspaceId();
   const data = {
+    workspaceId,
     date: new Date(parsed.data.date),
     category: parsed.data.category,
     vendor: parsed.data.vendor || null,
@@ -97,9 +114,16 @@ export async function saveExpenseAction(
     notes: parsed.data.notes || null,
   };
 
-  const expense = expenseId
-    ? await prisma.expense.update({ where: { id: expenseId }, data })
-    : await prisma.expense.create({ data });
+  const expense = await withWorkspaceTransaction(workspaceId, async (tx) => {
+    if (expenseId) {
+      const updated = await tx.expense.updateMany({ where: { id: expenseId, workspaceId }, data });
+      if (updated.count !== 1) throw new Error("EXPENSE_NOT_FOUND_IN_WORKSPACE");
+      const record = await tx.expense.findFirst({ where: { id: expenseId, workspaceId } });
+      if (!record) throw new Error("EXPENSE_NOT_FOUND_IN_WORKSPACE");
+      return record;
+    }
+    return tx.expense.create({ data });
+  });
 
   await writeAuditLog({
     action: expenseId ? "expense.update" : "expense.create",
@@ -120,7 +144,11 @@ export async function deleteExpenseAction(id: string) {
     auditAction: "expense.delete",
     entityType: "Expense",
     handler: async (input) => {
-      await prisma.expense.delete({ where: { id: input.id } });
+      const workspaceId = await resolveWorkspaceId();
+      const deleted = await withWorkspaceTransaction(workspaceId, (tx) =>
+        tx.expense.deleteMany({ where: { id: input.id, workspaceId } }),
+      );
+      if (deleted.count !== 1) throw new Error("EXPENSE_NOT_FOUND_IN_WORKSPACE");
       return { id: input.id };
     },
     entityId: (output) => output.id,
