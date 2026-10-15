@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db/client";
+import { listCampaigns } from "@/server/services/campaigns";
 import { VideoJobForm } from "@/components/videos/video-job-form";
 import { listProductsForSelect } from "@/server/services/affiliate";
 
@@ -9,7 +10,7 @@ export default async function NewVideoJobPage() {
   const [scripts, products, campaigns] = await Promise.all([
     prisma.script.findMany({ select: { id: true, title: true }, orderBy: { createdAt: "desc" } }),
     listProductsForSelect(),
-    prisma.campaign.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    listCampaigns(),
   ]);
 
   return (
