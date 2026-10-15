@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db/client";
+import { listCampaigns } from "@/server/services/campaigns";
 import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { listRevenues, listExpenses, getFinanceOverview, getOrCreateTaxSetting } from "@/server/services/finance";
 import { estimateTaxReserve } from "@/lib/finance/calculations";
@@ -18,7 +19,7 @@ export default async function FinancePage() {
     getOrCreateTaxSetting(),
     prisma.affiliateProgram.findMany({ select: { id: true, provider: true, customName: true }, orderBy: { provider: "asc" } }),
     prisma.product.findMany({ where: { workspaceId }, select: { id: true, name: true }, orderBy: { name: "asc" } }),
-    prisma.campaign.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    listCampaigns(),
   ]);
 
   const revenueRows: RevenueRow[] = revenues.map((r) => ({
