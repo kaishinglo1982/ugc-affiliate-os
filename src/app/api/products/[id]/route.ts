@@ -29,7 +29,7 @@ export async function GET(
         offers: true,
         complianceProfiles: { orderBy: { evaluatedAt: "desc" }, take: 1 },
         contentFitProfiles: { orderBy: { generatedAt: "desc" }, take: 1 },
-        profitabilityEstimates: { orderBy: { calculatedAt: "desc" }, take: 1 },
+        profitabilityEstimates: { orderBy: { generatedAt: "desc" }, take: 1 },
         opportunities: { orderBy: { calculatedAt: "desc" }, take: 1 },
         matchCandidates: true,
       },
