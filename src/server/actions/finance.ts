@@ -73,7 +73,11 @@ export async function deleteRevenueAction(id: string) {
     auditAction: "revenue.delete",
     entityType: "Revenue",
     handler: async (input) => {
-      await prisma.revenue.delete({ where: { id: input.id } });
+      const workspaceId = await resolveWorkspaceId();
+      const deleted = await withWorkspaceTransaction(workspaceId, (tx) =>
+        tx.revenue.deleteMany({ where: { id: input.id, workspaceId } }),
+      );
+      if (deleted.count !== 1) throw new Error("REVENUE_NOT_FOUND_IN_WORKSPACE");
       return { id: input.id };
     },
     entityId: (output) => output.id,
@@ -140,7 +144,11 @@ export async function deleteExpenseAction(id: string) {
     auditAction: "expense.delete",
     entityType: "Expense",
     handler: async (input) => {
-      await prisma.expense.delete({ where: { id: input.id } });
+      const workspaceId = await resolveWorkspaceId();
+      const deleted = await withWorkspaceTransaction(workspaceId, (tx) =>
+        tx.expense.deleteMany({ where: { id: input.id, workspaceId } }),
+      );
+      if (deleted.count !== 1) throw new Error("EXPENSE_NOT_FOUND_IN_WORKSPACE");
       return { id: input.id };
     },
     entityId: (output) => output.id,
