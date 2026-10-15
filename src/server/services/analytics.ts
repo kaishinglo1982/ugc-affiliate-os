@@ -25,7 +25,7 @@ export async function getAnalyticsData(filters: AnalyticsFilters) {
   const platformText = filters.platform ? platformLabel(filters.platform) : undefined;
 
   const campaign = filters.campaignId
-    ? await prisma.campaign.findUnique({ where: { id: filters.campaignId }, select: { affiliateLinkId: true } })
+    ? await prisma.campaign.findFirst({ where: { id: filters.campaignId, workspaceId }, select: { affiliateLinkId: true } })
     : null;
   // A campaign filter with no linked affiliate link should yield zero clicks, not "all clicks".
   const campaignHasNoLink = Boolean(filters.campaignId) && !campaign?.affiliateLinkId;
@@ -34,6 +34,7 @@ export async function getAnalyticsData(filters: AnalyticsFilters) {
     occurredAt: { gte: from, lte: to },
     ...(campaignHasNoLink ? { linkId: "__none__" } : {}),
     link: {
+      program: { workspaceId },
       ...(filters.productId ? { productId: filters.productId } : {}),
       ...(filters.programId ? { programId: filters.programId } : {}),
       ...(platformText ? { platform: platformText } : {}),
