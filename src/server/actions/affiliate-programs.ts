@@ -87,7 +87,11 @@ export async function deleteAffiliateProgramAction(id: string) {
     auditAction: "affiliate_program.delete",
     entityType: "AffiliateProgram",
     handler: async (input) => {
-      await prisma.affiliateProgram.delete({ where: { id: input.id } });
+      const workspaceId = await resolveWorkspaceId();
+      const deleted = await prisma.affiliateProgram.deleteMany({
+        where: { id: input.id, workspaceId },
+      });
+      if (deleted.count !== 1) throw new Error("AFFILIATE_PROGRAM_NOT_FOUND_IN_WORKSPACE");
       return { id: input.id };
     },
     entityId: (output) => output.id,
@@ -102,11 +106,15 @@ export async function disconnectAffiliateProgramAction(id: string) {
     input: { id },
     auditAction: "integration.disconnect",
     entityType: "AffiliateProgram",
-    handler: async (input) =>
-      prisma.affiliateProgram.update({
-        where: { id: input.id },
+    handler: async (input) => {
+      const workspaceId = await resolveWorkspaceId();
+      const updated = await prisma.affiliateProgram.updateMany({
+        where: { id: input.id, workspaceId },
         data: { status: "DISCONNECTED", credentialId: null },
-      }),
+      });
+      if (updated.count !== 1) throw new Error("AFFILIATE_PROGRAM_NOT_FOUND_IN_WORKSPACE");
+      return { id: input.id };
+    },
     entityId: (output) => output.id,
   });
   revalidatePath("/app/affiliate-programs");
