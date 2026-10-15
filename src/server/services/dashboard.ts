@@ -81,14 +81,14 @@ export async function getDashboardData(period: DashboardPeriod, workspaceId?: st
     prisma.videoJob.count({
       where: { status: { in: ["QUEUED", "PROCESSING", "REVIEW_REQUIRED"] }, campaign: { workspaceId: resolvedWorkspaceId } },
     }),
-    Promise.resolve([]), // AuditLog has no workspace ownership field; never expose global activity in a tenant dashboard.
+    Promise.resolve([] as Array<{ id: string; action: string; createdAt: Date }>), // AuditLog has no workspace ownership field; never expose global activity in a tenant dashboard.
     prisma.socialPost.findMany({
       where: { status: "SCHEDULED", scheduledAt: { gte: new Date() }, account: { workspaceId: resolvedWorkspaceId } },
       orderBy: { scheduledAt: "asc" },
       take: 5,
       include: { account: true, campaign: true },
     }),
-    Promise.resolve([]), // Integration records have no workspace ownership; avoid leaking global integration errors.
+    Promise.resolve([] as Array<{ id: string; displayName: string; lastError: string | null }>), // Integration records have no workspace ownership; avoid leaking global integration errors.
     prisma.agent.findMany({ orderBy: { name: "asc" } }),
     prisma.campaign.groupBy({ by: ["status"], where: { workspaceId: resolvedWorkspaceId }, _count: { _all: true } }),
     prisma.script.groupBy({ by: ["status"], where: { campaign: { workspaceId: resolvedWorkspaceId } }, _count: { _all: true } }),
