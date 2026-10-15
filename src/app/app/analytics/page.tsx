@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Eye, Users, MousePointerClick, Percent, TrendingUp, Coins, Target, Heart } from "lucide-react";
 import { prisma } from "@/lib/db/client";
+import { listCampaigns } from "@/server/services/campaigns";
 import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { getAnalyticsData } from "@/server/services/analytics";
 import type { DashboardPeriod } from "@/lib/dashboard-period";
@@ -49,7 +50,7 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       select: { id: true, name: true },
       orderBy: { name: "asc" },
     }),
-    prisma.campaign.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    listCampaigns(),
     prisma.affiliateProgram.findMany({ select: { id: true, provider: true, customName: true }, orderBy: { provider: "asc" } }),
   ]);
 
