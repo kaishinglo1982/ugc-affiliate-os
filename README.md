@@ -25,6 +25,10 @@ Copy `.env.example` to `.env.local` for local development and set at least:
 
 Set `ADMIN_EMAIL` plus either `ADMIN_PASSWORD_HASH` for production or `ADMIN_PASSWORD` for local/CI seeding. Set `WORKER_SECRET` in deployed environments before wiring cron jobs.
 
+### One-time bootstrap access
+
+If production needs initial dashboard access before its first seed, set a high-entropy `BOOTSTRAP_ACCESS_TOKEN` and open `/bootstrap`. The token creates exactly one admin session only when the database has no user. Remove `BOOTSTRAP_ACCESS_TOKEN` immediately after use, then set `ADMIN_PASSWORD_HASH` and run `pnpm run db:seed`; the seed replaces the temporary bootstrap credential.
+
 ## Database
 
 ```bash

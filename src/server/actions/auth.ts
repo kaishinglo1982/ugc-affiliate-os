@@ -1,9 +1,10 @@
 "use server";
 
 import { cookies, headers } from "next/headers";
+import { timingSafeEqual } from "node:crypto";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db/client";
-import { verifyPassword } from "@/lib/auth/password";
+import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import {
   SESSION_COOKIE_NAME,
   SESSION_DURATION_SECONDS,
@@ -97,6 +98,68 @@ export async function loginAction(
   });
 
   return ok({ redirectTo }, requestId);
+}
+
+export async function bootstrapAction(
+  _prevState: Result<{ redirectTo: string }> | null,
+  formData: FormData,
+): Promise<Result<{ redirectTo: string }>> {
+  const requestId = newRequestId();
+  const configuredToken = process.env.BOOTSTRAP_ACCESS_TOKEN;
+  const submittedToken = formData.get("token");
+  const adminEmail = process.env.ADMIN_EMAIL;
+
+  if (!configuredToken || !adminEmail || typeof submittedToken !== "string") {
+    return fail("Bootstrap-Zugang ist nicht verfügbar.", requestId);
+  }
+
+  const configured = Buffer.from(configuredToken);
+  const submitted = Buffer.from(submittedToken);
+  if (configured.length !== submitted.length || !timingSafeEqual(configured, submitted)) {
+    return fail("Bootstrap-Token ist ungültig.", requestId);
+  }
+
+  const existingUser = await prisma.user.findFirst({ select: { id: true } });
+  if (existingUser) {
+    return fail("Bootstrap-Zugang wurde bereits verwendet.", requestId);
+  }
+
+  const bootstrapPassword = generateOpaqueSecret();
+  const user = await prisma.user.create({
+    data: {
+      email: adminEmail,
+      name: "Bootstrap Admin",
+      passwordHash: await hashPassword(bootstrapPassword),
+    },
+  });
+
+  const secret = generateOpaqueSecret();
+  const session = await prisma.session.create({
+    data: {
+      userId: user.id,
+      tokenHash: hashOpaqueSecret(secret),
+      expiresAt: new Date(Date.now() + SESSION_DURATION_SECONDS * 1000),
+    },
+  });
+  const token = await signSessionToken({ sub: user.id, sid: session.id, sec: secret });
+
+  const cookieStore = await cookies();
+  cookieStore.set(SESSION_COOKIE_NAME, token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: SESSION_DURATION_SECONDS,
+  });
+
+  await writeAuditLog({
+    action: "auth.bootstrap",
+    entityType: "User",
+    entityId: user.id,
+    requestId,
+  });
+
+  return ok({ redirectTo: "/app/dashboard" }, requestId);
 }
 
 export async function logoutAction(): Promise<void> {

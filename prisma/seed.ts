@@ -43,11 +43,17 @@ async function seedAdminUser() {
       ? process.env.ADMIN_PASSWORD_HASH
       : await bcrypt.hash(process.env.ADMIN_PASSWORD || "ChangeMe123!", 12);
 
-  const user = await prisma.user.upsert({
-    where: { email },
-    update: {},
-    create: { email, passwordHash, name: "Owner" },
-  });
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+  const user = existingUser?.name === "Bootstrap Admin"
+    ? await prisma.user.update({
+        where: { email },
+        data: { name: "Owner", passwordHash },
+      })
+    : await prisma.user.upsert({
+        where: { email },
+        update: {},
+        create: { email, passwordHash, name: "Owner" },
+      });
   console.log(`Seeded admin user: ${user.email}`);
   return user;
 }
