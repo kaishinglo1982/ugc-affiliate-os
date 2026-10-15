@@ -64,12 +64,27 @@ export async function getDashboardData(period: DashboardPeriod, workspaceId?: st
     socialPosts,
   ] = await Promise.all([
     prisma.revenue.findMany({
-      where: { workspaceId: resolvedWorkspaceId, date: { gte: from, lte: to } },
-      include: { product: true },
+      where: {
+        workspaceId: resolvedWorkspaceId,
+        date: { gte: from, lte: to },
+        AND: [
+          { OR: [{ productId: null }, { product: { workspaceId: resolvedWorkspaceId } }] },
+          { OR: [{ campaignId: null }, { campaign: { workspaceId: resolvedWorkspaceId } }] },
+          { OR: [{ programId: null }, { program: { workspaceId: resolvedWorkspaceId } }] },
+        ],
+      },
+      include: { product: { where: { workspaceId: resolvedWorkspaceId } } },
       orderBy: { date: "asc" },
     }),
     prisma.expense.findMany({
-      where: { workspaceId: resolvedWorkspaceId, date: { gte: from, lte: to } },
+      where: {
+        workspaceId: resolvedWorkspaceId,
+        date: { gte: from, lte: to },
+        AND: [
+          { OR: [{ productId: null }, { product: { workspaceId: resolvedWorkspaceId } }] },
+          { OR: [{ campaignId: null }, { campaign: { workspaceId: resolvedWorkspaceId } }] },
+        ],
+      },
       orderBy: { date: "asc" },
     }),
     prisma.linkClick.count({ where: { occurredAt: { gte: from, lte: to }, link: { program: { workspaceId: resolvedWorkspaceId } } } }),
