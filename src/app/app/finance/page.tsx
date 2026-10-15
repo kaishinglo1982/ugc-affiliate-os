@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { prisma } from "@/lib/db/client";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { listRevenues, listExpenses, getFinanceOverview, getOrCreateTaxSetting } from "@/server/services/finance";
 import { estimateTaxReserve } from "@/lib/finance/calculations";
 import { FinancePageClient } from "@/components/finance/finance-page-client";
@@ -9,10 +10,11 @@ import type { ExpenseRow } from "@/components/finance/expenses-table";
 export const metadata: Metadata = { title: "Finance" };
 
 export default async function FinancePage() {
+  const workspaceId = await resolveWorkspaceId();
   const [revenues, expenses, overview, taxSetting, programs, products, campaigns] = await Promise.all([
-    listRevenues(),
-    listExpenses(),
-    getFinanceOverview(),
+    listRevenues(workspaceId),
+    listExpenses(workspaceId),
+    getFinanceOverview(workspaceId),
     getOrCreateTaxSetting(),
     prisma.affiliateProgram.findMany({ select: { id: true, provider: true, customName: true }, orderBy: { provider: "asc" } }),
     prisma.product.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
