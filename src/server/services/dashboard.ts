@@ -73,7 +73,7 @@ export async function getDashboardData(period: DashboardPeriod, workspaceId?: st
           { OR: [{ programId: null }, { program: { workspaceId: resolvedWorkspaceId } }] },
         ],
       },
-      include: { product: { where: { workspaceId: resolvedWorkspaceId } } },
+      include: { product: true },
       orderBy: { date: "asc" },
     }),
     prisma.expense.findMany({
