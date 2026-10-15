@@ -259,6 +259,9 @@ enum CampaignStatus {
 
 model Campaign {
   id             String         @id @default(uuid())
+  // Nullable during the ownership migration: legacy rows remain inaccessible
+  // to workspace-scoped paths until ownership is explicitly reconciled.
+  workspaceId    String?
   name           String
   productId      String?
   product        Product?       @relation(fields: [productId], references: [id])
