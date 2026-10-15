@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Eye, Users, MousePointerClick, Percent, TrendingUp, Coins, Target, Heart } from "lucide-react";
 import { prisma } from "@/lib/db/client";
+import { resolveWorkspaceId } from "@/lib/auth/tenant";
 import { getAnalyticsData } from "@/server/services/analytics";
 import type { DashboardPeriod } from "@/lib/dashboard-period";
 import { AnalyticsFilters } from "@/components/analytics/analytics-filters";
@@ -29,6 +30,7 @@ interface AnalyticsPageProps {
 
 export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps) {
   const params = await searchParams;
+  const workspaceId = await resolveWorkspaceId();
   const period: DashboardPeriod = VALID_PERIODS.includes(params.period as DashboardPeriod)
     ? (params.period as DashboardPeriod)
     : "30d";
@@ -42,7 +44,11 @@ export default async function AnalyticsPage({ searchParams }: AnalyticsPageProps
       programId: params.programId,
       contentStatus: params.contentStatus,
     }),
-    prisma.product.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
+    prisma.product.findMany({
+      where: { workspaceId },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
     prisma.campaign.findMany({ select: { id: true, name: true }, orderBy: { name: "asc" } }),
     prisma.affiliateProgram.findMany({ select: { id: true, provider: true, customName: true }, orderBy: { provider: "asc" } }),
   ]);
