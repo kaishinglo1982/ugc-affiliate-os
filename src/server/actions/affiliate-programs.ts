@@ -54,7 +54,7 @@ export async function saveAffiliateProgramAction(
     ...(credentialId ? { credentialId, status: "CONNECTED" } : {}),
   };
 
-  let program;
+  let program: Awaited<ReturnType<typeof prisma.affiliateProgram.findFirstOrThrow>>;
   if (programId) {
     const updated = await prisma.affiliateProgram.updateMany({
       where: { id: programId, workspaceId },
