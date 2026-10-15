@@ -31,6 +31,14 @@ export async function saveAffiliateProgramAction(
     return fail("Eingabe ungültig.", requestId, parsed.error.flatten().fieldErrors);
   }
 
+  if (programId) {
+    const existing = await prisma.affiliateProgram.findFirst({
+      where: { id: programId, workspaceId },
+      select: { id: true },
+    });
+    if (!existing) return fail("Affiliate-Programm nicht gefunden oder kein Zugriff.", requestId);
+  }
+
   let credentialId: string | undefined;
   if (parsed.data.apiKey) {
     const encrypted = encryptSecret(parsed.data.apiKey);
