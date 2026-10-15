@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApiPermission } from "@/lib/api/guard";
 import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceTransaction } from "@/lib/db/with-workspace-transaction";
 import type { ProductStatus, RiskLevel } from "@/generated/prisma/client";
 
 export async function GET(request: Request) {
@@ -29,7 +29,7 @@ export async function GET(request: Request) {
   const limit = limitParam ? Math.max(1, Number(limitParam) || 50) : 50;
   const offset = offsetParam ? Math.max(0, Number(offsetParam) || 0) : 0;
 
-  const products = await prisma.product.findMany({
+  const products = await withWorkspaceTransaction(workspaceId, (tx) => tx.product.findMany({
     where: {
       workspaceId: workspaceId,
       ...(status ? { status: status as ProductStatus } : {}),
@@ -60,7 +60,7 @@ export async function GET(request: Request) {
     take: limit,
     skip: offset,
     orderBy: { createdAt: "desc" },
-  });
+  }));
 
   return NextResponse.json({ products });
 }
