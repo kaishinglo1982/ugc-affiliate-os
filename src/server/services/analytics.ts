@@ -61,15 +61,22 @@ export async function getAnalyticsData(filters: AnalyticsFilters) {
 
   const postWhere: Prisma.SocialPostWhereInput = {
     publishedAt: { gte: from, lte: to },
+    campaign: {
+      workspaceId,
+      ...(filters.productId ? { productId: filters.productId } : {}),
+    },
     ...(filters.campaignId ? { campaignId: filters.campaignId } : {}),
     ...(filters.contentStatus ? { status: filters.contentStatus as never } : {}),
     ...(filters.platform ? { account: { platform: filters.platform as never } } : {}),
-    ...(filters.productId ? { campaign: { productId: filters.productId } } : {}),
   };
 
   // Content-status breakdown should reflect the same scope minus the period lock on
   // unpublished posts (a DRAFT post has no publishedAt and would otherwise vanish).
   const statusBreakdownWhere: Prisma.SocialPostWhereInput = {
+    campaign: {
+      workspaceId,
+      ...(filters.productId ? { productId: filters.productId } : {}),
+    },
     ...(filters.campaignId ? { campaignId: filters.campaignId } : {}),
     ...(filters.platform ? { account: { platform: filters.platform as never } } : {}),
     ...(filters.productId ? { campaign: { productId: filters.productId } } : {}),
