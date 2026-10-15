@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireApiPermission } from "@/lib/api/guard";
 import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
-import { prisma } from "@/lib/db/client";
+import { withWorkspaceTransaction } from "@/lib/db/with-workspace-transaction";
 import type { AffiliateProviderKey, AffiliateOfferStatus } from "@/generated/prisma/client";
 
 export async function GET(request: Request) {
@@ -11,11 +11,11 @@ export async function GET(request: Request) {
   let workspaceId: string;
   try {
     workspaceId = await resolveWorkspaceId();
-  } catch (e) {
-    if (e instanceof InvalidTenantTokenError) {
+  } catch (error) {
+    if (error instanceof InvalidTenantTokenError) {
       return NextResponse.json({ error: "Ungültiges Tenant-Token." }, { status: 401 });
     }
-    throw e;
+    throw error;
   }
 
   const { searchParams } = new URL(request.url);
@@ -23,18 +23,20 @@ export async function GET(request: Request) {
   const status = searchParams.get("status");
   const productId = searchParams.get("productId");
 
-  const offers = await prisma.affiliateOffer.findMany({
-    where: {
-      workspaceId: workspaceId,
-      ...(provider ? { provider: provider as AffiliateProviderKey } : {}),
-      ...(status ? { status: status as AffiliateOfferStatus } : {}),
-      ...(productId ? { productId } : {}),
-    },
-    include: {
-      product: { select: { id: true, canonicalName: true } },
-      affiliateProgram: { select: { id: true, provider: true, mode: true } },
-    },
-    orderBy: { importedAt: "desc" },
-  });
+  const offers = await withWorkspaceTransaction(workspaceId, (tx) =>
+    tx.affiliateOffer.findMany({
+      where: {
+        workspaceId,
+        ...(provider ? { provider: provider as AffiliateProviderKey } : {}),
+        ...(status ? { status: status as AffiliateOfferStatus } : {}),
+        ...(productId ? { productId } : {}),
+      },
+      include: {
+        product: { select: { id: true, canonicalName: true } },
+        affiliateProgram: { select: { id: true, provider: true, mode: true } },
+      },
+      orderBy: { importedAt: "desc" },
+    }),
+  );
   return NextResponse.json({ offers });
 }
