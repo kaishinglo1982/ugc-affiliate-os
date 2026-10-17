@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 
-import type { Pool, PoolClient } from "pg";
+import type { Pool } from "pg";
+
+import { withWorkspacePgTransaction } from "@/lib/db/workspace-pg-transaction";
 
 export interface ClaimedWorkflowStep {
   id: string;
@@ -22,21 +24,6 @@ export class WorkflowStepClaimLostError extends Error {
   }
 }
 
-async function inTransaction<T>(pool: Pool, work: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    const result = await work(client);
-    await client.query("COMMIT");
-    return result;
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
-}
-
 export class PostgresWorkflowStepClaimService {
   constructor(private readonly pool: Pool) {}
 
@@ -50,7 +37,7 @@ export class PostgresWorkflowStepClaimService {
     const leaseExpiresAt = new Date(now.getTime() + input.leaseMs);
     const claimToken = randomUUID();
 
-    return inTransaction(this.pool, async (client) => {
+    return withWorkspacePgTransaction(this.pool, input.workspaceId, async (client) => {
       const result = await client.query<ClaimedWorkflowStep>(
         `WITH candidate AS (
            SELECT "id"
@@ -100,19 +87,21 @@ export class PostgresWorkflowStepClaimService {
   }): Promise<void> {
     const now = input.now ?? new Date();
     const leaseExpiresAt = new Date(now.getTime() + input.leaseMs);
-    const result = await this.pool.query(
-      `UPDATE "WorkflowStepRun"
-       SET "heartbeatAt" = $4,
-           "leaseExpiresAt" = $5,
-           "version" = "version" + 1
-       WHERE "workspaceId" = $1
-         AND "id" = $2
-         AND "claimToken" = $3
-         AND "state" IN ('CLAIMED', 'RUNNING')
-         AND "leaseExpiresAt" > $4`,
-      [input.workspaceId, input.stepRunId, input.claimToken, now, leaseExpiresAt],
-    );
-    if (result.rowCount !== 1) throw new WorkflowStepClaimLostError(input.stepRunId);
+    await withWorkspacePgTransaction(this.pool, input.workspaceId, async (client) => {
+      const result = await client.query(
+        `UPDATE "WorkflowStepRun"
+         SET "heartbeatAt" = $4,
+             "leaseExpiresAt" = $5,
+             "version" = "version" + 1
+         WHERE "workspaceId" = $1
+           AND "id" = $2
+           AND "claimToken" = $3
+           AND "state" IN ('CLAIMED', 'RUNNING')
+           AND "leaseExpiresAt" > $4`,
+        [input.workspaceId, input.stepRunId, input.claimToken, now, leaseExpiresAt],
+      );
+      if (result.rowCount !== 1) throw new WorkflowStepClaimLostError(input.stepRunId);
+    });
   }
 
   async complete(input: {
@@ -123,42 +112,46 @@ export class PostgresWorkflowStepClaimService {
     now?: Date;
   }): Promise<void> {
     const now = input.now ?? new Date();
-    const result = await this.pool.query(
-      `UPDATE "WorkflowStepRun"
-       SET "state" = 'COMPLETED',
-           "status" = 'COMPLETED',
-           "output" = $4::jsonb,
-           "finishedAt" = $5,
-           "claimedBy" = NULL,
-           "claimToken" = NULL,
-           "leaseExpiresAt" = NULL,
-           "version" = "version" + 1
-       WHERE "workspaceId" = $1
-         AND "id" = $2
-         AND "claimToken" = $3
-         AND "state" IN ('CLAIMED', 'RUNNING')
-         AND "leaseExpiresAt" > $5`,
-      [input.workspaceId, input.stepRunId, input.claimToken, JSON.stringify(input.output ?? null), now],
-    );
-    if (result.rowCount !== 1) throw new WorkflowStepClaimLostError(input.stepRunId);
+    await withWorkspacePgTransaction(this.pool, input.workspaceId, async (client) => {
+      const result = await client.query(
+        `UPDATE "WorkflowStepRun"
+         SET "state" = 'COMPLETED',
+             "status" = 'COMPLETED',
+             "output" = $4::jsonb,
+             "finishedAt" = $5,
+             "claimedBy" = NULL,
+             "claimToken" = NULL,
+             "leaseExpiresAt" = NULL,
+             "version" = "version" + 1
+         WHERE "workspaceId" = $1
+           AND "id" = $2
+           AND "claimToken" = $3
+           AND "state" IN ('CLAIMED', 'RUNNING')
+           AND "leaseExpiresAt" > $5`,
+        [input.workspaceId, input.stepRunId, input.claimToken, JSON.stringify(input.output ?? null), now],
+      );
+      if (result.rowCount !== 1) throw new WorkflowStepClaimLostError(input.stepRunId);
+    });
   }
 
   async releaseExpiredClaims(input: { workspaceId: string; now?: Date }): Promise<number> {
     const now = input.now ?? new Date();
-    const result = await this.pool.query(
-      `UPDATE "WorkflowStepRun"
-       SET "state" = CASE WHEN "attemptCount" >= "maxAttempts" THEN 'FAILED' ELSE 'READY' END,
-           "status" = CASE WHEN "attemptCount" >= "maxAttempts" THEN 'FAILED' ELSE "status" END,
-           "claimedBy" = NULL,
-           "claimToken" = NULL,
-           "leaseExpiresAt" = NULL,
-           "heartbeatAt" = NULL,
-           "version" = "version" + 1
-       WHERE "workspaceId" = $1
-         AND "state" IN ('CLAIMED', 'RUNNING')
-         AND "leaseExpiresAt" <= $2`,
-      [input.workspaceId, now],
-    );
-    return result.rowCount ?? 0;
+    return withWorkspacePgTransaction(this.pool, input.workspaceId, async (client) => {
+      const result = await client.query(
+        `UPDATE "WorkflowStepRun"
+         SET "state" = CASE WHEN "attemptCount" >= "maxAttempts" THEN 'FAILED' ELSE 'READY' END,
+             "status" = CASE WHEN "attemptCount" >= "maxAttempts" THEN 'FAILED' ELSE "status" END,
+             "claimedBy" = NULL,
+             "claimToken" = NULL,
+             "leaseExpiresAt" = NULL,
+             "heartbeatAt" = NULL,
+             "version" = "version" + 1
+         WHERE "workspaceId" = $1
+           AND "state" IN ('CLAIMED', 'RUNNING')
+           AND "leaseExpiresAt" <= $2`,
+        [input.workspaceId, now],
+      );
+      return result.rowCount ?? 0;
+    });
   }
 }
