@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
-import { toCsv } from "@/lib/csv";
+import { requireApiPermission } from "@/lib/api/guard";
+import { Permission } from "@/lib/auth/rbac";
 import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
+import { toCsv } from "@/lib/csv";
 
 export async function GET(request: Request) {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Nicht authentifiziert." }, { status: 401 });
-  }
+  const denied = await requireApiPermission(Permission.EXPORT_FINANCE);
+  if (denied) return denied.response;
 
   let workspaceId: string;
   try {
@@ -23,11 +22,11 @@ export async function GET(request: Request) {
   const type = new URL(request.url).searchParams.get("type") === "expense" ? "expense" : "revenue";
 
   if (type === "expense") {
-    const expenses = await prisma.expense.findMany({
+    const expenses = await withWorkspaceTransaction(workspaceId, (tx) => tx.expense.findMany({
       where: { workspaceId },
       include: { product: { select: { name: true } }, campaign: { select: { name: true } } },
       orderBy: { date: "desc" },
-    });
+    }));
     const header = ["date", "category", "vendor", "product", "campaign", "amount", "isRecurring", "isTaxRelevant", "notes"];
     const rows = expenses.map((e) => [
       e.date.toISOString().slice(0, 10),
@@ -48,7 +47,7 @@ export async function GET(request: Request) {
     });
   }
 
-  const revenues = await prisma.revenue.findMany({
+  const revenues = await withWorkspaceTransaction(workspaceId, (tx) => tx.revenue.findMany({
     where: { workspaceId },
     include: {
       product: { select: { name: true } },
@@ -56,7 +55,7 @@ export async function GET(request: Request) {
       program: { select: { provider: true, customName: true } },
     },
     orderBy: { date: "desc" },
-  });
+  }));
   const header = ["date", "status", "platform", "product", "campaign", "program", "grossAmount", "reference", "notes"];
   const rows = revenues.map((r) => [
     r.date.toISOString().slice(0, 10),

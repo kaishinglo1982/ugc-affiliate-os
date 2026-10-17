@@ -1,14 +1,13 @@
 import { NextResponse } from "next/server";
-import { getCurrentUser } from "@/lib/auth/current-user";
-import { prisma } from "@/lib/db/client";
-import { toCsv } from "@/lib/csv";
+import { requireApiPermission } from "@/lib/api/guard";
+import { Permission } from "@/lib/auth/rbac";
 import { InvalidTenantTokenError, resolveWorkspaceId } from "@/lib/auth/tenant";
+import { withWorkspaceTransaction } from "@/lib/db/workspace-transaction";
+import { toCsv } from "@/lib/csv";
 
 export async function GET() {
-  const user = await getCurrentUser();
-  if (!user) {
-    return NextResponse.json({ error: "Nicht authentifiziert." }, { status: 401 });
-  }
+  const denied = await requireApiPermission(Permission.VIEW_PRODUCTS);
+  if (denied) return denied.response;
 
   let workspaceId: string;
   try {
@@ -20,11 +19,11 @@ export async function GET() {
     throw error;
   }
 
-  const products = await prisma.product.findMany({
+  const products = await withWorkspaceTransaction(workspaceId, (tx) => tx.product.findMany({
     where: { workspaceId },
     include: { scores: { orderBy: { createdAt: "desc" }, take: 1 } },
     orderBy: { createdAt: "desc" },
-  });
+  }));
 
   const header = [
     "name",
