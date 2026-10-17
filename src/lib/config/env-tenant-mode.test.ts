@@ -33,6 +33,18 @@ describe("validateTenantModeConfiguration", () => {
     })).toThrow(/CARRYOS_TENANT_SECRET/);
   });
 
+  it("rejects reuse of AUTH_SECRET as the tenant signing secret", () => {
+    const sharedSecret = "s".repeat(32);
+    expect(() => validateTenantModeConfiguration({
+      NODE_ENV: "test",
+      CARRYOS_INTEGRATION_MODE: "CORE_BOUND",
+      AUTH_SECRET: sharedSecret,
+      CARRYOS_TENANT_SECRET: sharedSecret,
+      CARRYOS_TENANT_WORKSPACE_BINDINGS_JSON: JSON.stringify({ [TENANT_ID]: WORKSPACE_ID }),
+      CARRYOS_WORKSPACE_ROLE_BINDINGS_JSON: JSON.stringify({ [WORKSPACE_ID]: { [USER_ID]: "admin" } }),
+    })).toThrow(/CARRYOS_TENANT_SECRET must differ from AUTH_SECRET/);
+  });
+
   it("rejects malformed tenant binding JSON", () => {
     expect(() => validateTenantModeConfiguration({
       NODE_ENV: "test",
@@ -43,10 +55,22 @@ describe("validateTenantModeConfiguration", () => {
     })).toThrow(/CARRYOS_TENANT_WORKSPACE_BINDINGS_JSON must contain valid JSON/);
   });
 
+  it("rejects a workspace with no explicit user-role binding", () => {
+    expect(() => validateTenantModeConfiguration({
+      NODE_ENV: "production",
+      CARRYOS_INTEGRATION_MODE: "CORE_BOUND",
+      AUTH_SECRET: "a".repeat(32),
+      CARRYOS_TENANT_SECRET: "s".repeat(32),
+      CARRYOS_TENANT_WORKSPACE_BINDINGS_JSON: JSON.stringify({ [TENANT_ID]: WORKSPACE_ID }),
+      CARRYOS_WORKSPACE_ROLE_BINDINGS_JSON: JSON.stringify({ [WORKSPACE_ID]: {} }),
+    })).toThrow(/CARRYOS_WORKSPACE_ROLE_BINDINGS_JSON must contain a non-empty, valid binding object/);
+  });
+
   it("accepts valid, explicit CORE_BOUND tenant and role bindings", () => {
     expect(() => validateTenantModeConfiguration({
       NODE_ENV: "production",
       CARRYOS_INTEGRATION_MODE: "CORE_BOUND",
+      AUTH_SECRET: "a".repeat(32),
       CARRYOS_TENANT_SECRET: "s".repeat(32),
       CARRYOS_TENANT_WORKSPACE_BINDINGS_JSON: JSON.stringify({ [TENANT_ID]: WORKSPACE_ID }),
       CARRYOS_WORKSPACE_ROLE_BINDINGS_JSON: JSON.stringify({ [WORKSPACE_ID]: { [USER_ID]: "admin" } }),
