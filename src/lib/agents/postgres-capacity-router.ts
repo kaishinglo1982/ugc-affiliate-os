@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 
-import type { Pool, PoolClient } from "pg";
+import type { Pool } from "pg";
+
+import { withWorkspacePgTransaction } from "@/lib/db/workspace-pg-transaction";
 
 import {
   type AgentTaskRequest,
@@ -23,21 +25,6 @@ export class NoAgentCapacityError extends Error {
   }
 }
 
-async function transaction<T>(pool: Pool, work: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    const value = await work(client);
-    await client.query("COMMIT");
-    return value;
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
-}
-
 export class PostgresAgentCapacityRouter {
   constructor(private readonly pool: Pool) {}
 
@@ -52,7 +39,7 @@ export class PostgresAgentCapacityRouter {
     const reservationId = randomUUID();
     const reservationToken = randomUUID();
 
-    return transaction(this.pool, async (client) => {
+    return withWorkspacePgTransaction(this.pool, input.request.workspaceId, async (client) => {
       const existing = await client.query<{
         reservationId: string;
         reservationToken: string;
@@ -178,7 +165,7 @@ export class PostgresAgentCapacityRouter {
     now?: Date;
   }): Promise<boolean> {
     const now = input.now ?? new Date();
-    return transaction(this.pool, async (client) => {
+    return withWorkspacePgTransaction(this.pool, input.workspaceId, async (client) => {
       const result = await client.query<{ agentRegistrationId: string }>(
         `UPDATE "AgentCapacityReservation"
          SET "status" = 'RELEASED', "releasedAt" = $3
@@ -204,7 +191,7 @@ export class PostgresAgentCapacityRouter {
 
   async releaseExpired(input: { workspaceId: string; now?: Date }): Promise<number> {
     const now = input.now ?? new Date();
-    return transaction(this.pool, async (client) => {
+    return withWorkspacePgTransaction(this.pool, input.workspaceId, async (client) => {
       const expired = await client.query<{ agentRegistrationId: string }>(
         `UPDATE "AgentCapacityReservation"
          SET "status" = 'EXPIRED', "releasedAt" = $2
