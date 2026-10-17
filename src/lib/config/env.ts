@@ -2,6 +2,16 @@ import { z } from "zod";
 
 import { logStructured } from "@/lib/observability/metrics";
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const workspaceBindingsSchema = z.record(z.string().regex(UUID_PATTERN), z.string().regex(UUID_PATTERN));
+const roleBindingsSchema = z.record(
+  z.string().regex(UUID_PATTERN),
+  z.record(
+    z.string().regex(UUID_PATTERN),
+    z.enum(["viewer", "analyst", "affiliate_manager", "content_manager", "publisher", "finance_viewer", "admin", "owner"]),
+  ),
+);
+
 const environmentSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   DATABASE_URL: z.string().min(1),
@@ -11,6 +21,10 @@ const environmentSchema = z.object({
   APP_URL: z.string().url().optional(),
   ADMIN_EMAIL: z.string().email().optional(),
   ADMIN_PASSWORD: z.string().min(12).optional(),
+  CARRYOS_INTEGRATION_MODE: z.enum(["SINGLE_TENANT", "CORE_BOUND"]).optional(),
+  CARRYOS_TENANT_SECRET: z.string().min(32).optional(),
+  CARRYOS_TENANT_WORKSPACE_BINDINGS_JSON: z.string().optional(),
+  CARRYOS_WORKSPACE_ROLE_BINDINGS_JSON: z.string().optional(),
 });
 
 const CRITICAL_SERVER_VARS = [
@@ -31,6 +45,47 @@ function readVar(name: string): string | undefined {
   return value && value.trim().length > 0 ? value : undefined;
 }
 
+function parseBindingJson<T>(name: string, raw: string | undefined, schema: z.ZodType<T>): T {
+  if (!raw?.trim()) throw new Error(`${name} must be configured in CORE_BOUND mode.`);
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch {
+    throw new Error(`${name} must contain valid JSON.`);
+  }
+  const parsed = schema.safeParse(value);
+  if (!parsed.success || Object.keys((value ?? {}) as object).length === 0) {
+    throw new Error(`${name} must contain a non-empty, valid binding object.`);
+  }
+  return parsed.data;
+}
+
+/**
+ * Production must declare tenancy explicitly. Otherwise a typo/missing
+ * CORE_BOUND setting could silently enable the default-workspace fallback.
+ */
+export function validateTenantModeConfiguration(
+  source: NodeJS.ProcessEnv = process.env,
+): void {
+  const nodeEnv = source.NODE_ENV ?? "development";
+  const mode = source.CARRYOS_INTEGRATION_MODE;
+
+  if (nodeEnv === "production" && mode !== "SINGLE_TENANT" && mode !== "CORE_BOUND") {
+    throw new Error(
+      "CARRYOS_INTEGRATION_MODE must be explicitly set to SINGLE_TENANT or CORE_BOUND in production.",
+    );
+  }
+
+  // Preserve local/dev single-workspace behavior; production must opt in explicitly.
+  if (mode !== "CORE_BOUND") return;
+
+  if (!source.CARRYOS_TENANT_SECRET || source.CARRYOS_TENANT_SECRET.length < 32) {
+    throw new Error("CARRYOS_TENANT_SECRET must be at least 32 characters in CORE_BOUND mode.");
+  }
+  parseBindingJson("CARRYOS_TENANT_WORKSPACE_BINDINGS_JSON", source.CARRYOS_TENANT_WORKSPACE_BINDINGS_JSON, workspaceBindingsSchema);
+  parseBindingJson("CARRYOS_WORKSPACE_ROLE_BINDINGS_JSON", source.CARRYOS_WORKSPACE_ROLE_BINDINGS_JSON, roleBindingsSchema);
+}
+
 export type EnvValidationResult = {
   ok: boolean;
   missing: string[];
@@ -45,6 +100,7 @@ let cachedEnvironment: ServerEnvironment | null = null;
 export function getServerEnvironment(): ServerEnvironment {
   if (cachedEnvironment) return cachedEnvironment;
 
+  validateTenantModeConfiguration();
   const parsed = environmentSchema.parse(process.env);
   if (parsed.NODE_ENV === "production") {
     const secretValues = [
