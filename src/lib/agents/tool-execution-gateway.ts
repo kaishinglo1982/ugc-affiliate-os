@@ -2,6 +2,8 @@ import { randomUUID } from "node:crypto";
 
 import type { Pool, PoolClient } from "pg";
 
+import { withWorkspacePgTransaction } from "@/lib/db/workspace-pg-transaction";
+
 export type ToolExecutionDenialReason =
   | "TOOL_NOT_FOUND"
   | "TOOL_DISABLED"
@@ -62,22 +64,22 @@ export class PostgresToolExecutionGateway {
     try {
       const { output, cost } = await executor(request.input);
       const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
-      await this.pool.query(
+      await withWorkspacePgTransaction(this.pool, request.workspaceId, async (client) => client.query(
         `UPDATE "AgentToolCall"
          SET "status" = 'SUCCESS', "output" = $3::jsonb, "cost" = $4, "durationMs" = $5
          WHERE "workspaceId" = $1 AND "id" = $2`,
         [request.workspaceId, reservation.callId, JSON.stringify(output ?? null), cost ?? null, Math.round(durationMs)],
-      );
+      ));
       return { callId: reservation.callId, toolId: reservation.toolId, output, cost: cost ?? null, durationMs };
     } catch (error) {
       const durationMs = Number(process.hrtime.bigint() - startedAt) / 1_000_000;
       const message = error instanceof Error ? error.message : String(error);
-      await this.pool.query(
+      await withWorkspacePgTransaction(this.pool, request.workspaceId, async (client) => client.query(
         `UPDATE "AgentToolCall"
          SET "status" = 'FAILED', "error" = $3, "durationMs" = $4
          WHERE "workspaceId" = $1 AND "id" = $2`,
         [request.workspaceId, reservation.callId, message, Math.round(durationMs)],
-      );
+      ));
       throw error;
     }
   }
@@ -86,14 +88,7 @@ export class PostgresToolExecutionGateway {
     request: ToolExecutionRequest,
     now: Date,
   ): Promise<{ callId: string; toolId: string }> {
-    // Denials must still be committed as an audit row, so the transaction
-    // always commits; only success/denial is distinguished afterwards. A
-    // denial thrown *inside* the transaction would roll back its own audit
-    // insert, which would silently drop the evidence the gateway exists to
-    // produce.
-    const outcome = await inTransaction(this.pool, async (client) => {
-      // Serialize policy evaluation + rate-limit accounting per (workspace, tool)
-      // so concurrent callers cannot race past the per-minute limit.
+    const outcome = await withWorkspacePgTransaction(this.pool, request.workspaceId, async (client) => {
       await client.query(`SELECT pg_advisory_xact_lock(hashtext($1))`, [
         `${request.workspaceId}:${request.toolName}`,
       ]);
@@ -107,8 +102,6 @@ export class PostgresToolExecutionGateway {
       );
       const tool = definition.rows[0];
       if (!tool) {
-        // No valid toolId to attach an audit row to; nothing was written, so
-        // rolling back this no-op transaction is harmless.
         throw new ToolExecutionDeniedError("TOOL_NOT_FOUND", request.toolName, "no such tool in this workspace");
       }
       if (!tool.enabled) {
@@ -126,7 +119,6 @@ export class PostgresToolExecutionGateway {
         [request.workspaceId, tool.id],
       );
 
-      // Most-restrictive-wins: any matching policy that denies, denies.
       const requiresApproval = policies.rows.some((policy) => policy.requiresApproval);
       const maxCostPerCall = minDefined(policies.rows.map((policy) => policy.maxCostPerCall).map(toNumberOrNull));
       const rateLimitPerMin = minDefined(policies.rows.map((policy) => policy.rateLimitPerMin));
@@ -240,19 +232,4 @@ function toNumberOrNull(value: string | null): number | null {
 function minDefined(values: Array<number | null>): number | null {
   const defined = values.filter((value): value is number => value !== null);
   return defined.length === 0 ? null : Math.min(...defined);
-}
-
-async function inTransaction<T>(pool: Pool, work: (client: PoolClient) => Promise<T>): Promise<T> {
-  const client = await pool.connect();
-  try {
-    await client.query("BEGIN");
-    const result = await work(client);
-    await client.query("COMMIT");
-    return result;
-  } catch (error) {
-    await client.query("ROLLBACK");
-    throw error;
-  } finally {
-    client.release();
-  }
 }
