@@ -86,8 +86,24 @@ export function validateTenantModeConfiguration(
   if (source.AUTH_SECRET && source.CARRYOS_TENANT_SECRET === source.AUTH_SECRET) {
     throw new Error("CARRYOS_TENANT_SECRET must differ from AUTH_SECRET in CORE_BOUND mode.");
   }
-  parseBindingJson("CARRYOS_TENANT_WORKSPACE_BINDINGS_JSON", source.CARRYOS_TENANT_WORKSPACE_BINDINGS_JSON, workspaceBindingsSchema);
-  parseBindingJson("CARRYOS_WORKSPACE_ROLE_BINDINGS_JSON", source.CARRYOS_WORKSPACE_ROLE_BINDINGS_JSON, roleBindingsSchema);
+  const tenantWorkspaceBindings = parseBindingJson(
+    "CARRYOS_TENANT_WORKSPACE_BINDINGS_JSON",
+    source.CARRYOS_TENANT_WORKSPACE_BINDINGS_JSON,
+    workspaceBindingsSchema,
+  );
+  const workspaceRoleBindings = parseBindingJson(
+    "CARRYOS_WORKSPACE_ROLE_BINDINGS_JSON",
+    source.CARRYOS_WORKSPACE_ROLE_BINDINGS_JSON,
+    roleBindingsSchema,
+  );
+
+  const unconfiguredWorkspaces = [...new Set(Object.values(tenantWorkspaceBindings))]
+    .filter((workspaceId) => !(workspaceId in workspaceRoleBindings));
+  if (unconfiguredWorkspaces.length > 0) {
+    throw new Error(
+      "Every workspace referenced by CARRYOS_TENANT_WORKSPACE_BINDINGS_JSON must have explicit user-role bindings in CARRYOS_WORKSPACE_ROLE_BINDINGS_JSON.",
+    );
+  }
 }
 
 export type EnvValidationResult = {
