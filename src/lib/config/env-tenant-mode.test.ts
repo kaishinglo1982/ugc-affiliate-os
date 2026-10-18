@@ -26,6 +26,13 @@ describe("validateTenantModeConfiguration", () => {
     })).not.toThrow();
   });
 
+  it("preserves the existing STANDALONE production mode", () => {
+    expect(() => validateTenantModeConfiguration({
+      NODE_ENV: "production",
+      CARRYOS_INTEGRATION_MODE: "STANDALONE",
+    })).not.toThrow();
+  });
+
   it("requires the tenant secret and both binding maps in CORE_BOUND mode", () => {
     expect(() => validateTenantModeConfiguration({
       NODE_ENV: "test",
