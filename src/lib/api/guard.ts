@@ -17,8 +17,8 @@ import { newRequestId } from "@/types/result";
  * server-side permission (UI hiding never replaces this). Returns a 401/403
  * response when unauthorized, or `null` when the caller may proceed.
  *
- * In STANDALONE mode the legacy single-user owner model remains compatible.
- * In CORE_BOUND mode tenant assertion, tenant->workspace binding and an
+ * In STANDALONE/SINGLE_TENANT mode the legacy single-user owner model remains
+ * compatible. In CORE_BOUND mode tenant assertion, tenant->workspace binding and an
  * explicit workspace-scoped user role are all required before permission
  * evaluation. Missing context fails closed; there is no implicit owner role.
  */

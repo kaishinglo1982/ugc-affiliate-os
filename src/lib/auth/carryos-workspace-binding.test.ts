@@ -17,6 +17,16 @@ describe("resolveWorkspaceIdForCarryOsTenant", () => {
     expect(resolveWorkspaceIdForCarryOsTenant(TENANT_ID)).toBe(WORKSPACE_ID);
   });
 
+  it("resolves RFC 9562 UUIDv7 tenant and workspace identifiers", () => {
+    const tenantIdV7 = "01890f3e-7c00-7000-8000-000000000001";
+    const workspaceIdV7 = "01890f3e-7c00-7000-8000-000000000002";
+    process.env.CARRYOS_TENANT_WORKSPACE_BINDINGS_JSON = JSON.stringify({
+      [tenantIdV7]: workspaceIdV7,
+    });
+
+    expect(resolveWorkspaceIdForCarryOsTenant(tenantIdV7)).toBe(workspaceIdV7);
+  });
+
   it("rejects a tenant without an explicit binding", () => {
     process.env.CARRYOS_TENANT_WORKSPACE_BINDINGS_JSON = JSON.stringify({});
 
