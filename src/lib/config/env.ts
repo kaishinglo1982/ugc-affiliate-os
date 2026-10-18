@@ -22,7 +22,7 @@ const environmentSchema = z.object({
   APP_URL: z.string().url().optional(),
   ADMIN_EMAIL: z.string().email().optional(),
   ADMIN_PASSWORD: z.string().min(12).optional(),
-  CARRYOS_INTEGRATION_MODE: z.enum(["SINGLE_TENANT", "CORE_BOUND"]).optional(),
+  CARRYOS_INTEGRATION_MODE: z.enum(["STANDALONE", "SINGLE_TENANT", "CORE_BOUND"]).optional(),
   CARRYOS_TENANT_SECRET: z.string().min(32).optional(),
   CARRYOS_TENANT_WORKSPACE_BINDINGS_JSON: z.string().optional(),
   CARRYOS_WORKSPACE_ROLE_BINDINGS_JSON: z.string().optional(),
@@ -71,9 +71,9 @@ export function validateTenantModeConfiguration(
   const nodeEnv = source.NODE_ENV ?? "development";
   const mode = source.CARRYOS_INTEGRATION_MODE;
 
-  if (nodeEnv === "production" && mode !== "SINGLE_TENANT" && mode !== "CORE_BOUND") {
+  if (nodeEnv === "production" && mode !== "STANDALONE" && mode !== "SINGLE_TENANT" && mode !== "CORE_BOUND") {
     throw new Error(
-      "CARRYOS_INTEGRATION_MODE must be explicitly set to SINGLE_TENANT or CORE_BOUND in production.",
+      "CARRYOS_INTEGRATION_MODE must be explicitly set to STANDALONE, SINGLE_TENANT, or CORE_BOUND in production.",
     );
   }
 
