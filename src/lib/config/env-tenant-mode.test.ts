@@ -73,6 +73,18 @@ describe("validateTenantModeConfiguration", () => {
     })).toThrow(/CARRYOS_WORKSPACE_ROLE_BINDINGS_JSON must contain a non-empty, valid binding object/);
   });
 
+  it("rejects a tenant mapping whose workspace has no role bindings", () => {
+    const otherWorkspaceId = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    expect(() => validateTenantModeConfiguration({
+      NODE_ENV: "production",
+      CARRYOS_INTEGRATION_MODE: "CORE_BOUND",
+      AUTH_SECRET: "a".repeat(32),
+      CARRYOS_TENANT_SECRET: "s".repeat(32),
+      CARRYOS_TENANT_WORKSPACE_BINDINGS_JSON: JSON.stringify({ [TENANT_ID]: otherWorkspaceId }),
+      CARRYOS_WORKSPACE_ROLE_BINDINGS_JSON: JSON.stringify({ [WORKSPACE_ID]: { [USER_ID]: "admin" } }),
+    })).toThrow(/Every workspace referenced by CARRYOS_TENANT_WORKSPACE_BINDINGS_JSON/);
+  });
+
   it("accepts RFC 9562 UUIDv7 identifiers in tenant and role bindings", () => {
     const tenantIdV7 = "01890f3e-7c00-7000-8000-000000000001";
     const workspaceIdV7 = "01890f3e-7c00-7000-8000-000000000002";
