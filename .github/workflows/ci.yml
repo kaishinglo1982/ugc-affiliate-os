@@ -42,6 +42,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ugc_affiliate_ci?schema=public
       DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/ugc_affiliate_ci?schema=public
       AUTH_SECRET: ci-auth-secret-at-least-thirty-two-characters
+      CARRYOS_INTEGRATION_MODE: SINGLE_TENANT
       CREDENTIAL_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
       WORKER_SECRET: ci-worker-secret-at-least-thirty-two-characters
       APP_URL: http://127.0.0.1:3000
@@ -107,6 +108,7 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ugc_affiliate_e2e?schema=public
       DATABASE_URL_TEST: postgresql://postgres:postgres@localhost:5432/ugc_affiliate_e2e?schema=public
       AUTH_SECRET: ci-auth-secret-at-least-thirty-two-characters
+      CARRYOS_INTEGRATION_MODE: SINGLE_TENANT
       CREDENTIAL_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000"
       WORKER_SECRET: ci-worker-secret-at-least-thirty-two-characters
       APP_URL: http://127.0.0.1:3000
