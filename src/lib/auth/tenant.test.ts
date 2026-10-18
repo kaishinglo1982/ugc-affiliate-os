@@ -37,6 +37,14 @@ describe("resolveWorkspaceId", () => {
     await expect(resolveWorkspaceId()).rejects.toBeInstanceOf(InvalidTenantTokenError);
   });
 
+  it("accepts a UUIDv7 tenant id when issuing and resolving a token", async () => {
+    const tenantIdV7 = "01890f3e-7c00-7000-8000-000000000001";
+    const { resolveWorkspaceId, signTenantToken } = await import("./tenant");
+    const token = await signTenantToken(tenantIdV7);
+    mockHeaders.set("x-carryos-tenant-token", token);
+    await expect(resolveWorkspaceId()).resolves.toBe(tenantIdV7);
+  });
+
   it("rejects a non-UUID tenant id before issuing a tenant token", async () => {
     const { signTenantToken } = await import("./tenant");
     await expect(signTenantToken("tenant-123")).rejects.toThrow("tenantId must be a UUID");
