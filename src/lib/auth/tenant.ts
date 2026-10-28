@@ -7,7 +7,7 @@ import { resolveWorkspaceIdForCarryOsTenant, TenantWorkspaceBindingError } from 
 const TENANT_HEADER = "x-carryos-tenant-token";
 const TOKEN_ISSUER = "carryos-core";
 const TOKEN_AUDIENCE = "ugc-affiliate-os";
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function getTenantSecretKey(): Uint8Array | null {
   const secret = process.env.CARRYOS_TENANT_SECRET;
